@@ -416,7 +416,7 @@ const Dashboard = () => {
                             <span className="w-20 text-center">STOCK</span>
                         </div>
                         <div className="divide-y divide-slate-100">
-                            {stats.products.slice(0, 10).map((product) => (
+                            {stats.products.map((product) => (
                                 <div key={product._id} className="p-3 flex items-center hover:bg-slate-50 transition-colors">
                                     <span className="flex-1 font-medium text-slate-700">{product.name}</span>
                                     <span className={`w-20 text-center font-bold px-2 py-1 rounded-full text-xs
