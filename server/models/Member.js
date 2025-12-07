@@ -1,0 +1,21 @@
+const mongoose = require('mongoose');
+
+const MemberSchema = new mongoose.Schema({
+    ci: { type: String, required: true, unique: true },
+    fullName: { type: String, required: true },
+    phone: { type: String },
+    emergencyContact: {
+        name: { type: String },
+        phone: { type: String }
+    },
+    birthDate: { type: Date },
+    planType: { type: String, default: 'Libre' },
+    planCost: { type: Number, default: 2000 }, // Stored snapshot of cost
+    active: { type: Boolean, default: true },
+    photoUrl: { type: String },
+    medicalInfo: { type: String },
+    comments: { type: String },
+    createdAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('Member', MemberSchema);
