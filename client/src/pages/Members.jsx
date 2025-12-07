@@ -531,6 +531,71 @@ const Members = () => {
                 </form>
             </Modal>
 
+            {/* View Member Details Modal */}
+            <Modal
+                isOpen={viewModalOpen}
+                onClose={() => setViewModalOpen(false)}
+                title="Detalles del Socio"
+            >
+                {viewMember && (
+                    <div className="space-y-6">
+                        <div className="flex justify-center">
+                            <div className="h-40 w-40 rounded-full overflow-hidden border-4 border-slate-100 shadow-lg">
+                                {viewMember.photoUrl ? (
+                                    <img
+                                        src={`${viewMember.photoUrl.startsWith('http') ? viewMember.photoUrl : API_URL + viewMember.photoUrl}`}
+                                        alt={viewMember.fullName}
+                                        className="h-full w-full object-cover"
+                                        onError={(e) => { e.target.src = 'https://via.placeholder.com/150'; }}
+                                    />
+                                ) : (
+                                    <div className="h-full w-full flex items-center justify-center bg-slate-100 text-slate-400 text-4xl font-bold">
+                                        {viewMember.fullName?.charAt(0) || '?'}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="text-center">
+                            <h2 className="text-2xl font-bold text-slate-800">{viewMember.fullName}</h2>
+                            <p className="text-slate-500 font-medium">{viewMember.active ? 'Socio Activo' : 'Socio Inactivo'}</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Cédula</p>
+                                <p className="font-mono text-slate-700 font-medium">{viewMember.ci}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Teléfono</p>
+                                <p className="font-mono text-slate-700 font-medium">{viewMember.phone || '-'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Plan</p>
+                                <p className="text-slate-700 font-medium">{viewMember.planType || 'Estándar'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Costo</p>
+                                <p className="text-green-600 font-bold font-mono">${viewMember.planCost}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => {
+                                    handleOpenModal(viewMember);
+                                    setViewModalOpen(false);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
+                            >
+                                <Edit2 size={18} />
+                                Editar Información
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800">Socios</h1>
@@ -577,7 +642,10 @@ const Members = () => {
                                 <tr key={member._id} className="hover:bg-slate-50/80 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200">
+                                            <div
+                                                onClick={() => handleViewMember(member)}
+                                                className="h-10 w-10 rounded-full overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
+                                            >
                                                 {member.photoUrl ? (
                                                     <img
                                                         src={member.photoUrl}
