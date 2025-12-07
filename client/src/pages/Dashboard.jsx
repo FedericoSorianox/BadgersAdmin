@@ -3,7 +3,7 @@ import { Users, CreditCard, Package, UserX, Loader2, Search } from 'lucide-react
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import axios from 'axios';
 import Modal from '../components/Modal';
-import { API_URL } from '../config';
+import { API_URL, EXCLUDED_MEMBERS } from '../config';
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, iconClass, onClick }) => (
     <div
@@ -56,8 +56,10 @@ const Dashboard = () => {
                 const currentMonth = new Date().getMonth() + 1;
                 const currentYear = new Date().getFullYear();
 
-                // Active members count
-                const activeMembersCount = members.filter(m => m.active).length;
+                // Active members count (Excluding Exempt Members)
+                const activeMembersCount = members.filter(m =>
+                    m.active && !EXCLUDED_MEMBERS.includes(m.fullName)
+                ).length;
                 const inactiveMembersCount = members.length - activeMembersCount;
 
                 // Paid members for current month

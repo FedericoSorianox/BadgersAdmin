@@ -3,7 +3,7 @@ import { Search, CheckCircle, XCircle, Calendar, Loader2, DollarSign, BarChart2 
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Modal from '../components/Modal';
-import { API_URL } from '../config';
+import { API_URL, EXCLUDED_MEMBERS } from '../config';
 
 const Payments = () => {
     const [loading, setLoading] = useState(true);
@@ -33,7 +33,9 @@ const Payments = () => {
                 axios.get(`${API_URL}/api/members`),
                 axios.get(`${API_URL}/api/finance`) // Fetches all payments
             ]);
-            setMembers(membersRes.data.filter(m => m.active)); // Only active members
+            setMembers(membersRes.data.filter(m =>
+                m.active && !EXCLUDED_MEMBERS.includes(m.fullName)
+            )); // Only active and non-exempt members
             setPayments(paymentsRes.data);
         } catch (error) {
             console.error("Error fetching data", error);
