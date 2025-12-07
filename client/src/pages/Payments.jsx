@@ -3,6 +3,7 @@ import { Search, CheckCircle, XCircle, Calendar, Loader2, DollarSign, BarChart2 
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Modal from '../components/Modal';
+import { API_URL } from '../config';
 
 const Payments = () => {
     const [loading, setLoading] = useState(true);
@@ -29,8 +30,8 @@ const Payments = () => {
         setLoading(true);
         try {
             const [membersRes, paymentsRes] = await Promise.all([
-                axios.get('http://localhost:5001/api/members'),
-                axios.get('http://localhost:5001/api/finance') // Fetches all payments
+                axios.get(`${API_URL}/api/members`),
+                axios.get(`${API_URL}/api/finance`) // Fetches all payments
             ]);
             setMembers(membersRes.data.filter(m => m.active)); // Only active members
             setPayments(paymentsRes.data);
@@ -86,7 +87,7 @@ const Payments = () => {
 
     const fetchAnalytics = async () => {
         try {
-            const response = await axios.get('http://localhost:5001/api/finance');
+            const response = await axios.get(`${API_URL}/api/finance`);
             const allPayments = response.data.filter(p => p.type === 'Cuota' || !p.type);
 
             const monthlyData = Array(12).fill(0).map((_, i) => ({
@@ -136,7 +137,7 @@ const Payments = () => {
                 date: new Date()
             };
 
-            await axios.post('http://localhost:5001/api/finance', paymentData);
+            await axios.post(`${API_URL}/api/finance`, paymentData);
 
             // Refresh data
             await fetchData();

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Save, Calculator } from 'lucide-react';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 const Admin = () => {
     const currentMonth = new Date().getMonth() + 1;
@@ -31,10 +32,10 @@ const Admin = () => {
             try {
                 setLoading(true);
                 const [paymentsRes, expensesRes] = await Promise.all([
-                    axios.get(`http://localhost:5001/api/finance`, {
+                    axios.get(`${API_URL}/api/finance`, {
                         params: { month: currentMonth, year: currentYear }
                     }),
-                    axios.get(`http://localhost:5001/api/finance/expenses`)
+                    axios.get(`${API_URL}/api/finance/expenses`)
                 ]);
 
                 // Calculate balance same way as in Finances.jsx

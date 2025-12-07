@@ -5,6 +5,7 @@ import { Search, Loader2, UserPlus, Edit2, Check, X, BarChart2, Trash2, Eye } fr
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Modal from '../components/Modal';
+import { API_URL } from '../config';
 
 const Members = () => {
     const [members, setMembers] = useState([]);
@@ -50,7 +51,7 @@ const Members = () => {
     const fetchMembers = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('http://localhost:5001/api/members');
+            const response = await axios.get(`${API_URL}/api/members`);
             setMembers(response.data);
         } catch (error) {
             console.error("Error fetching members", error);
@@ -73,7 +74,7 @@ const Members = () => {
                 active: member.active,
                 photoUrl: member.photoUrl || ''
             });
-            setImagePreview(member.photoUrl ? `http://localhost:5001${member.photoUrl}` : null);
+            setImagePreview(member.photoUrl ? `${API_URL}${member.photoUrl}` : null);
         } else {
             setEditingMember(null);
             setFormData({
@@ -107,11 +108,11 @@ const Members = () => {
             }
 
             if (editingMember) {
-                await axios.put(`http://localhost:5001/api/members/${editingMember._id}`, formDataToSend, {
+                await axios.put(`${API_URL}/api/members/${editingMember._id}`, formDataToSend, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                await axios.post('http://localhost:5001/api/members', formDataToSend, {
+                await axios.post(`${API_URL}/api/members`, formDataToSend, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
@@ -129,7 +130,7 @@ const Members = () => {
         }
 
         try {
-            await axios.delete(`http://localhost:5001/api/members/${memberId}`);
+            await axios.delete(`${API_URL}/api/members/${memberId}`);
             fetchMembers();
         } catch (error) {
             console.error("Error deleting member", error);
@@ -154,7 +155,7 @@ const Members = () => {
 
     const fetchAnalytics = async () => {
         try {
-            const response = await axios.get('http://localhost:5001/api/finance');
+            const response = await axios.get(`${API_URL}/api/finance`);
             const payments = response.data.filter(p => p.type === 'Cuota' || !p.type); // Only fees
 
             // Process data for the selected year
@@ -197,7 +198,7 @@ const Members = () => {
         setSelectedMemberHistory(member);
         setMemberHistoryOpen(true);
         try {
-            const response = await axios.get(`http://localhost:5001/api/finance/member/${member._id}`);
+            const response = await axios.get(`${API_URL}/api/finance/member/${member._id}`);
             setMemberPayments(response.data);
         } catch (error) {
             console.error("Error fetching member payments", error);

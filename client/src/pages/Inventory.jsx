@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Package, AlertTriangle, CheckCircle, Loader2, RefreshCw, Edit2, Trash2 } from 'lucide-react';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 const Inventory = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -23,7 +24,7 @@ const Inventory = () => {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:5001/api/products');
+            const res = await axios.get(`${API_URL}/api/products`);
             setProducts(res.data);
             setError(null);
         } catch (err) {
@@ -49,7 +50,7 @@ const Inventory = () => {
                 stock: product.stock,
                 imageUrl: product.imageUrl || ''
             });
-            setImagePreview(product.imageUrl ? `http://localhost:5001${product.imageUrl}` : null);
+            setImagePreview(product.imageUrl ? `${API_URL}${product.imageUrl}` : null);
         } else {
             setEditingProduct(null);
             setFormData({
@@ -81,11 +82,11 @@ const Inventory = () => {
             }
 
             if (editingProduct) {
-                await axios.put(`http://localhost:5001/api/products/${editingProduct._id}`, formDataToSend, {
+                await axios.put(`${API_URL}/api/products/${editingProduct._id}`, formDataToSend, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                await axios.post('http://localhost:5001/api/products', formDataToSend, {
+                await axios.post(`${API_URL}/api/products`, formDataToSend, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
@@ -101,7 +102,7 @@ const Inventory = () => {
         if (!confirm('¿Estás seguro de eliminar este producto?')) return;
 
         try {
-            await axios.delete(`http://localhost:5001/api/products/${id}`);
+            await axios.delete(`${API_URL}/api/products/${id}`);
             fetchProducts();
         } catch (error) {
             console.error('Error deleting product:', error);

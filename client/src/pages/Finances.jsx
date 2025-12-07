@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2, Filter, Plus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 const monthlyData = [
     { name: 'Ene', ingresos: 4000, gastos: 2400 },
@@ -56,11 +57,11 @@ const Finances = () => {
         setLoading(true);
         try {
             const [paymentsRes, expensesRes, productsRes] = await Promise.all([
-                axios.get(`http://localhost:5001/api/finance`, {
+                axios.get(`${API_URL}/api/finance`, {
                     params: { month: selectedMonth, year: selectedYear }
                 }),
-                axios.get(`http://localhost:5001/api/finance/expenses`),
-                axios.get(`http://localhost:5001/api/products`)
+                axios.get(`${API_URL}/api/finance/expenses`),
+                axios.get(`${API_URL}/api/products`)
             ]);
 
             setProducts(productsRes.data);
@@ -95,9 +96,9 @@ const Finances = () => {
 
         try {
             if (transaction.category === 'Gasto') {
-                await axios.delete(`http://localhost:5001/api/finance/expenses/${transaction._id}`);
+                await axios.delete(`${API_URL}/api/finance/expenses/${transaction._id}`);
             } else {
-                await axios.delete(`http://localhost:5001/api/finance/${transaction._id}`);
+                await axios.delete(`${API_URL}/api/finance/${transaction._id}`);
             }
             fetchTransactions();
         } catch (error) {
@@ -113,9 +114,9 @@ const Finances = () => {
     const handleSaveEdit = async () => {
         try {
             if (editingTransaction.category === 'Gasto') {
-                await axios.put(`http://localhost:5001/api/finance/expenses/${editingTransaction._id}`, editingTransaction);
+                await axios.put(`${API_URL}/api/finance/expenses/${editingTransaction._id}`, editingTransaction);
             } else {
-                await axios.put(`http://localhost:5001/api/finance/${editingTransaction._id}`, editingTransaction);
+                await axios.put(`${API_URL}/api/finance/${editingTransaction._id}`, editingTransaction);
             }
             setEditingTransaction(null);
             fetchTransactions();
@@ -141,7 +142,7 @@ const Finances = () => {
                 date: new Date()
             };
 
-            await axios.post('http://localhost:5001/api/finance', saleData);
+            await axios.post(`${API_URL}/api/finance`, saleData);
             setNewSaleModalOpen(false);
             setNewSaleForm({ productId: '', productName: '', amount: 0, quantity: 1 });
             fetchTransactions();
@@ -178,7 +179,7 @@ const Finances = () => {
                 date: new Date()
             };
 
-            await axios.post('http://localhost:5001/api/finance/expenses', expenseData);
+            await axios.post(`${API_URL}/api/finance/expenses`, expenseData);
             setNewExpenseModalOpen(false);
             setNewExpenseForm({ description: '', amount: 0, concept: '' });
             fetchTransactions();

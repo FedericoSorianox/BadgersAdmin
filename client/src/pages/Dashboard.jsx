@@ -3,6 +3,7 @@ import { Users, CreditCard, Package, UserX, Loader2, Search } from 'lucide-react
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import axios from 'axios';
 import Modal from '../components/Modal';
+import { API_URL } from '../config';
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, iconClass, onClick }) => (
     <div
@@ -39,9 +40,9 @@ const Dashboard = () => {
             setLoading(true);
             try {
                 const [financeRes, productsRes, membersRes] = await Promise.all([
-                    axios.get('http://localhost:5001/api/finance'),
-                    axios.get('http://localhost:5001/api/products'),
-                    axios.get('http://localhost:5001/api/members')
+                    axios.get(`${API_URL}/api/finance`),
+                    axios.get(`${API_URL}/api/products`),
+                    axios.get(`${API_URL}/api/members`)
                 ]);
 
                 const payments = financeRes.data;
@@ -122,7 +123,7 @@ const Dashboard = () => {
                 date: new Date()
             };
 
-            await axios.post('http://localhost:5001/api/finance', paymentData);
+            await axios.post(`${API_URL}/api/finance`, paymentData);
 
             // Refresh data
             window.location.reload();
