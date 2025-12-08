@@ -259,7 +259,7 @@ const Members = () => {
                         </ResponsiveContainer>
                     </div>
 
-                    <div className="border rounded-xl overflow-hidden">
+                    <div className="border rounded-xl overflow-hidden overflow-x-auto">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-50 font-bold text-slate-500">
                                 <tr>
@@ -328,9 +328,9 @@ const Members = () => {
                                 </h4>
                                 <div className="bg-green-50 rounded-xl p-4 max-h-[250px] overflow-y-auto divide-y divide-green-100">
                                     {paidList.map(m => (
-                                        <div key={m._id} className="py-2 flex justify-between">
-                                            <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
-                                            <span className="text-xs text-slate-500 font-mono">CI: {m.ci}</span>
+                                        <div key={m._id} className="py-2 flex justify-between items-center gap-4">
+                                            <span className="text-sm font-medium text-slate-700 truncate flex-1">{m.fullName}</span>
+                                            <span className="text-xs text-slate-500 font-mono shrink-0">CI: {m.ci}</span>
                                         </div>
                                     ))}
                                     {paidList.length === 0 && <p className="text-sm text-slate-400 italic">Ningún pago registrado.</p>}
@@ -344,9 +344,9 @@ const Members = () => {
                                 </h4>
                                 <div className="bg-red-50 rounded-xl p-4 max-h-[250px] overflow-y-auto divide-y divide-red-100">
                                     {pendingList.map(m => (
-                                        <div key={m._id} className="py-2 flex justify-between">
-                                            <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
-                                            <span className="text-xs text-slate-500 font-mono">CI: {m.ci}</span>
+                                        <div key={m._id} className="py-2 flex justify-between items-center gap-4">
+                                            <span className="text-sm font-medium text-slate-700 truncate flex-1">{m.fullName}</span>
+                                            <span className="text-xs text-slate-500 font-mono shrink-0">CI: {m.ci}</span>
                                         </div>
                                     ))}
                                     {pendingList.length === 0 && <p className="text-sm text-slate-400 italic">Todos al día.</p>}
@@ -367,7 +367,7 @@ const Members = () => {
                     {memberPayments.length === 0 ? (
                         <p className="text-center text-slate-400 py-8">No hay pagos registrados para este socio.</p>
                     ) : (
-                        <div className="border rounded-xl overflow-hidden">
+                        <div className="border rounded-xl overflow-hidden overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead className="bg-slate-50 font-bold text-slate-500">
                                     <tr>
@@ -557,11 +557,11 @@ const Members = () => {
                         </div>
 
                         <div className="text-center">
-                            <h2 className="text-2xl font-bold text-slate-800">{viewMember.fullName}</h2>
+                            <h2 className="text-2xl font-bold text-slate-800 break-words line-clamp-2">{viewMember.fullName}</h2>
                             <p className="text-slate-500 font-medium">{viewMember.active ? 'Socio Activo' : 'Socio Inactivo'}</p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                             <div>
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">Cédula</p>
                                 <p className="font-mono text-slate-700 font-medium">{viewMember.ci}</p>
