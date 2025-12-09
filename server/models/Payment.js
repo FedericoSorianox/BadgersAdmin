@@ -9,6 +9,8 @@ const paymentSchema = new mongoose.Schema({
     year: Number,
     amount: Number,
     type: { type: String, enum: ['Cuota', 'Producto', 'Venta'], default: 'Cuota' },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    quantity: { type: Number, default: 1 },
     date: { type: Date, default: Date.now }
 }, { timestamps: true });
 

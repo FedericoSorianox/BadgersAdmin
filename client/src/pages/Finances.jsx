@@ -135,6 +135,8 @@ const Finances = () => {
         try {
             const saleData = {
                 productName: newSaleForm.productName,
+                productId: newSaleForm.productId, // Add productId for stock deduction
+                quantity: newSaleForm.quantity,   // Add quantity for stock deduction
                 amount: newSaleForm.amount * newSaleForm.quantity,
                 type: 'Producto',
                 month: selectedMonth,

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL, EXCLUDED_MEMBERS } from '../config';
@@ -31,78 +30,244 @@ const Dashboard = () => {
         paidCount: 0,
         pendingCount: 0,
         products: [],
-        membersList: [], // All members
-        paymentsList: [] // Monthly payments
+        membersList: [],
+        paymentsList: []
     });
 
+    const [debts, setDebts] = useState([]);
+
+    // Quick Actions State
+    const [newSaleModalOpen, setNewSaleModalOpen] = useState(false);
+    const [newSaleForm, setNewSaleForm] = useState({ productId: '', productName: '', amount: 0, quantity: 1 });
+
+    const [newExpenseModalOpen, setNewExpenseModalOpen] = useState(false);
+    const [newExpenseForm, setNewExpenseForm] = useState({ description: '', amount: 0, concept: '' });
+
+    const [newFiadoModalOpen, setNewFiadoModalOpen] = useState(false);
+    const [newFiadoForm, setNewFiadoForm] = useState({ memberId: '', products: [] });
+    // products in fixture: [{ productId, productName, quantity, amount }]
+    const [currentFiadoProduct, setCurrentFiadoProduct] = useState({ productId: '', quantity: 1 });
+
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [financeRes, productsRes, membersRes, debtsRes] = await Promise.all([
+                axios.get(`${API_URL}/api/finance`),
+                axios.get(`${API_URL}/api/products`),
+                axios.get(`${API_URL}/api/members`),
+                axios.get(`${API_URL}/api/debts`)
+            ]);
+
+            const payments = financeRes.data;
+            const products = productsRes.data;
+            const members = membersRes.data;
+            const fetchedDebts = debtsRes.data;
+
+            setDebts(fetchedDebts);
+
+            // Calculate Metrics
+            const stockCount = products.reduce((acc, p) => acc + (Number(p.stock) > 0 ? 1 : 0), 0);
+
+            // Payments logic
+            const currentMonth = new Date().getMonth() + 1;
+            const currentYear = new Date().getFullYear();
+
+            // Active members count
+            const activeMembersCount = members.filter(m =>
+                m.active && !EXCLUDED_MEMBERS.includes(m.fullName)
+            ).length;
+            const inactiveMembersCount = members.length - activeMembersCount;
+
+            // Paid members for current month
+            const paidThisMonthIds = new Set(
+                payments
+                    .filter(p =>
+                        Number(p.month) === currentMonth &&
+                        Number(p.year) === currentYear &&
+                        (p.type === 'Cuota' || !p.type)
+                    )
+                    .map(p => String(p.memberId))
+            );
+
+            const paidCount = members.filter(m => m.active && paidThisMonthIds.has(String(m._id))).length;
+            const sortedProducts = [...products].sort((a, b) => Number(a.stock) - Number(b.stock));
+
+            setStats({
+                activeMembers: activeMembersCount,
+                inactiveMembers: inactiveMembersCount,
+                stockCount,
+                paidCount,
+                pendingCount: activeMembersCount - paidCount,
+                products: sortedProducts,
+                membersList: members,
+                paymentsList: payments
+            });
+
+        } catch (error) {
+            console.error("Error fetching dashboard data", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const [financeRes, productsRes, membersRes] = await Promise.all([
-                    axios.get(`${API_URL}/api/finance`),
-                    axios.get(`${API_URL}/api/products`),
-                    axios.get(`${API_URL}/api/members`)
-                ]);
-
-                const payments = financeRes.data;
-                const products = productsRes.data;
-                const members = membersRes.data;
-
-                // Calculate Metrics
-                const stockCount = products.reduce((acc, p) => acc + (Number(p.stock) > 0 ? 1 : 0), 0);
-
-                // Payments logic
-                const currentMonth = new Date().getMonth() + 1;
-                const currentYear = new Date().getFullYear();
-
-                // Active members count (Excluding Exempt Members)
-                const activeMembersCount = members.filter(m =>
-                    m.active && !EXCLUDED_MEMBERS.includes(m.fullName)
-                ).length;
-                const inactiveMembersCount = members.length - activeMembersCount;
-
-                // Paid members for current month
-                // Create a Set of Member IDs who have paid
-                const paidThisMonthIds = new Set(
-                    payments
-                        .filter(p =>
-                            Number(p.month) === currentMonth &&
-                            Number(p.year) === currentYear &&
-                            (p.type === 'Cuota' || !p.type)
-                        )
-                        .map(p => String(p.memberId))
-                );
-
-                const paidCount = members.filter(m => m.active && paidThisMonthIds.has(String(m._id))).length;
-
-                // Sort products by stock level (Low to High)
-                const sortedProducts = [...products].sort((a, b) => Number(a.stock) - Number(b.stock));
-
-                setStats({
-                    activeMembers: activeMembersCount,
-                    inactiveMembers: inactiveMembersCount,
-                    stockCount,
-                    paidCount,
-                    pendingCount: activeMembersCount - paidCount,
-                    products: sortedProducts,
-                    membersList: members,
-                    paymentsList: payments
-                });
-
-            } catch (error) {
-                console.error("Error fetching dashboard data", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchData();
     }, []);
 
+
+    // --- Quick Action Handlers ---
+
+    const handleProductSelectForSale = (e) => {
+        const productId = e.target.value;
+        const product = stats.products.find(p => p._id === productId);
+        if (product) {
+            setNewSaleForm({
+                productId: product._id,
+                productName: product.name,
+                amount: product.salePrice,
+                quantity: 1
+            });
+        }
+    };
+
+    const handleNewSale = async () => {
+        if (!newSaleForm.productId || !newSaleForm.amount) {
+            alert('Por favor selecciona un producto');
+            return;
+        }
+        try {
+            const currentMonth = new Date().getMonth() + 1;
+            const currentYear = new Date().getFullYear();
+            const saleData = {
+                productName: newSaleForm.productName,
+                productId: newSaleForm.productId,
+                quantity: newSaleForm.quantity,
+                amount: newSaleForm.amount * newSaleForm.quantity,
+                type: 'Producto',
+                month: currentMonth,
+                year: currentYear,
+                date: new Date()
+            };
+
+            await axios.post(`${API_URL}/api/finance`, saleData);
+            setNewSaleModalOpen(false);
+            setNewSaleForm({ productId: '', productName: '', amount: 0, quantity: 1 });
+            fetchData();
+        } catch (error) {
+            console.error('Error registering sale:', error);
+            alert('Error al registrar la venta');
+        }
+    };
+
+    const handleNewExpense = async () => {
+        if (!newExpenseForm.description || !newExpenseForm.amount) {
+            alert('Por favor completa todos los campos');
+            return;
+        }
+        try {
+            const expenseData = {
+                description: newExpenseForm.description,
+                concept: newExpenseForm.concept,
+                amount: newExpenseForm.amount,
+                date: new Date()
+            };
+            await axios.post(`${API_URL}/api/finance/expenses`, expenseData);
+            setNewExpenseModalOpen(false);
+            setNewExpenseForm({ description: '', amount: 0, concept: '' });
+            fetchData(); // Refresh to update financials if we were showing them, although mainly updates stats here
+        } catch (error) {
+            console.error('Error registering expense:', error);
+            alert('Error al registrar el gasto');
+        }
+    };
+
+    // --- Fiados Logic ---
+
+    const addProductToFiado = () => {
+        if (!currentFiadoProduct.productId) return;
+        const product = stats.products.find(p => p._id === currentFiadoProduct.productId);
+        if (!product) return;
+
+        const existingItem = newFiadoForm.products.find(p => p.productId === product._id);
+
+        // Check local stock availability (naive check against loaded data)
+        const currentQtyInForm = existingItem ? existingItem.quantity : 0;
+        if (product.stock < (currentQtyInForm + currentFiadoProduct.quantity)) {
+            alert(`Stock insuficiente. Solo quedan ${product.stock}`);
+            return;
+        }
+
+        let updatedProducts;
+        if (existingItem) {
+            updatedProducts = newFiadoForm.products.map(p =>
+                p.productId === product._id
+                    ? { ...p, quantity: p.quantity + currentFiadoProduct.quantity }
+                    : p
+            );
+        } else {
+            updatedProducts = [...newFiadoForm.products, {
+                productId: product._id,
+                productName: product.name,
+                quantity: currentFiadoProduct.quantity,
+                amount: product.salePrice
+            }];
+        }
+
+        setNewFiadoForm({ ...newFiadoForm, products: updatedProducts });
+        setCurrentFiadoProduct({ productId: '', quantity: 1 });
+    };
+
+    const removeProductFromFiado = (productId) => {
+        setNewFiadoForm({
+            ...newFiadoForm,
+            products: newFiadoForm.products.filter(p => p.productId !== productId)
+        });
+    };
+
+    const handleCreateFiado = async () => {
+        if (!newFiadoForm.memberId || newFiadoForm.products.length === 0) {
+            alert('Selecciona un socio y al menos un producto');
+            return;
+        }
+        const member = stats.membersList.find(m => m._id === newFiadoForm.memberId);
+
+        try {
+            const totalAmount = newFiadoForm.products.reduce((acc, p) => acc + (p.amount * p.quantity), 0);
+            const fiadoData = {
+                memberId: member._id,
+                memberName: member.fullName,
+                products: newFiadoForm.products,
+                totalAmount
+            };
+
+            await axios.post(`${API_URL}/api/debts`, fiadoData);
+            setNewFiadoModalOpen(false);
+            setNewFiadoForm({ memberId: '', products: [] });
+            fetchData();
+        } catch (error) {
+            console.error('Error creating fiado:', error);
+            alert(error.response?.data?.message || 'Error al crear el fiado');
+        }
+    };
+
+    const handlePayFiado = async (debt) => {
+        if (!confirm(`¿Confirmar que ${debt.memberName} pagó el total de $${debt.totalAmount}?`)) return;
+        try {
+            await axios.put(`${API_URL}/api/debts/${debt._id}/pay`);
+            fetchData();
+        } catch (error) {
+            console.error('Error paying fiado:', error);
+            alert('Error al registrar el pago');
+        }
+    };
+
+
+    // --- Modal Logic ---
+
     const openModal = (type) => {
         setModalType(type);
-        setSearchTerm(''); // Reset search when opening modal
+        setSearchTerm('');
         setModalOpen(true);
     };
 
@@ -126,9 +291,9 @@ const Dashboard = () => {
             };
 
             await axios.post(`${API_URL}/api/finance`, paymentData);
-
-            // Refresh data
-            window.location.reload();
+            fetchData();
+            // window.location.reload(); // Removed reload, using fetchData
+            setModalOpen(false);
 
         } catch (error) {
             console.error("Error registering payment", error);
@@ -185,7 +350,6 @@ const Dashboard = () => {
                     <div className="flex justify-between items-center">
                         <p className="text-sm text-slate-500">Total Productos: {stats.products.length}</p>
                     </div>
-
                     <div className="border rounded-xl overflow-hidden">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-50 text-slate-500 font-bold">
@@ -220,8 +384,6 @@ const Dashboard = () => {
         if (modalType === 'payments') {
             const currentMonth = new Date().getMonth() + 1;
             const currentYear = new Date().getFullYear();
-
-            // Re-calculate paid IDs for this render scope
             const paidThisMonthIds = new Set(
                 stats.paymentsList
                     .filter(p =>
@@ -236,7 +398,6 @@ const Dashboard = () => {
             const pendingList = activeMembers.filter(m => !paidThisMonthIds.has(String(m._id)));
             const paidList = activeMembers.filter(m => paidThisMonthIds.has(String(m._id)));
 
-            // Apply search filter
             const filteredPending = pendingList.filter(m =>
                 m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 m.ci.includes(searchTerm)
@@ -248,7 +409,6 @@ const Dashboard = () => {
 
             return (
                 <div className="space-y-6">
-                    {/* Search Input */}
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
@@ -259,7 +419,6 @@ const Dashboard = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-
                     <div>
                         <h4 className="font-bold text-red-600 mb-2 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-red-600"></span>
@@ -283,7 +442,6 @@ const Dashboard = () => {
                             {filteredPending.length === 0 && <p className="text-sm text-slate-400">No hay resultados.</p>}
                         </div>
                     </div>
-
                     <div>
                         <h4 className="font-bold text-green-600 mb-2 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-green-600"></span>
@@ -323,122 +481,370 @@ const Dashboard = () => {
 
     return (
         <div className="space-y-8">
-            <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={getModalTitle()}>
+            <Modal
+                isOpen={modalOpen}
+                onClose={() => setModalOpen(false)}
+                title={getModalTitle()}
+                maxWidth={modalType === 'inactive' ? 'max-w-md' : 'max-w-2xl'}
+            >
                 {renderModalContent()}
             </Modal>
 
-            <div className="text-center mb-8">
-                <h1 className="text-4xl font-bold text-blue-500">Dashboard Principal</h1>
+            {/* Header w/ Quick Actions */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h1 className="text-4xl font-bold text-blue-500">Dashboard</h1>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setNewSaleModalOpen(true)}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                        <DollarSign size={20} />
+                        Nueva Venta
+                    </button>
+                    <button
+                        onClick={() => setNewExpenseModalOpen(true)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                        <TrendingDown size={20} />
+                        Nuevo Gasto
+                    </button>
+                    <button
+                        onClick={() => setNewFiadoModalOpen(true)}
+                        className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                        <Clock size={20} />
+                        Nuevo Fiado
+                    </button>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Stat Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <StatCard
                     title="SOCIOS ACTIVOS"
                     value={stats.activeMembers}
-                    subtext="(Excluyendo socios sin pago mensual)"
+                    subtext="(Excluyendo libres)"
                     icon={Users}
                     iconClass="bg-slate-800 text-white"
                     onClick={() => openModal('active')}
                 />
                 <StatCard
-                    title="SOCIOS INACTIVOS"
+                    title="INACTIVOS"
                     value={stats.inactiveMembers}
-                    subtext="(Vacaciones o ausencia temporal)"
+                    subtext="Ver lista"
                     icon={UserX}
-                    iconClass="bg-red-500 text-white"
+                    iconClass="bg-slate-200 text-slate-500"
                     onClick={() => openModal('inactive')}
                 />
                 <StatCard
-                    title="PRODUCTOS EN INVENTARIO"
+                    title="PRODUCTOS"
                     value={stats.stockCount}
-                    subtext="(Con stock disponible)"
+                    subtext="En Inventario"
                     icon={Package}
                     iconClass="bg-emerald-500 text-white"
                     onClick={() => openModal('stock')}
                 />
                 <StatCard
-                    title="ESTADO DE PAGOS"
-                    value={`${stats.paidCount} / ${Math.max(0, stats.pendingCount)}`}
-                    subtext="Pagados / Pendientes"
+                    title="PAGOS DEL MES"
+                    value={`${Math.round((stats.paidCount / (stats.activeMembers || 1)) * 100)}%`}
+                    subtext={`${stats.paidCount} / ${stats.activeMembers} Pagados`}
                     icon={CreditCard}
                     iconClass="bg-amber-400 text-white"
                     onClick={() => openModal('payments')}
                 />
+                <StatCard
+                    title="DEUDAS ACTIVAS"
+                    value={debts.length}
+                    subtext="Fiados Pendientes"
+                    icon={Clock}
+                    iconClass="bg-red-500 text-white"
+                    onClick={() => { }}
+                />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 className="text-xl font-bold text-slate-700 mb-6 text-center">Estado de Pagos del Mes</h3>
-                    <div className="flex items-center justify-center h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={[
-                                        { name: 'Pagados', value: stats.paidCount, color: '#10b981' },
-                                        { name: 'Pendientes', value: stats.pendingCount, color: '#ef4444' }
-                                    ]}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                    outerRadius={100}
-                                    fill="#8884d8"
-                                    dataKey="value"
+            {/* Fiados / Deudas Section */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-700">Control de Fiados (Productos sin Pagar)</h3>
+                        <p className="text-sm text-slate-400">Los productos de esta lista ya han sido descontados del stock.</p>
+                    </div>
+                </div>
+
+                {debts.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl">
+                        No hay deudas pendientes en este momento.
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-bold text-sm uppercase">
+                                <tr>
+                                    <th className="px-6 py-3 rounded-l-lg">Fecha</th>
+                                    <th className="px-6 py-3">Socio</th>
+                                    <th className="px-6 py-3">Detalle</th>
+                                    <th className="px-6 py-3">Total</th>
+                                    <th className="px-6 py-3 text-right rounded-r-lg">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {debts.map(debt => (
+                                    <tr key={debt._id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-6 py-4 text-sm text-slate-500">
+                                            {new Date(debt.date).toLocaleDateString('es-UY')}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                                    {debt.memberName.charAt(0)}
+                                                </div>
+                                                <span className="font-bold text-slate-700">{debt.memberName}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-600">
+                                            <div className="flex flex-col gap-1">
+                                                {debt.products.map((p, idx) => (
+                                                    <span key={idx}>
+                                                        {p.quantity}x {p.productName}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 font-bold text-red-500">
+                                            ${debt.totalAmount.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button
+                                                onClick={() => handlePayFiado(debt)}
+                                                className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1 rounded-full text-xs font-bold transition-colors flex items-center gap-1 ml-auto"
+                                            >
+                                                <CheckCircle size={14} />
+                                                Marcar Pagado
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* --- MODALS --- */}
+
+            {/* New Sale Modal */}
+            {newSaleModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4">Nueva Venta Directa</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Producto</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={newSaleForm.productId}
+                                    onChange={handleProductSelectForSale}
                                 >
-                                    {[
-                                        { name: 'Pagados', value: stats.paidCount, color: '#10b981' },
-                                        { name: 'Pendientes', value: stats.pendingCount, color: '#ef4444' }
-                                    ].map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    <option value="">Seleccionar producto...</option>
+                                    {stats.products.map(product => (
+                                        <option key={product._id} value={product._id}>
+                                            {product.name} - ${product.salePrice} (Stock: {product.stock})
+                                        </option>
                                     ))}
-                                </Pie>
-                                <Tooltip />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <div className="mt-4 flex justify-center gap-8">
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                            <span className="text-sm text-slate-600">Pagados: {stats.paidCount}</span>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Cantidad</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={newSaleForm.quantity}
+                                    onChange={(e) => setNewSaleForm({ ...newSaleForm, quantity: Number(e.target.value) })}
+                                />
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-lg text-right">
+                                <span className="text-lg font-bold text-green-600">
+                                    Total: ${(newSaleForm.amount * newSaleForm.quantity).toLocaleString()}
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                            <span className="text-sm text-slate-600">Pendientes: {stats.pendingCount}</span>
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setNewSaleModalOpen(false)}
+                                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleNewSale}
+                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold"
+                            >
+                                Registrar Venta
+                            </button>
                         </div>
                     </div>
                 </div>
+            )}
 
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-                    <h3 className="text-xl font-bold text-slate-700 mb-6 text-center">Stock de Productos</h3>
-
-                    <div className="flex-1 overflow-auto max-h-[400px]">
-                        <div className="bg-slate-100 p-3 rounded-t-lg flex font-bold text-slate-500 text-sm">
-                            <span className="flex-1">PRODUCTO</span>
-                            <span className="w-20 text-center">STOCK</span>
+            {/* New Expense Modal */}
+            {newExpenseModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4">Nuevo Gasto</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={newExpenseForm.description}
+                                    onChange={(e) => setNewExpenseForm({ ...newExpenseForm, description: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Monto</label>
+                                <input
+                                    type="number"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={newExpenseForm.amount}
+                                    onChange={(e) => setNewExpenseForm({ ...newExpenseForm, amount: Number(e.target.value) })}
+                                />
+                            </div>
                         </div>
-                        <div className="divide-y divide-slate-100">
-                            {stats.products.map((product) => (
-                                <div key={product._id} className="p-3 flex items-center hover:bg-slate-50 transition-colors">
-                                    <span className="flex-1 font-medium text-slate-700">{product.name}</span>
-                                    <span className={`w-20 text-center font-bold px-2 py-1 rounded-full text-xs
-                                        ${Number(product.stock) <= 3 ? 'bg-red-100 text-red-600' :
-                                            Number(product.stock) <= 7 ? 'bg-amber-100 text-amber-600' :
-                                                'bg-green-100 text-green-600'}`}>
-                                        {product.stock}
-                                    </span>
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setNewExpenseModalOpen(false)}
+                                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleNewExpense}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold"
+                            >
+                                Registrar Gasto
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* New Fiado Modal */}
+            {newFiadoModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <Clock className="text-amber-500" />
+                            Nuevo Fiado / Deuda
+                        </h3>
+
+                        <div className="space-y-4">
+                            {/* Member Select */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Socio</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={newFiadoForm.memberId}
+                                    onChange={(e) => setNewFiadoForm({ ...newFiadoForm, memberId: e.target.value })}
+                                >
+                                    <option value="">Seleccionar socio...</option>
+                                    {stats.membersList.filter(m => m.active).map(m => (
+                                        <option key={m._id} value={m._id}>{m.fullName}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Add Product Section */}
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Producto</label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={currentFiadoProduct.productId}
+                                        onChange={(e) => setCurrentFiadoProduct({ ...currentFiadoProduct, productId: e.target.value })}
+                                    >
+                                        <option value="">Seleccionar producto...</option>
+                                        {stats.products.map(p => (
+                                            <option key={p._id} value={p._id} disabled={p.stock <= 0}>
+                                                {p.name} (${p.salePrice}) - Stock: {p.stock}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                            ))}
+                                <div className="flex gap-2 items-end">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cant.</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            value={currentFiadoProduct.quantity}
+                                            onChange={(e) => setCurrentFiadoProduct({ ...currentFiadoProduct, quantity: Number(e.target.value) })}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={addProductToFiado}
+                                        className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex justify-center items-center gap-2 font-bold text-sm transition-colors"
+                                    >
+                                        <Plus size={18} />
+                                        Agregar Item
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* List of added products */}
+                            <div className="min-h-[100px] max-h-[200px] overflow-y-auto border border-slate-100 rounded-lg p-2">
+                                {newFiadoForm.products.length === 0 ? (
+                                    <p className="text-center text-slate-400 text-sm py-4">Agrega productos a la lista...</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {newFiadoForm.products.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 shadow-sm text-sm">
+                                                <div>
+                                                    <span className="font-bold">{item.quantity}x</span> {item.productName}
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="font-medium text-slate-600">${item.amount * item.quantity}</span>
+                                                    <button
+                                                        onClick={() => removeProductFromFiado(item.productId)}
+                                                        className="text-red-400 hover:text-red-600"
+                                                    >
+                                                        <UserX size={16} /> {/* Using UserX as 'X' icon proxy */}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                                <span className="font-bold text-slate-700">Total a Deber:</span>
+                                <span className="text-xl font-bold text-red-600">
+                                    ${newFiadoForm.products.reduce((acc, p) => acc + (p.amount * p.quantity), 0).toLocaleString()}
+                                </span>
+                            </div>
+
+                        </div>
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setNewFiadoModalOpen(false)}
+                                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCreateFiado}
+                                className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-bold"
+                            >
+                                Crear Deuda
+                            </button>
                         </div>
                     </div>
-
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between text-xs text-slate-500">
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 bg-red-400 rounded-full"></div> Stock crítico (≤ 3)</div>
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 bg-amber-400 rounded-full"></div> Stock bajo (≤ 7)</div>
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 bg-green-400 rounded-full"></div> Stock normal ({'>'} 7)</div>
-                    </div>
                 </div>
-            </div>
+            )}
+
         </div>
     );
 };

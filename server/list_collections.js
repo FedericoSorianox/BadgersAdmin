@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI.replace('BadgersAdmin', 'test'))
     .then(async () => {
         const collections = await mongoose.connection.db.listCollections().toArray();
         console.log('Collections in database:');

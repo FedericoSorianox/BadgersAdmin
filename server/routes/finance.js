@@ -3,6 +3,7 @@ const router = express.Router();
 const Payment = require('../models/Payment');
 const Expense = require('../models/Expense');
 const Member = require('../models/Member');
+const Product = require('../models/Product');
 
 // Get payments (optionally filter by month/year)
 router.get('/', async (req, res) => {
@@ -43,6 +44,19 @@ router.get('/expenses', async (req, res) => {
 router.post('/', async (req, res) => {
     const payment = new Payment(req.body);
     try {
+        // If it's a product sale, deduct stock
+        if (req.body.type === 'Producto' && req.body.productId) {
+            const product = await Product.findById(req.body.productId);
+            if (!product) {
+                return res.status(404).json({ message: 'Producto no encontrado' });
+            }
+            if (product.stock < (req.body.quantity || 1)) {
+                return res.status(400).json({ message: `Stock insuficiente. Stock actual: ${product.stock}` });
+            }
+            product.stock -= (req.body.quantity || 1);
+            await product.save();
+        }
+
         const newPayment = await payment.save();
         res.status(201).json(newPayment);
     } catch (err) {
