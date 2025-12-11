@@ -49,7 +49,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Pay debt
+// Pay debt (Full)
 router.put('/:id/pay', async (req, res) => {
     try {
         const debt = await Debt.findById(req.params.id);
@@ -59,16 +59,12 @@ router.put('/:id/pay', async (req, res) => {
         // Mark as paid
         debt.status = 'paid';
         debt.paidDate = new Date();
+        debt.paidAmount = debt.totalAmount; // Ensure consistency
         await debt.save();
 
         // Register in Finance (Payment)
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
-
-        // Create one payment record for the total amount of the debt
-        // Or create individual payment records per product? Let's do a consolidated one for simplicity as "Pago Fiado"
-        // But for better tracking, maybe individually? The user wants "money counted when paid".
-        // Let's record a single payment entry with details.
 
         const payment = new Payment({
             memberId: debt.memberId,
@@ -84,6 +80,87 @@ router.put('/:id/pay', async (req, res) => {
         await payment.save();
 
         res.json({ message: 'Deuda pagada exitosamente', debt });
+
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Partial Batch Payment
+router.post('/pay-partial', async (req, res) => {
+    try {
+        const { memberId, amount } = req.body;
+        const payAmount = Number(amount);
+
+        if (!payAmount || payAmount <= 0) {
+            return res.status(400).json({ message: 'Monto inválido' });
+        }
+
+        const debts = await Debt.find({ memberId, status: 'pending' }).sort({ date: 1 });
+
+        if (debts.length === 0) {
+            return res.status(404).json({ message: 'No se encontraron deudas pendientes' });
+        }
+
+        let remainingPayment = payAmount;
+        let paidDebtsCount = 0;
+
+        // Iterate updates
+        for (const debt of debts) {
+            if (remainingPayment <= 0) break;
+
+            const debtTotal = debt.totalAmount;
+            const alreadyPaid = debt.paidAmount || 0;
+            const debtBalance = debtTotal - alreadyPaid;
+
+            // SKIP if for some reason it's already fully paid but status says pending (sanity check)
+            if (debtBalance <= 0) {
+                debt.status = 'paid';
+                debt.paidAmount = debtTotal; // fix it
+                await debt.save();
+                continue;
+            }
+
+            const paymentForThis = Math.min(remainingPayment, debtBalance);
+
+            debt.paidAmount = alreadyPaid + paymentForThis;
+            remainingPayment -= paymentForThis;
+
+            if (debt.paidAmount >= debtTotal - 0.01) { // Tolerance for float
+                debt.status = 'paid';
+                debt.paidDate = new Date();
+                debt.paidAmount = debtTotal; // Cap it clean
+                paidDebtsCount++;
+            }
+
+            await debt.save();
+        }
+
+        const effectivePaid = payAmount - remainingPayment;
+
+        if (effectivePaid > 0) {
+            const currentMonth = new Date().getMonth() + 1;
+            const currentYear = new Date().getFullYear();
+            const memberName = debts[0].memberName;
+
+            const payment = new Payment({
+                memberId,
+                memberName,
+                productName: 'Pago Parcial (Fiado)',
+                month: currentMonth,
+                year: currentYear,
+                amount: effectivePaid,
+                type: 'Producto',
+                date: new Date()
+            });
+
+            await payment.save();
+        }
+
+        res.json({
+            message: `Pago parcial de $${effectivePaid} registrado.`,
+            remainingCredit: remainingPayment
+        });
 
     } catch (err) {
         res.status(500).json({ message: err.message });

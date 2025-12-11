@@ -48,6 +48,9 @@ const Dashboard = () => {
     // products in fixture: [{ productId, productName, quantity, amount }]
     const [currentFiadoProduct, setCurrentFiadoProduct] = useState({ productId: '', quantity: 1 });
 
+    const [partialPayModalOpen, setPartialPayModalOpen] = useState(false);
+    const [partialPayForm, setPartialPayForm] = useState({ memberId: '', amount: '', memberName: '', maxAmount: 0 });
+
 
     const fetchData = async () => {
         setLoading(true);
@@ -251,14 +254,26 @@ const Dashboard = () => {
         }
     };
 
-    const handlePayFiado = async (debt) => {
-        if (!confirm(`¿Confirmar que ${debt.memberName} pagó el total de $${debt.totalAmount}?`)) return;
+    const handlePartialSubmit = async () => {
+        if (!partialPayForm.amount || partialPayForm.amount <= 0) {
+            alert('Ingrese un monto válido');
+            return;
+        }
+        if (partialPayForm.amount > partialPayForm.maxAmount) {
+            if (!confirm('El monto es mayor a la deuda total. ¿Desea continuar y dejar saldo a favor?')) return;
+        }
+
         try {
-            await axios.put(`${API_URL}/api/debts/${debt._id}/pay`);
+            await axios.post(`${API_URL}/api/debts/pay-partial`, {
+                memberId: partialPayForm.memberId,
+                amount: partialPayForm.amount
+            });
+            setPartialPayModalOpen(false);
+            setPartialPayForm({ memberId: '', amount: '', memberName: '', maxAmount: 0 });
             fetchData();
         } catch (error) {
-            console.error('Error paying fiado:', error);
-            alert('Error al registrar el pago');
+            console.error('Error paying partial:', error);
+            alert(error.response?.data?.message || 'Error al registrar el pago');
         }
     };
 
@@ -566,8 +581,8 @@ const Dashboard = () => {
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h3 className="text-xl font-bold text-slate-700">Control de Fiados (Productos sin Pagar)</h3>
-                        <p className="text-sm text-slate-400">Los productos de esta lista ya han sido descontados del stock.</p>
+                        <h3 className="text-xl font-bold text-slate-700">Control de Fiados (Por Socio)</h3>
+                        <p className="text-sm text-slate-400">Agrupado por deudor. Pagos parciales se descuentan de la deuda más antigua.</p>
                     </div>
                 </div>
 
@@ -580,47 +595,102 @@ const Dashboard = () => {
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-500 font-bold text-sm uppercase">
                                 <tr>
-                                    <th className="px-6 py-3 rounded-l-lg">Fecha</th>
-                                    <th className="px-6 py-3">Socio</th>
-                                    <th className="px-6 py-3">Detalle</th>
-                                    <th className="px-6 py-3">Total</th>
+                                    <th className="px-6 py-3 rounded-l-lg">Socio</th>
+                                    <th className="px-6 py-3">Detalle Deudas</th>
+                                    <th className="px-6 py-3">Total Pendiente</th>
                                     <th className="px-6 py-3 text-right rounded-r-lg">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {debts.map(debt => (
-                                    <tr key={debt._id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 text-sm text-slate-500">
-                                            {new Date(debt.date).toLocaleDateString('es-UY')}
-                                        </td>
+                                {Object.values(debts.reduce((acc, debt) => {
+                                    const mId = debt.memberId?._id || debt.memberId;
+                                    const mName = debt.memberId?.fullName || debt.memberName;
+                                    if (!acc[mId]) {
+                                        acc[mId] = {
+                                            id: mId,
+                                            name: mName,
+                                            count: 0,
+                                            totalDebt: 0,
+                                            items: []
+                                        };
+                                    }
+                                    const remaining = debt.totalAmount - (debt.paidAmount || 0);
+                                    acc[mId].items.push(debt);
+                                    acc[mId].totalDebt += remaining;
+                                    acc[mId].count += 1;
+                                    return acc;
+                                }, {})).map(group => (
+                                    <tr key={group.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                                                    {debt.memberName.charAt(0)}
+                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                    {group.name.charAt(0)}
                                                 </div>
-                                                <span className="font-bold text-slate-700">{debt.memberName}</span>
+                                                <div>
+                                                    <p className="font-bold text-slate-700">{group.name}</p>
+                                                    <p className="text-xs text-slate-400">{group.count} registro(s)</p>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-slate-600">
-                                            <div className="flex flex-col gap-1">
-                                                {debt.products.map((p, idx) => (
-                                                    <span key={idx}>
-                                                        {p.quantity}x {p.productName}
-                                                    </span>
+                                            <div className="break-words max-w-xs text-xs text-slate-500">
+                                                {group.items.slice(0, 3).map((d, i) => (
+                                                    <div key={d._id} className="mb-1">
+                                                        <span className="font-bold">
+                                                            {d.products.map(p => p.productName).join(', ')}
+                                                        </span>
+                                                        <span className="text-slate-400 mx-1">
+                                                            ({new Date(d.date).toLocaleDateString()})
+                                                        </span>
+                                                        <span className="text-red-500 font-medium">
+                                                            ${(d.totalAmount - (d.paidAmount || 0)).toLocaleString()}
+                                                        </span>
+                                                    </div>
                                                 ))}
+                                                {group.items.length > 3 && <span>... y {group.items.length - 3} más</span>}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-bold text-red-500">
-                                            ${debt.totalAmount.toLocaleString()}
+                                        <td className="px-6 py-4">
+                                            <span className="font-bold text-red-600 text-lg">
+                                                ${group.totalDebt.toLocaleString()}
+                                            </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => handlePayFiado(debt)}
-                                                className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1 rounded-full text-xs font-bold transition-colors flex items-center gap-1 ml-auto"
-                                            >
-                                                <CheckCircle size={14} />
-                                                Marcar Pagado
-                                            </button>
+                                            <div className="flex justify-end gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setPartialPayForm({
+                                                            memberId: group.id,
+                                                            amount: '',
+                                                            memberName: group.name,
+                                                            maxAmount: group.totalDebt
+                                                        });
+                                                        setPartialPayModalOpen(true);
+                                                    }}
+                                                    className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                                >
+                                                    Pago Parcial
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (confirm(`¿Confirmar pago TOTAL de $${group.totalDebt} para ${group.name}?`)) {
+                                                            try {
+                                                                await axios.post(`${API_URL}/api/debts/pay-partial`, {
+                                                                    memberId: group.id,
+                                                                    amount: group.totalDebt
+                                                                });
+                                                                fetchData();
+                                                            } catch (e) {
+                                                                alert('Error al procesar pago');
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                                                >
+                                                    <CheckCircle size={14} />
+                                                    Pagar Todo
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -839,6 +909,49 @@ const Dashboard = () => {
                                 className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-bold"
                             >
                                 Crear Deuda
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Partial Payment Modal */}
+            {partialPayModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4">Pago Parcial</h3>
+                        <p className="text-sm text-slate-500 mb-4">
+                            Socio: <span className="font-bold text-slate-700">{partialPayForm.memberName}</span><br />
+                            Deuda Total: <span className="font-bold text-red-600">${partialPayForm.maxAmount.toLocaleString()}</span>
+                        </p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Monto a Pagar</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={partialPayForm.amount}
+                                        onChange={(e) => setPartialPayForm({ ...partialPayForm, amount: Number(e.target.value) })}
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setPartialPayModalOpen(false)}
+                                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handlePartialSubmit}
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold"
+                            >
+                                Confirmar Pago
                             </button>
                         </div>
                     </div>

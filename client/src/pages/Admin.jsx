@@ -12,7 +12,8 @@ const Admin = () => {
         fedeHours: 40,
         gonzaHours: 8,
         fedeDaysOff: 0,
-        gonzaDaysOff: 0
+        gonzaDaysOff: 0,
+        instructors: []
     });
 
     const [results, setResults] = useState({
@@ -25,10 +26,12 @@ const Admin = () => {
     });
 
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-    // Fetch balance from Finances API
+    // Fetch initial data
     useEffect(() => {
-        const fetchBalance = async () => {
+        const fetchInitialData = async () => {
+            // Fetch Finance Data (Gross Profit)
             try {
                 setLoading(true);
                 const [paymentsRes, expensesRes] = await Promise.all([
@@ -38,7 +41,7 @@ const Admin = () => {
                     axios.get(`${API_URL}/api/finance/expenses`)
                 ]);
 
-                // Calculate balance same way as in Finances.jsx
+                // Calculate balance
                 const payments = paymentsRes.data;
                 const expenses = expensesRes.data.filter(e => {
                     const eDate = new Date(e.date);
@@ -52,32 +55,60 @@ const Admin = () => {
 
                 setConfig(prev => ({ ...prev, grossProfit: balance }));
             } catch (error) {
-                console.error('Error fetching balance:', error);
+                console.error('Error fetching finance data:', error);
+            }
+
+            // Fetch Settings
+            try {
+                const settingsRes = await axios.get(`${API_URL}/api/settings`);
+                const settings = settingsRes.data;
+
+                setConfig(prev => ({
+                    ...prev,
+                    fedeHours: settings.fedeHours,
+                    gonzaHours: settings.gonzaHours,
+                    fedeDaysOff: settings.fedeDaysOff,
+                    gonzaDaysOff: settings.gonzaDaysOff,
+                    instructors: settings.instructors || []
+                }));
+            } catch (error) {
+                console.error('Error fetching settings:', error);
+                // Keep defaults if settings fail (e.g. route not ready)
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchBalance();
+        fetchInitialData();
     }, []);
 
     const handleCalculate = () => {
-        const totalHours = Number(config.fedeHours) + Number(config.gonzaHours);
+        const workingDays = 26;
+
+        // Effective hours calculation:
+        // Adjust hours based on days worked vs max working days
+        // Logic: If you engage for 40 hours (approx 1.5h/day), and miss 10 days
+        // Effective = 40 * ((26 - 10) / 26)
+
+        const effectiveFedeHours = Number(config.fedeHours) * ((workingDays - Number(config.fedeDaysOff)) / workingDays);
+        const effectiveGonzaHours = Number(config.gonzaHours) * ((workingDays - Number(config.gonzaDaysOff)) / workingDays);
+
+        const totalEffectiveHours = effectiveFedeHours + effectiveGonzaHours;
         const grossProfit = Number(config.grossProfit);
 
-        if (totalHours === 0) return;
+        if (totalEffectiveHours <= 0) return;
 
         // New distribution logic:
         // 40% split 50/50
-        // 60% split by hours worked
+        // 60% split by EFFECTIVE hours worked
         const fixedPortion = grossProfit * 0.40;
         const variablePortion = grossProfit * 0.60;
 
         const fixedFede = fixedPortion * 0.50;
         const fixedGonza = fixedPortion * 0.50;
 
-        const variableFede = (variablePortion * Number(config.fedeHours)) / totalHours;
-        const variableGonza = (variablePortion * Number(config.gonzaHours)) / totalHours;
+        const variableFede = (variablePortion * effectiveFedeHours) / totalEffectiveHours;
+        const variableGonza = (variablePortion * effectiveGonzaHours) / totalEffectiveHours;
 
         setResults({
             fixedFede,
@@ -94,14 +125,59 @@ const Admin = () => {
         handleCalculate();
     }, [config]);
 
+    const handleSave = async () => {
+        try {
+            setSaving(true);
+            await axios.post(`${API_URL}/api/settings`, {
+                fedeHours: config.fedeHours,
+                gonzaHours: config.gonzaHours,
+                fedeDaysOff: config.fedeDaysOff,
+                gonzaDaysOff: config.gonzaDaysOff,
+                instructors: config.instructors
+            });
+            alert('Configuración guardada exitosamente');
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            alert('Error al guardar la configuración');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleInstructorChange = (index, field, value) => {
+        const newInstructors = [...config.instructors];
+        newInstructors[index][field] = value;
+        setConfig({ ...config, instructors: newInstructors });
+    };
+
+    const addInstructor = () => {
+        setConfig({
+            ...config,
+            instructors: [...config.instructors, { name: '', hours: 0 }]
+        });
+    };
+
+    const removeInstructor = (index) => {
+        const newInstructors = config.instructors.filter((_, i) => i !== index);
+        setConfig({ ...config, instructors: newInstructors });
+    };
+
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'UYU' }).format(value);
     };
 
     return (
-        <div className="space-y-6">
-            <div className="text-center">
-                <h1 className="text-3xl font-bold text-slate-800">Calculadora de Reparto para The Badgers</h1>
+        <div className="space-y-6 pb-20">
+            <div className="text-center flex justify-between items-center">
+                <h1 className="text-3xl font-bold text-slate-800">Panel de Reparto</h1>
+                <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
+                >
+                    <Save size={20} />
+                    {saving ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
             </div>
 
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 space-y-6">
@@ -117,105 +193,173 @@ const Admin = () => {
                             disabled={loading}
                         />
                     </div>
-                    {loading && (
-                        <p className="text-xs text-slate-500 mt-1">Cargando balance del mes...</p>
-                    )}
                 </div>
 
-                <div className="border border-blue-100 bg-blue-50 p-4 rounded-lg text-sm text-blue-800">
-                    <strong>Nueva fórmula de reparto:</strong>
-                    <ul className="mt-2 ml-4 list-disc space-y-1">
-                        <li>40% de las ganancias se divide 50/50 entre Fede y Gonza</li>
-                        <li>60% de las ganancias se divide según horas trabajadas</li>
-                    </ul>
-                </div>
+                {/* Hidden formula info as requested */}
 
-                <div>
-                    <h3 className="text-lg font-bold text-slate-700 mb-4">Horas de Clase Mensuales</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">Horas Fede</label>
-                            <input
-                                type="number"
-                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={config.fedeHours}
-                                onChange={(e) => setConfig({ ...config, fedeHours: e.target.value })}
-                            />
+                <div className="flex flex-col md:flex-row gap-6">
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold text-slate-700 mb-4">Horas Base Mensuales</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Horas Fede</label>
+                                <input
+                                    type="number"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={config.fedeHours}
+                                    onChange={(e) => setConfig({ ...config, fedeHours: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Horas Gonza</label>
+                                <input
+                                    type="number"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={config.gonzaHours}
+                                    onChange={(e) => setConfig({ ...config, gonzaHours: e.target.value })}
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">Horas Gonza</label>
-                            <input
-                                type="number"
-                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={config.gonzaHours}
-                                onChange={(e) => setConfig({ ...config, gonzaHours: e.target.value })}
-                            />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold text-slate-700 mb-4">Días Libres (Reducen pago)</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres Fede</label>
+                                <input
+                                    type="number"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={config.fedeDaysOff}
+                                    onChange={(e) => setConfig({ ...config, fedeDaysOff: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres Gonza</label>
+                                <input
+                                    type="number"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={config.gonzaDaysOff}
+                                    onChange={(e) => setConfig({ ...config, gonzaDaysOff: e.target.value })}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div>
-                    <h3 className="text-lg font-bold text-slate-700 mb-4">Días Libres del Mes (máx. 26 días laborables)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres Fede</label>
-                            <input
-                                type="number"
-                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={config.fedeDaysOff}
-                                onChange={(e) => setConfig({ ...config, fedeDaysOff: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres Gonza</label>
-                            <input
-                                type="number"
-                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={config.gonzaDaysOff}
-                                onChange={(e) => setConfig({ ...config, gonzaDaysOff: e.target.value })}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <button
-                    className="w-full py-3 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 transition-colors flex justify-center items-center gap-2"
-                    onClick={handleCalculate}
-                >
-                    <Calculator size={20} />
-                    Calcular Reparto
-                </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <p className="text-sm font-bold text-slate-400 uppercase mb-2">FEDE ({config.fedeHours}H/MES)</p>
+                    <div className="flex justify-between items-center mb-2">
+                        <p className="text-sm font-bold text-slate-400 uppercase">FEDE</p>
+                        <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
+                            Neto: {(Number(config.fedeHours) * ((26 - Number(config.fedeDaysOff)) / 26)).toFixed(1)}h
+                        </span>
+                    </div>
                     <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.fedeAmount)}</p>
                     <div className="space-y-2 pt-4 border-t border-slate-100">
                         <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Parte fija :</span>
+                            <span className="text-slate-600">Parte fija:</span>
                             <span className="font-medium text-slate-800">{formatCurrency(results.fixedFede)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Por horas :</span>
+                            <span className="text-slate-600">Por horas:</span>
                             <span className="font-medium text-slate-800">{formatCurrency(results.variableFede)}</span>
                         </div>
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <p className="text-sm font-bold text-slate-400 uppercase mb-2">GONZA ({config.gonzaHours}H/MES)</p>
+                    <div className="flex justify-between items-center mb-2">
+                        <p className="text-sm font-bold text-slate-400 uppercase">GONZA</p>
+                        <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
+                            Neto: {(Number(config.gonzaHours) * ((26 - Number(config.gonzaDaysOff)) / 26)).toFixed(1)}h
+                        </span>
+                    </div>
                     <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.gonzaAmount)}</p>
                     <div className="space-y-2 pt-4 border-t border-slate-100">
                         <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Parte fija :</span>
+                            <span className="text-slate-600">Parte fija:</span>
                             <span className="font-medium text-slate-800">{formatCurrency(results.fixedGonza)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Por horas :</span>
+                            <span className="text-slate-600">Por horas:</span>
                             <span className="font-medium text-slate-800">{formatCurrency(results.variableGonza)}</span>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Payments to Instructors Section */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mt-8">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-700">Pago a Instructores (Externos)</h3>
+                    <button onClick={addInstructor} className="text-sm text-blue-600 font-bold hover:underline">
+                        + Agregar Instructor
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 text-slate-500 font-bold text-sm uppercase">
+                            <tr>
+                                <th className="px-6 py-3 rounded-l-lg">Nombre</th>
+                                <th className="px-6 py-3">Horas</th>
+                                <th className="px-6 py-3">Total a Pagar</th>
+                                <th className="px-6 py-3 rounded-r-lg"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {config.instructors.map((instructor, index) => (
+                                <tr key={index}>
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="text"
+                                            className="w-full border-b border-slate-200 focus:border-blue-500 outline-none py-1"
+                                            value={instructor.name}
+                                            onChange={(e) => handleInstructorChange(index, 'name', e.target.value)}
+                                            placeholder="Nombre"
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="number"
+                                            className="w-24 border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500"
+                                            value={instructor.hours}
+                                            onChange={(e) => handleInstructorChange(index, 'hours', Number(e.target.value))}
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4 font-bold text-green-600">
+                                        {formatCurrency(instructor.hours * 500)}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => removeInstructor(index)}
+                                            className="text-red-400 hover:text-red-600 text-sm font-bold"
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {config.instructors.length === 0 && (
+                                <tr>
+                                    <td colSpan="4" className="text-center py-6 text-slate-400">
+                                        No hay instructores configurados.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                        <tfoot className="border-t border-slate-200">
+                            <tr>
+                                <td colSpan="2" className="px-6 py-4 text-right font-bold text-slate-700">Total Instructores:</td>
+                                <td className="px-6 py-4 font-bold text-xl text-green-600">
+                                    {formatCurrency(config.instructors.reduce((acc, curr) => acc + (curr.hours * 500), 0))}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
             </div>
         </div>
     );

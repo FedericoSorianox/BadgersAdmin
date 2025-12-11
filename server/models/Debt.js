@@ -12,7 +12,8 @@ const debtSchema = new mongoose.Schema({
     totalAmount: { type: Number, required: true },
     status: { type: String, enum: ['pending', 'paid'], default: 'pending' },
     date: { type: Date, default: Date.now },
-    paidDate: Date
+    paidDate: Date,
+    paidAmount: { type: Number, default: 0 }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Debt', debtSchema);
