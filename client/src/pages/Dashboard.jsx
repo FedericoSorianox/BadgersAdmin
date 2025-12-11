@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle } from 'lucide-react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL, EXCLUDED_MEMBERS } from '../config';
@@ -31,7 +31,9 @@ const Dashboard = () => {
         pendingCount: 0,
         products: [],
         membersList: [],
-        paymentsList: []
+        membersList: [],
+        paymentsList: [],
+        remindersSent: [] // New state for tracking sent reminders
     });
 
     const [debts, setDebts] = useState([]);
@@ -55,17 +57,19 @@ const Dashboard = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [financeRes, productsRes, membersRes, debtsRes] = await Promise.all([
+            const [financeRes, productsRes, membersRes, debtsRes, remindersRes] = await Promise.all([
                 axios.get(`${API_URL}/api/finance`),
                 axios.get(`${API_URL}/api/products`),
                 axios.get(`${API_URL}/api/members`),
-                axios.get(`${API_URL}/api/debts`)
+                axios.get(`${API_URL}/api/debts`),
+                axios.get(`${API_URL}/api/notifications/reminders`) // Fetch sent reminders
             ]);
 
             const payments = financeRes.data;
             const products = productsRes.data;
             const members = membersRes.data;
             const fetchedDebts = debtsRes.data;
+            const remindersSent = remindersRes.data || [];
 
             setDebts(fetchedDebts);
 
@@ -104,7 +108,8 @@ const Dashboard = () => {
                 pendingCount: activeMembersCount - paidCount,
                 products: sortedProducts,
                 membersList: members,
-                paymentsList: payments
+                paymentsList: payments,
+                remindersSent: new Set(remindersSent) // Convert to Set for faster lookup
             });
 
         } catch (error) {
@@ -316,6 +321,36 @@ const Dashboard = () => {
         }
     };
 
+    const handlePaymentReminder = async (member) => {
+        // Optimistic UI or simple loading state could be added here
+        try {
+            const amount = member.planCost || 2000;
+            // Assuming the phone number is stored in member.phone
+            if (!member.phone) {
+                alert('Este socio no tiene número de teléfono registrado.');
+                return;
+            }
+
+            if (!confirm(`¿Enviar recordatorio de pago a ${member.fullName} por WhatsApp?`)) {
+                return;
+            }
+
+            await axios.post(`${API_URL}/api/notifications/send-reminder`, {
+                phone: member.phone,
+                memberName: member.fullName,
+                memberId: member._id, // Send ID for checking/logging
+                amount: amount,
+                type: 'payment_reminder'
+            });
+
+            alert(`Recordatorio enviado a ${member.fullName}`);
+            fetchData(); // Refresh to update "Enviado" status immediately
+        } catch (error) {
+            console.error('Error sending reminder:', error);
+            alert('Error al enviar el recordatorio. Verifique la conexión con el servidor.');
+        }
+    };
+
     const renderModalContent = () => {
         if (!modalType) return null;
 
@@ -446,12 +481,29 @@ const Dashboard = () => {
                                         <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
                                         <span className="text-xs text-slate-500 ml-2">CI: {m.ci}</span>
                                     </div>
-                                    <button
-                                        onClick={() => handleQuickPayment(m)}
-                                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors"
-                                    >
-                                        Marcar como Pagado
-                                    </button>
+                                    <div className="flex gap-2">
+                                        {stats.remindersSent.has(m._id) ? (
+                                            <span className="px-3 py-1 bg-slate-100 text-slate-400 text-xs font-bold rounded-lg flex items-center gap-1 cursor-not-allowed">
+                                                <CheckCircle size={14} />
+                                                Enviado
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => handlePaymentReminder(m)}
+                                                className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                                                title="Enviar recordatorio por WhatsApp"
+                                            >
+                                                <MessageCircle size={14} />
+                                                Recordar
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => handleQuickPayment(m)}
+                                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors"
+                                        >
+                                            Marcar como Pagado
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                             {filteredPending.length === 0 && <p className="text-sm text-slate-400">No hay resultados.</p>}
