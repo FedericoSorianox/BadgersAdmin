@@ -31,7 +31,6 @@ const Dashboard = () => {
         pendingCount: 0,
         products: [],
         membersList: [],
-        membersList: [],
         paymentsList: [],
         remindersSent: [] // New state for tracking sent reminders
     });

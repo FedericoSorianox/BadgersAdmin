@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "cross-env NODE_ENV=development node index.js",
+    "seed": "cross-env NODE_ENV=development node seed_dev.js"
   },
   "keywords": [],
   "author": "",
@@ -21,5 +23,8 @@
     "mongoose": "^9.0.1",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0"
   }
 }

@@ -10,8 +10,8 @@ export const EXCLUDED_MEMBERS = [
     'Mariana Peralta'
 ];
 
-export const API_URL = isProduction
+export const API_URL = import.meta.env.VITE_API_URL || (isProduction
     ? 'https://badgersadmin-backend.onrender.com' // Production URL
-    : 'http://localhost:5001';
+    : 'http://localhost:5001');
 
 export default API_URL;
