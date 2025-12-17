@@ -22,6 +22,8 @@ router.post('/', upload.single('image'), async (req, res) => {
             phone: req.body.phone,
             planType: req.body.planType,
             planCost: Number(req.body.planCost),
+            birthDate: req.body.birthDate,
+            comments: req.body.comments,
             active: req.body.active === 'true' || req.body.active === true
         };
 
@@ -46,6 +48,8 @@ router.put('/:id', upload.single('image'), async (req, res) => {
             phone: req.body.phone,
             planType: req.body.planType,
             planCost: Number(req.body.planCost),
+            birthDate: req.body.birthDate,
+            comments: req.body.comments,
             active: req.body.active === 'true' || req.body.active === true
         };
 

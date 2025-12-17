@@ -34,6 +34,8 @@ const Members = () => {
         phone: '',
         planType: '', // e.g. 'Libre'
         planCost: 0,
+        birthDate: '',
+        comments: '',
         active: true,
         photoUrl: ''
     });
@@ -71,6 +73,8 @@ const Members = () => {
                 phone: member.phone || '',
                 planType: member.planType || '',
                 planCost: member.planCost || 0,
+                birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split('T')[0] : '',
+                comments: member.comments || '',
                 active: member.active,
                 photoUrl: member.photoUrl || ''
             });
@@ -83,6 +87,8 @@ const Members = () => {
                 phone: '',
                 planType: 'Libre',
                 planCost: 2000,
+                birthDate: '',
+                comments: '',
                 active: true,
                 photoUrl: ''
             });
@@ -101,6 +107,8 @@ const Members = () => {
             formDataToSend.append('phone', formData.phone);
             formDataToSend.append('planType', formData.planType);
             formDataToSend.append('planCost', formData.planCost);
+            formDataToSend.append('birthDate', formData.birthDate);
+            formDataToSend.append('comments', formData.comments);
             formDataToSend.append('active', formData.active);
 
             if (imageFile) {
@@ -453,6 +461,28 @@ const Members = () => {
                             />
                         </div>
                     </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Nacimiento</label>
+                            <input
+                                type="date"
+                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={formData.birthDate}
+                                onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios</label>
+                        <textarea
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            rows="3"
+                            value={formData.comments}
+                            onChange={(e) => setFormData({ ...formData, comments: e.target.value })}
+                        ></textarea>
+                    </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Plan</label>
                         <select
@@ -577,6 +607,22 @@ const Members = () => {
                             <div>
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">Costo</p>
                                 <p className="text-green-600 font-bold font-mono">${viewMember.planCost}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Fecha de Nacimiento</p>
+                                <p className="text-slate-700 font-medium">
+                                    {viewMember.birthDate
+                                        ? new Date(viewMember.birthDate).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
+                                        : '-'
+                                    }
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Comentarios</p>
+                                <p className="text-slate-700 font-medium whitespace-pre-wrap">{viewMember.comments || '-'}</p>
                             </div>
                         </div>
 
