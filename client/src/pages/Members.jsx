@@ -78,7 +78,7 @@ const Members = () => {
                 active: member.active,
                 photoUrl: member.photoUrl || ''
             });
-            setImagePreview(member.photoUrl ? `${API_URL}${member.photoUrl}` : null);
+            setImagePreview(member.photoUrl ? (member.photoUrl.startsWith('http') ? member.photoUrl : `${API_URL}${member.photoUrl}`) : null);
         } else {
             setEditingMember(null);
             setFormData({
