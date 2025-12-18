@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
 import { useTenant } from '../context/TenantContext';
+import API_URL from '../config';
 
 const Login = () => {
     const [username, setUsername] = useState('admin');
@@ -16,9 +17,9 @@ const Login = () => {
 
         try {
             // Determine API URL (Hardcoded for dev, normally env or relative)
-            const API_URL = 'http://localhost:5001/api/auth/login';
+            // const API_URL_LOCAL = 'http://localhost:5001/api/auth/login'; // Renamed to avoid shadow
 
-            const res = await fetch(API_URL, {
+            const res = await fetch(`${API_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
