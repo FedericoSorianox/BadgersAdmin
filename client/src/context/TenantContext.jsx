@@ -36,6 +36,11 @@ export const TenantProvider = ({ children }) => {
                 textColor: '#ffffff',
                 logoUrl: '/badgers-logo.jpg'
             });
+            const root = document.documentElement;
+            root.style.setProperty('--primary', '#000000');
+            root.style.setProperty('--secondary', '#1a1a1a');
+            root.style.setProperty('--text-on-primary', '#ffffff');
+
             setLoading(false);
             return;
         }
@@ -135,6 +140,10 @@ export const TenantProvider = ({ children }) => {
             });
             // Reset extended vars
             const root = document.documentElement;
+            root.style.setProperty('--primary', '#000000');
+            root.style.setProperty('--secondary', '#1a1a1a');
+            root.style.setProperty('--text-on-primary', '#ffffff');
+
             root.style.removeProperty('--menu-hover');
             root.style.removeProperty('--menu-active');
             root.style.removeProperty('--dashboard-title');
