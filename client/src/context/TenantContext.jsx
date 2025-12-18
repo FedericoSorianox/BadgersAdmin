@@ -30,8 +30,8 @@ export const TenantProvider = ({ children }) => {
             console.log('Super Admin Route - Skipping Tenant Branding');
             setBranding({
                 name: 'Badgers Admin',
-                primaryColor: '#3498db',
-                secondaryColor: '#2c3e50',
+                primaryColor: '#000000',
+                secondaryColor: '#1a1a1a',
                 sidebarText: 'Badgers Admin',
                 textColor: '#ffffff',
                 logoUrl: '/badgers-logo.jpg'
@@ -127,8 +127,8 @@ export const TenantProvider = ({ children }) => {
             // Reset to defaults if needed
             setBranding({
                 name: 'Badgers Admin',
-                primaryColor: '#3498db',
-                secondaryColor: '#2c3e50',
+                primaryColor: '#000000',
+                secondaryColor: '#1a1a1a',
                 sidebarText: 'Badgers Admin',
                 textColor: '#ffffff',
                 logoUrl: '/badgers-logo.jpg' // Default logo
