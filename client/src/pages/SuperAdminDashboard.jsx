@@ -490,7 +490,9 @@ const SuperAdminDashboard = () => {
                             </form>
                         </div>
                     </div>
-                );
+                )}
+        </div>
+    );
 };
 
-            export default SuperAdminDashboard;
+export default SuperAdminDashboard;
