@@ -3,6 +3,6 @@
 
 @layer base {
   body {
-    @apply bg-background text-primary antialiased;
+    @apply bg-background text-slate-900 antialiased;
   }
 }

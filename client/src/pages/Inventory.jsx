@@ -129,7 +129,8 @@ const Inventory = () => {
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="bg-primary hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    style={{ backgroundColor: 'var(--btn-new-product, #2563eb)' }}
+                    className="text-white hover:brightness-90 px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm"
                 >
                     <Plus size={20} />
                     Nuevo Producto
@@ -138,12 +139,12 @@ const Inventory = () => {
 
             {loading ? (
                 <div className="flex justify-center items-center py-20">
-                    <Loader2 className="animate-spin text-primary" size={40} />
+                    <Loader2 className="animate-spin text-blue-600" size={40} />
                 </div>
             ) : error ? (
                 <div className="p-8 text-center text-red-500">
                     <p>{error}</p>
-                    <button onClick={fetchProducts} className="mt-4 text-primary underline">Intentar nuevamente</button>
+                    <button onClick={fetchProducts} className="mt-4 text-blue-600 underline">Intentar nuevamente</button>
                 </div>
             ) : (
                 <>
@@ -184,7 +185,7 @@ const Inventory = () => {
                                 <input
                                     type="text"
                                     placeholder="Buscar producto..."
-                                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -277,7 +278,7 @@ const Inventory = () => {
                                 <input
                                     required
                                     type="text"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 />
@@ -287,7 +288,7 @@ const Inventory = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={formData.category}
                                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                 />
@@ -301,7 +302,7 @@ const Inventory = () => {
                                         type="number"
                                         min="0"
                                         step="0.01"
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                         value={formData.costPrice}
                                         onChange={(e) => setFormData({ ...formData, costPrice: Number(e.target.value) })}
                                     />
@@ -314,7 +315,7 @@ const Inventory = () => {
                                         type="number"
                                         min="0"
                                         step="0.01"
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                         value={formData.salePrice}
                                         onChange={(e) => setFormData({ ...formData, salePrice: Number(e.target.value) })}
                                     />
@@ -327,7 +328,7 @@ const Inventory = () => {
                                     required
                                     type="number"
                                     min="0"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={formData.stock}
                                     onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
                                 />
@@ -338,7 +339,7 @@ const Inventory = () => {
                                 <input
                                     type="file"
                                     accept="image/*"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     onChange={(e) => {
                                         const file = e.target.files[0];
                                         if (file) {
@@ -376,7 +377,8 @@ const Inventory = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-slate-800 transition-colors"
+                                    style={{ backgroundColor: 'var(--btn-save, #2563eb)' }}
+                                    className="flex-1 px-4 py-2 text-white rounded-lg hover:brightness-90 transition-all"
                                 >
                                     {editingProduct ? 'Guardar Cambios' : 'Crear Producto'}
                                 </button>

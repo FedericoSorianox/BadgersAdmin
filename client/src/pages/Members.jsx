@@ -553,7 +553,8 @@ const Members = () => {
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-bold"
+                            style={{ backgroundColor: 'var(--btn-save, #2563eb)' }}
+                            className="px-4 py-2 text-white hover:brightness-90 rounded-lg font-bold transition-all"
                         >
                             {editingMember ? 'Guardar Cambios' : 'Crear Socio'}
                         </button>
@@ -650,7 +651,8 @@ const Members = () => {
                 <div className="flex gap-3">
                     <button
                         onClick={() => handleOpenModal()}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                        style={{ backgroundColor: 'var(--btn-new-member, #2563eb)' }}
+                        className="text-white hover:brightness-90 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shadow-sm"
                     >
                         <UserPlus size={20} />
                         Nuevo Socio

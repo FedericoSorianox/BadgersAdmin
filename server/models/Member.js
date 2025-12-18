@@ -18,4 +18,6 @@ const MemberSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+MemberSchema.plugin(require('../plugins/tenantPlugin'));
+
 module.exports = mongoose.model('Member', MemberSchema);

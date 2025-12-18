@@ -9,4 +9,7 @@ const ExpenseSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+// Tenant Plugin
+ExpenseSchema.plugin(require('../plugins/tenantPlugin'));
+
 module.exports = mongoose.model('Expense', ExpenseSchema);

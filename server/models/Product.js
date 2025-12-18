@@ -10,4 +10,7 @@ const ProductSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+// Tenant Plugin
+ProductSchema.plugin(require('../plugins/tenantPlugin'));
+
 module.exports = mongoose.model('Product', ProductSchema);

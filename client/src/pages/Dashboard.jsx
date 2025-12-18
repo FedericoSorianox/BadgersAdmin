@@ -540,7 +540,7 @@ const Dashboard = () => {
     if (loading) {
         return (
             <div className="flex justify-center items-center h-full min-h-[400px]">
-                <Loader2 className="animate-spin text-primary" size={40} />
+                <Loader2 className="animate-spin text-blue-600" size={40} />
             </div>
         );
     }
@@ -558,25 +558,28 @@ const Dashboard = () => {
 
             {/* Header w/ Quick Actions */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h1 className="text-4xl font-bold text-blue-500">Dashboard</h1>
+                <h1 className="text-4xl font-bold text-slate-900" style={{ color: 'var(--dashboard-title, #0f172a)' }}>Dashboard</h1>
                 <div className="flex gap-2">
                     <button
                         onClick={() => setNewSaleModalOpen(true)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm"
+                        style={{ backgroundColor: 'var(--btn-new-sale, #9333ea)' }}
+                        className="hover:brightness-90 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm"
                     >
                         <DollarSign size={20} />
                         Nueva Venta
                     </button>
                     <button
                         onClick={() => setNewExpenseModalOpen(true)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm"
+                        style={{ backgroundColor: 'var(--btn-new-expense, #dc2626)' }}
+                        className="hover:brightness-90 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm"
                     >
                         <TrendingDown size={20} />
                         Nuevo Gasto
                     </button>
                     <button
                         onClick={() => setNewFiadoModalOpen(true)}
-                        className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm"
+                        style={{ backgroundColor: 'var(--btn-new-fiado, #f59e0b)' }}
+                        className="hover:brightness-90 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm"
                     >
                         <Clock size={20} />
                         Nuevo Fiado
@@ -674,7 +677,7 @@ const Dashboard = () => {
                                     <tr key={group.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
                                                     {group.name.charAt(0)}
                                                 </div>
                                                 <div>
@@ -762,7 +765,7 @@ const Dashboard = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Producto</label>
                                 <select
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newSaleForm.productId}
                                     onChange={handleProductSelectForSale}
                                 >
@@ -779,7 +782,7 @@ const Dashboard = () => {
                                 <input
                                     type="number"
                                     min="1"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newSaleForm.quantity}
                                     onChange={(e) => setNewSaleForm({ ...newSaleForm, quantity: Number(e.target.value) })}
                                 />
@@ -818,7 +821,7 @@ const Dashboard = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newExpenseForm.description}
                                     onChange={(e) => setNewExpenseForm({ ...newExpenseForm, description: e.target.value })}
                                 />
@@ -827,7 +830,7 @@ const Dashboard = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Monto</label>
                                 <input
                                     type="number"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newExpenseForm.amount}
                                     onChange={(e) => setNewExpenseForm({ ...newExpenseForm, amount: Number(e.target.value) })}
                                 />
@@ -865,7 +868,7 @@ const Dashboard = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Socio</label>
                                 <select
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newFiadoForm.memberId}
                                     onChange={(e) => setNewFiadoForm({ ...newFiadoForm, memberId: e.target.value })}
                                 >
@@ -881,7 +884,7 @@ const Dashboard = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Producto</label>
                                     <select
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                         value={currentFiadoProduct.productId}
                                         onChange={(e) => setCurrentFiadoProduct({ ...currentFiadoProduct, productId: e.target.value })}
                                     >
@@ -899,7 +902,7 @@ const Dashboard = () => {
                                         <input
                                             type="number"
                                             min="1"
-                                            className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                             value={currentFiadoProduct.quantity}
                                             onChange={(e) => setCurrentFiadoProduct({ ...currentFiadoProduct, quantity: Number(e.target.value) })}
                                         />

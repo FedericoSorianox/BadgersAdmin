@@ -7,9 +7,9 @@ export default {
     theme: {
         extend: {
             colors: {
-                primary: '#0f172a', // Slate 900
-                secondary: '#64748b', // Slate 500
-                accent: '#3b82f6', // Blue 500
+                primary: 'var(--primary)',
+                secondary: 'var(--secondary)',
+                accent: 'var(--primary)', // Often the primary branding is the accent
                 background: '#f8fafc', // Slate 50
                 surface: '#ffffff',
             }

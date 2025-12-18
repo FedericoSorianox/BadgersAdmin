@@ -283,7 +283,7 @@ const Finances = () => {
                     </button>
 
                     <select
-                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(Number(e.target.value))}
                     >
@@ -295,7 +295,7 @@ const Finances = () => {
                     </select>
 
                     <select
-                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
                     >
@@ -470,7 +470,7 @@ const Finances = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <button
                                                 onClick={() => handleEdit(transaction)}
-                                                className="text-slate-400 hover:text-primary transition-colors p-2"
+                                                className="text-slate-400 hover:text-blue-600 transition-colors p-2"
                                             >
                                                 <Edit size={18} />
                                             </button>
@@ -499,7 +499,7 @@ const Finances = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Producto</label>
                                 <select
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newSaleForm.productId}
                                     onChange={handleProductSelect}
                                 >
@@ -517,7 +517,7 @@ const Finances = () => {
                                 <input
                                     type="number"
                                     min="1"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newSaleForm.quantity}
                                     onChange={(e) => setNewSaleForm({ ...newSaleForm, quantity: Number(e.target.value) })}
                                 />
@@ -529,7 +529,7 @@ const Finances = () => {
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newSaleForm.amount}
                                     onChange={(e) => setNewSaleForm({ ...newSaleForm, amount: Number(e.target.value) })}
                                 />
@@ -577,7 +577,7 @@ const Finances = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newExpenseForm.description}
                                     onChange={(e) => setNewExpenseForm({ ...newExpenseForm, description: e.target.value })}
                                     placeholder="Ej: Alquiler, Equipamiento, etc."
@@ -588,7 +588,7 @@ const Finances = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Concepto (Opcional)</label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newExpenseForm.concept}
                                     onChange={(e) => setNewExpenseForm({ ...newExpenseForm, concept: e.target.value })}
                                     placeholder="Detalles adicionales"
@@ -601,7 +601,7 @@ const Finances = () => {
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newExpenseForm.amount}
                                     onChange={(e) => setNewExpenseForm({ ...newExpenseForm, amount: Number(e.target.value) })}
                                 />
@@ -653,7 +653,7 @@ const Finances = () => {
                                 </label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={
                                         editingTransaction.category === 'Gasto' ? (editingTransaction.description || '') :
                                             editingTransaction.category === 'Producto' || editingTransaction.category === 'Venta' ? (editingTransaction.productName || '') :
@@ -675,7 +675,7 @@ const Finances = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Monto</label>
                                 <input
                                     type="number"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={Math.abs(editingTransaction.amount)}
                                     onChange={(e) => setEditingTransaction({
                                         ...editingTransaction,
@@ -687,7 +687,7 @@ const Finances = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
                                 <select
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={editingTransaction.category}
                                     onChange={(e) => setEditingTransaction({ ...editingTransaction, category: e.target.value })}
                                 >
@@ -708,7 +708,7 @@ const Finances = () => {
                             </button>
                             <button
                                 onClick={handleSaveEdit}
-                                className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-slate-800 transition-colors"
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-slate-800 transition-colors"
                             >
                                 Guardar
                             </button>

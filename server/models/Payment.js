@@ -14,4 +14,7 @@ const paymentSchema = new mongoose.Schema({
     date: { type: Date, default: Date.now }
 }, { timestamps: true });
 
+// Tenant Plugin
+paymentSchema.plugin(require('../plugins/tenantPlugin'));
+
 module.exports = mongoose.model('Payment', paymentSchema);

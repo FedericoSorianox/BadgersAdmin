@@ -16,4 +16,7 @@ const debtSchema = new mongoose.Schema({
     paidAmount: { type: Number, default: 0 }
 }, { timestamps: true });
 
+// Tenant Plugin
+debtSchema.plugin(require('../plugins/tenantPlugin'));
+
 module.exports = mongoose.model('Debt', debtSchema);

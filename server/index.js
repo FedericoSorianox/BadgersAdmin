@@ -26,6 +26,9 @@ app.get('/', (req, res) => {
 });
 
 // Routes placeholders
+app.use(require('./middleware/tenant'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/tenants', require('./routes/tenants'));
 app.use('/api/members', require('./routes/members'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/finance', require('./routes/finance'));

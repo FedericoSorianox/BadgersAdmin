@@ -9,6 +9,7 @@ router.get('/', async (req, res) => {
         const members = await Member.find().sort({ fullName: 1 });
         res.json(members);
     } catch (err) {
+        console.error('Error in GET /members:', err);
         res.status(500).json({ message: err.message });
     }
 });
