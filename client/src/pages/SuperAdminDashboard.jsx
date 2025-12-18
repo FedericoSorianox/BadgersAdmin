@@ -18,7 +18,9 @@ const SuperAdminDashboard = () => {
         textColor: '#ffffff',
         menuHoverColor: '',
         menuActiveColor: '',
-        dashboardTitleColor: ''
+        dashboardTitleColor: '',
+        adminUsername: '',
+        adminPassword: ''
     });
     const navigate = useNavigate();
 
@@ -70,7 +72,9 @@ const SuperAdminDashboard = () => {
                     textColor: '#ffffff',
                     menuHoverColor: '',
                     menuActiveColor: '',
-                    dashboardTitleColor: ''
+                    dashboardTitleColor: '',
+                    adminUsername: '',
+                    adminPassword: ''
                 });
                 fetchTenants();
             } else {
@@ -165,7 +169,9 @@ const SuperAdminDashboard = () => {
                                 newFiadoButtonColor: '',
                                 newMemberButtonColor: '',
                                 newProductButtonColor: '',
-                                saveButtonColor: ''
+                                saveButtonColor: '',
+                                adminUsername: '',
+                                adminPassword: ''
                             });
                             setShowModal(true);
                         }}
@@ -249,6 +255,34 @@ const SuperAdminDashboard = () => {
                                         onChange={e => setNewTenant({ ...newTenant, slug: e.target.value })}
                                     />
                                 </div>
+
+                                {!editingId && (
+                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                        <h4 className="font-semibold text-slate-700 mb-3">Usuario Administrador Inicial</h4>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Usuario Admin</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                    value={newTenant.adminUsername}
+                                                    onChange={e => setNewTenant({ ...newTenant, adminUsername: e.target.value })}
+                                                    placeholder="Ej: admin_cobra"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña Admin</label>
+                                                <input
+                                                    type="password"
+                                                    className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                    value={newTenant.adminPassword}
+                                                    onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
+                                                    placeholder="••••••••"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Color Primario</label>

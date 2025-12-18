@@ -7,7 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
     "dev": "cross-env NODE_ENV=development node index.js",
-    "seed": "cross-env NODE_ENV=development node seed_dev.js"
+    "seed": "cross-env NODE_ENV=development node seed_dev.js",
+    "create-superadmin": "node create_superadmin.js",
+    "promote-admin": "node promote_admin.js"
   },
   "keywords": [],
   "author": "",

@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const Tenant = require('../models/Tenant');
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
 
 // Middleware to ensure Super Admin
 const isSuperAdmin = (req, res, next) => {
@@ -40,12 +42,20 @@ router.get('/public/:slug', async (req, res) => {
 // @desc    Create a new tenant
 // @access  Super Admin
 router.post('/', auth, isSuperAdmin, async (req, res) => {
-    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, sidebarLogoUrl, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor } = req.body;
+    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, sidebarLogoUrl, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor, adminUsername, adminPassword } = req.body;
 
     try {
         let tenant = await Tenant.findOne({ slug });
         if (tenant) {
             return res.status(400).json({ message: 'Tenant already exists with that slug' });
+        }
+
+        // Validate User if provided
+        if (adminUsername) {
+            const existingUser = await User.findOne({ username: adminUsername });
+            if (existingUser) {
+                return res.status(400).json({ message: `User '${adminUsername}' already exists. Please choose another username.` });
+            }
         }
 
         tenant = new Tenant({
@@ -64,8 +74,23 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
             }
         });
 
-        await tenant.save();
-        res.status(201).json(tenant);
+        const savedTenant = await tenant.save();
+
+        let createdUser = null;
+        if (adminUsername && adminPassword) {
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(adminPassword, salt);
+
+            const newUser = new User({
+                username: adminUsername,
+                password: hashedPassword,
+                role: 'admin',
+                tenantId: savedTenant._id
+            });
+            createdUser = await newUser.save();
+        }
+
+        res.status(201).json({ tenant: savedTenant, user: createdUser });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
