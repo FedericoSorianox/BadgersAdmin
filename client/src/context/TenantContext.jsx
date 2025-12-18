@@ -6,10 +6,12 @@ export const useTenant = () => useContext(TenantContext);
 
 export const TenantProvider = ({ children }) => {
     const [branding, setBranding] = useState({
-        name: 'Default Gym',
-        primaryColor: '#3498db', // Default Blue
-        secondaryColor: '#2c3e50', // Default Dark
-        logoUrl: ''
+        name: 'Badgers Admin',
+        primaryColor: '#000000', // Badgers Black
+        secondaryColor: '#1a1a1a', // Badgers Dark
+        logoUrl: '/badgers-logo.jpg',
+        sidebarText: 'Badgers Admin',
+        textColor: '#ffffff'
     });
 
     const [tenantId, setTenantId] = useState(null);
@@ -17,6 +19,14 @@ export const TenantProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Set initial/default colors immediately to match invalid/loading state
+        const root = document.documentElement;
+        if (loading) {
+            root.style.setProperty('--primary', '#000000');
+            root.style.setProperty('--secondary', '#1a1a1a');
+            root.style.setProperty('--text-on-primary', '#ffffff');
+        }
+
         const hostname = window.location.hostname;
         let slug = null;
 
