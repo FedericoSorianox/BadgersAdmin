@@ -25,6 +25,14 @@ const SuperAdminDashboard = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
+        // Enforce Domain for Super Admin in Production
+        if (import.meta.env.MODE === 'production') {
+            const hostname = window.location.hostname;
+            if (hostname !== 'gymworkspro.com' && !hostname.includes('localhost')) {
+                window.location.href = 'https://gymworkspro.com/superadmin';
+                return;
+            }
+        }
         fetchTenants();
     }, []);
 

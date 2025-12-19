@@ -39,12 +39,12 @@ export const TenantProvider = ({ children }) => {
         if (window.location.pathname.startsWith('/superadmin')) {
             console.log('Super Admin Route - Skipping Tenant Branding');
             setBranding({
-                name: 'GymWorks Panel',
+                name: 'GymWorksPro Panel',
                 primaryColor: '#000000',
                 secondaryColor: '#1a1a1a',
-                sidebarText: 'GymWorks SuperAdmin',
+                sidebarText: 'GymWorksPro SuperAdmin',
                 textColor: '#ffffff',
-                logoUrl: '/badgers-logo.jpg' // Use generic logo or GymWorks specific if available
+                logoUrl: '/badgers-logo.jpg' // Use generic logo or GymWorksPro specific if available
             });
             const root = document.documentElement;
             root.style.setProperty('--primary', '#000000');
@@ -65,10 +65,45 @@ export const TenantProvider = ({ children }) => {
                 slug = parts[0];
             }
         } else {
-            // Production logic (e.g. app.domain.com vs tenant.app.domain.com ?)
-            // Assuming wildcard: tenant.domain.com
-            if (parts.length > 2 && parts[0] !== 'www') {
-                slug = parts[0];
+            // Production Domain Logic
+
+            // CASE A: Legacy Domain (The Badgers)
+            // e.g. badgersadminuy.netlify.app
+            if (hostname.includes('badgersadminuy.netlify.app')) {
+                // Determine if this is a Tenant or Root (Legacy Root is Badgers)
+                // netlify.app subdomains are usually 'site-name.netlify.app' which matches 'badgersadminuy'
+                // so parts[0] is 'badgersadminuy'.
+                // If we want to support tenants ON netlify, we can't easily doing sub-sub domains (as discussed).
+                // So we assume this domain is ONLY for the main badgers tenant.
+                console.log('Detected Legacy Domain (Badgers)');
+                setLoading(false);
+                return; // Default state is already Badgers, so we just stop loading logic.
+            }
+
+            // CASE B: Product Domain (GymWorksPro)
+            // e.g. gymworkspro.com or tenant.gymworkspro.com
+            if (hostname.includes('gymworkspro.com')) {
+                if (parts.length > 2 && parts[0] !== 'www') {
+                    // e.g. cobra.gymworkspro.com
+                    slug = parts[0];
+                } else {
+                    // e.g. gymworkspro.com (Root)
+                    console.log('Detected Product Root (GymWorksPro)');
+                    setBranding({
+                        name: 'GymWorksPro',
+                        primaryColor: '#000000',
+                        secondaryColor: '#1a1a1a',
+                        sidebarText: 'GymWorksPro',
+                        textColor: '#ffffff',
+                        logoUrl: '/badgers-logo.jpg' // Generic Logo
+                    });
+                    const root = document.documentElement;
+                    root.style.setProperty('--primary', '#000000');
+                    root.style.setProperty('--secondary', '#1a1a1a');
+                    root.style.setProperty('--text-on-primary', '#ffffff');
+                    setLoading(false);
+                    return;
+                }
             }
         }
 

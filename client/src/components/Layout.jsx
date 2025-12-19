@@ -20,7 +20,7 @@ const Layout = () => {
                 </button>
                 <div className="flex items-center gap-2">
                     <img src="/badgers-logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg" />
-                    <span className="font-bold">{branding?.name || 'GymWorks'}</span>
+                    <span className="font-bold">{branding?.name || 'GymWorksPro'}</span>
                 </div>
             </div>
 
