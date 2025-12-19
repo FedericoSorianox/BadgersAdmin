@@ -32,11 +32,7 @@ const Login = () => {
                 localStorage.setItem('role', data.user.role);
                 localStorage.setItem('isAuthenticated', 'true');
 
-                if (data.user.role === 'superadmin') {
-                    navigate('/superadmin');
-                } else {
-                    navigate('/');
-                }
+                navigate('/');
             } else {
                 setError(data.message || 'Error de autenticación');
             }

@@ -138,6 +138,23 @@ router.put('/:id', auth, isSuperAdmin, async (req, res) => {
             },
             { new: true }
         );
+
+        // Update Admin User if provided
+        if (req.body.adminUsername || req.body.adminPassword) {
+            const userUpdate = {};
+            if (req.body.adminUsername) userUpdate.username = req.body.adminUsername;
+            if (req.body.adminPassword) {
+                const salt = await bcrypt.genSalt(10);
+                userUpdate.password = await bcrypt.hash(req.body.adminPassword, salt);
+            }
+
+            await User.findOneAndUpdate(
+                { tenantId: tenant._id, role: 'admin' },
+                { $set: userUpdate },
+                { new: true }
+            );
+        }
+
         res.json(tenant);
     } catch (err) {
         res.status(500).json({ message: err.message });

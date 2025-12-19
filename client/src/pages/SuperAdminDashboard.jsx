@@ -217,7 +217,7 @@ const SuperAdminDashboard = () => {
 
                             <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center">
                                 <span className="text-xs text-slate-400">Created: {new Date(tenant.createdAt).toLocaleDateString()}</span>
-                                <a href={`http://${tenant.slug}.localhost:5173`} className="text-blue-600 text-sm hover:underline">
+                                <a href={`${window.location.protocol}//${tenant.slug}.${window.location.hostname.replace('www.', '')}${window.location.port ? ':' + window.location.port : ''}`} className="text-blue-600 text-sm hover:underline" target="_blank" rel="noopener noreferrer">
                                     Go to Dashboard →
                                 </a>
                             </div>
@@ -256,33 +256,31 @@ const SuperAdminDashboard = () => {
                                     />
                                 </div>
 
-                                {!editingId && (
-                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                        <h4 className="font-semibold text-slate-700 mb-3">Usuario Administrador Inicial</h4>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">Usuario Admin</label>
-                                                <input
-                                                    type="text"
-                                                    className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    value={newTenant.adminUsername}
-                                                    onChange={e => setNewTenant({ ...newTenant, adminUsername: e.target.value })}
-                                                    placeholder="Ej: admin_cobra"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña Admin</label>
-                                                <input
-                                                    type="password"
-                                                    className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    value={newTenant.adminPassword}
-                                                    onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
-                                                    placeholder="••••••••"
-                                                />
-                                            </div>
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <h4 className="font-semibold text-slate-700 mb-3">{editingId ? 'Actualizar Credenciales Admin' : 'Usuario Administrador Inicial'}</h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Nuevo Usuario (Opcional)' : 'Usuario Admin'}</label>
+                                            <input
+                                                type="text"
+                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                value={newTenant.adminUsername}
+                                                onChange={e => setNewTenant({ ...newTenant, adminUsername: e.target.value })}
+                                                placeholder={editingId ? 'Dejar vacío para mantener actual' : "Ej: admin_cobra"}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Nueva Contraseña (Opcional)' : 'Contraseña Admin'}</label>
+                                            <input
+                                                type="password"
+                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                value={newTenant.adminPassword}
+                                                onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
+                                                placeholder={editingId ? 'Dejar vacío para mantener actual' : "••••••••"}
+                                            />
                                         </div>
                                     </div>
-                                )}
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Color Primario</label>
