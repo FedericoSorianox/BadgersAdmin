@@ -39,12 +39,12 @@ export const TenantProvider = ({ children }) => {
         if (window.location.pathname.startsWith('/superadmin')) {
             console.log('Super Admin Route - Skipping Tenant Branding');
             setBranding({
-                name: 'Badgers Admin',
+                name: 'GymWorks Panel',
                 primaryColor: '#000000',
                 secondaryColor: '#1a1a1a',
-                sidebarText: 'Badgers Admin',
+                sidebarText: 'GymWorks SuperAdmin',
                 textColor: '#ffffff',
-                logoUrl: '/badgers-logo.jpg'
+                logoUrl: '/badgers-logo.jpg' // Use generic logo or GymWorks specific if available
             });
             const root = document.documentElement;
             root.style.setProperty('--primary', '#000000');

@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
+import { useTenant } from '../context/TenantContext';
 
 const Layout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const { branding } = useTenant();
 
     return (
         <div className="min-h-screen bg-background">
@@ -18,7 +20,7 @@ const Layout = () => {
                 </button>
                 <div className="flex items-center gap-2">
                     <img src="/badgers-logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg" />
-                    <span className="font-bold">Badgers Admin</span>
+                    <span className="font-bold">{branding?.name || 'GymWorks'}</span>
                 </div>
             </div>
 

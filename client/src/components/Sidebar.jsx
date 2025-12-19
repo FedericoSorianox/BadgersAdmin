@@ -30,12 +30,12 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <div className="flex items-center gap-2">
                         <img
                             src={branding?.sidebarLogoUrl || branding?.logoUrl || "/badgers-logo.jpg"}
-                            alt={branding?.name || "The Badgers"}
+                            alt={branding?.name || "GymWorks"}
                             className="w-10 h-10 rounded-xl object-cover bg-white"
                         />
                         <div>
                             <h1 className="font-bold text-base leading-tight" style={{ color: 'var(--text-on-primary, white)' }}>
-                                {branding?.sidebarText || branding?.name || "Badgers Admin"}
+                                {branding?.sidebarText || branding?.name || "GymWorks"}
                             </h1>
                         </div>
                     </div>
@@ -85,7 +85,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         />
                         <div>
                             <p className="text-sm font-medium">Administrador</p>
-                            <p className="text-xs text-slate-500">badgers@admin.com</p>
+                            <p className="text-xs text-slate-500">admin@gymworks.com</p>
                         </div>
                     </div>
                 </div>
