@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle } from 'lucide-react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL, EXCLUDED_MEMBERS } from '../config';
@@ -321,32 +321,64 @@ const Dashboard = () => {
     };
 
     const handlePaymentReminder = async (member) => {
-        // Optimistic UI or simple loading state could be added here
         try {
             const amount = member.planCost || 2000;
-            // Assuming the phone number is stored in member.phone
             if (!member.phone) {
                 alert('Este socio no tiene número de teléfono registrado.');
                 return;
             }
 
-            if (!confirm(`¿Enviar recordatorio de pago a ${member.fullName} por WhatsApp?`)) {
+            const isResend = stats.remindersSent.has(member._id);
+            const confirmMsg = isResend
+                ? `Ya se envió un recordatorio a ${member.fullName}. ¿Desea enviarlo de nuevo?`
+                : `¿Enviar recordatorio de pago a ${member.fullName} por WhatsApp?`;
+
+            if (!confirm(confirmMsg)) {
                 return;
             }
 
             await axios.post(`${API_URL}/api/notifications/send-reminder`, {
                 phone: member.phone,
                 memberName: member.fullName,
-                memberId: member._id, // Send ID for checking/logging
+                memberId: member._id,
                 amount: amount,
                 type: 'payment_reminder'
             });
 
             alert(`Recordatorio enviado a ${member.fullName}`);
-            fetchData(); // Refresh to update "Enviado" status immediately
+            fetchData();
         } catch (error) {
             console.error('Error sending reminder:', error);
             alert('Error al enviar el recordatorio. Verifique la conexión con el servidor.');
+        }
+    };
+
+    const handleBulkReminders = async (membersToRemind) => {
+        if (membersToRemind.length === 0) return;
+
+        if (!confirm(`¿Estás seguro de enviar recordatorios a ${membersToRemind.length} socios pendientes?`)) {
+            return;
+        }
+
+        try {
+            setLoading(true); // Show global loading or handle locally
+            const membersPayload = membersToRemind.map(m => ({
+                phone: m.phone,
+                name: m.fullName,
+                id: m._id,
+                amount: m.planCost || 2000
+            }));
+
+            const res = await axios.post(`${API_URL}/api/notifications/send-reminders-bulk`, {
+                members: membersPayload
+            });
+
+            alert(res.data.message);
+            fetchData();
+        } catch (error) {
+            console.error('Error sending bulk reminders:', error);
+            alert('Error al enviar recordatorios masivos');
+            setLoading(false); // Ensure loading is off on error
         }
     };
 
@@ -469,10 +501,21 @@ const Dashboard = () => {
                         />
                     </div>
                     <div>
-                        <h4 className="font-bold text-red-600 mb-2 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-red-600"></span>
-                            Pendientes ({filteredPending.length})
-                        </h4>
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-bold text-red-600 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-600"></span>
+                                Pendientes ({filteredPending.length})
+                            </h4>
+                            {filteredPending.length > 0 && (
+                                <button
+                                    onClick={() => handleBulkReminders(filteredPending)}
+                                    className="px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                                >
+                                    <Send size={14} />
+                                    Recordar a Todos
+                                </button>
+                            )}
+                        </div>
                         <div className="bg-red-50 rounded-xl p-4 max-h-[300px] overflow-y-auto divide-y divide-red-100">
                             {filteredPending.map(m => (
                                 <div key={m._id} className="py-2 flex justify-between items-center">
@@ -481,21 +524,27 @@ const Dashboard = () => {
                                         <span className="text-xs text-slate-500 ml-2">CI: {m.ci}</span>
                                     </div>
                                     <div className="flex gap-2">
-                                        {stats.remindersSent.has(m._id) ? (
-                                            <span className="px-3 py-1 bg-slate-100 text-slate-400 text-xs font-bold rounded-lg flex items-center gap-1 cursor-not-allowed">
-                                                <CheckCircle size={14} />
-                                                Enviado
-                                            </span>
-                                        ) : (
-                                            <button
-                                                onClick={() => handlePaymentReminder(m)}
-                                                className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
-                                                title="Enviar recordatorio por WhatsApp"
-                                            >
-                                                <MessageCircle size={14} />
-                                                Recordar
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={() => handlePaymentReminder(m)}
+                                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border
+                                                ${stats.remindersSent.has(m._id)
+                                                    ? 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300'
+                                                    : 'bg-blue-100 border-transparent hover:bg-blue-200 text-blue-700'
+                                                }`}
+                                            title={stats.remindersSent.has(m._id) ? "Re-enviar recordatorio" : "Enviar recordatorio"}
+                                        >
+                                            {stats.remindersSent.has(m._id) ? (
+                                                <>
+                                                    <CheckCircle size={14} />
+                                                    Enviado
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <MessageCircle size={14} />
+                                                    Recordar
+                                                </>
+                                            )}
+                                        </button>
                                         <button
                                             onClick={() => handleQuickPayment(m)}
                                             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors"
@@ -507,19 +556,19 @@ const Dashboard = () => {
                             ))}
                             {filteredPending.length === 0 && <p className="text-sm text-slate-400">No hay resultados.</p>}
                         </div>
-                    </div>
-                    <div>
-                        <h4 className="font-bold text-green-600 mb-2 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-green-600"></span>
-                            Pagados ({filteredPaid.length})
-                        </h4>
-                        <div className="bg-green-50 rounded-xl p-4 max-h-[200px] overflow-y-auto divide-y divide-green-100">
-                            {filteredPaid.map(m => (
-                                <div key={m._id} className="py-2 flex justify-between">
-                                    <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
-                                    <span className="text-xs text-slate-500">CI: {m.ci}</span>
-                                </div>
-                            ))}
+                        <div>
+                            <h4 className="font-bold text-green-600 mb-2 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-600"></span>
+                                Pagados ({filteredPaid.length})
+                            </h4>
+                            <div className="bg-green-50 rounded-xl p-4 max-h-[200px] overflow-y-auto divide-y divide-green-100">
+                                {filteredPaid.map(m => (
+                                    <div key={m._id} className="py-2 flex justify-between">
+                                        <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
+                                        <span className="text-xs text-slate-500">CI: {m.ci}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
