@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send } from 'lucide-react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL, EXCLUDED_MEMBERS } from '../config';
@@ -32,7 +32,8 @@ const Dashboard = () => {
         products: [],
         membersList: [],
         paymentsList: [],
-        remindersSent: [] // New state for tracking sent reminders
+        remindersSent: [], // New state for tracking sent reminders
+        notesMap: {} // memberId -> note string
     });
 
     const [debts, setDebts] = useState([]);
@@ -108,7 +109,10 @@ const Dashboard = () => {
                 products: sortedProducts,
                 membersList: members,
                 paymentsList: payments,
-                remindersSent: new Set(remindersSent) // Convert to Set for faster lookup
+                remindersSent: new Set(remindersSent), // Convert to Set for faster lookup
+                notesMap: payments
+                    .filter(p => Number(p.month) === currentMonth && Number(p.year) === currentYear && p.type === 'Nota')
+                    .reduce((acc, p) => ({ ...acc, [p.memberId]: p.comments }), {})
             });
 
         } catch (error) {
@@ -320,6 +324,31 @@ const Dashboard = () => {
         }
     };
 
+    const handleAddNote = async (member) => {
+        const currentNote = stats.notesMap[member._id] || '';
+        const note = prompt(`Agregar nota para ${member.fullName}:`, currentNote);
+
+        if (note === null) return; // Cancelled
+
+        try {
+            const currentMonth = new Date().getMonth() + 1;
+            const currentYear = new Date().getFullYear();
+
+            await axios.post(`${API_URL}/api/finance/note`, {
+                memberId: member._id,
+                memberName: member.fullName,
+                month: currentMonth,
+                year: currentYear,
+                comments: note
+            });
+
+            fetchData();
+        } catch (error) {
+            console.error('Error saving note:', error);
+            alert('Error al guardar la nota');
+        }
+    };
+
     const handlePaymentReminder = async (member) => {
         try {
             const amount = member.planCost || 2000;
@@ -520,10 +549,28 @@ const Dashboard = () => {
                             {filteredPending.map(m => (
                                 <div key={m._id} className="py-2 flex justify-between items-center">
                                     <div>
-                                        <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
-                                        <span className="text-xs text-slate-500 ml-2">CI: {m.ci}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
+                                            {stats.notesMap[m._id] && (
+                                                <span
+                                                    className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded border border-yellow-200 cursor-pointer"
+                                                    onClick={() => handleAddNote(m)}
+                                                    title="Click para editar"
+                                                >
+                                                    {stats.notesMap[m._id]}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-slate-500">CI: {m.ci}</span>
                                     </div>
                                     <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleAddNote(m)}
+                                            className="p-1.5 text-slate-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                                            title="Agregar Nota"
+                                        >
+                                            <StickyNote size={16} />
+                                        </button>
                                         <button
                                             onClick={() => handlePaymentReminder(m)}
                                             className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border

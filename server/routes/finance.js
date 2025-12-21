@@ -64,6 +64,42 @@ router.post('/', async (req, res) => {
     }
 });
 
+// Create or update a status note (amount 0)
+router.post('/note', async (req, res) => {
+    try {
+        const { memberId, memberName, month, year, comments } = req.body;
+
+        // Check if there is already a note for this month
+        let existingNote = await Payment.findOne({
+            memberId,
+            month,
+            year,
+            type: 'Nota'
+        });
+
+        if (existingNote) {
+            existingNote.comments = comments;
+            const updated = await existingNote.save();
+            return res.json(updated);
+        }
+
+        const newNote = new Payment({
+            memberId,
+            memberName,
+            month,
+            year,
+            amount: 0,
+            type: 'Nota',
+            comments
+        });
+
+        const savedNote = await newNote.save();
+        res.status(201).json(savedNote);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // Register expense
 router.post('/expenses', async (req, res) => {
     const expense = new Expense(req.body);
