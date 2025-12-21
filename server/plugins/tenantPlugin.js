@@ -50,13 +50,12 @@ module.exports = function tenantPlugin(schema) {
     schema.pre('deleteMany', injectTenant);
 
     // Middleware to inject tenantId on Save
-    schema.pre('save', function (next) {
+    schema.pre('save', function () {
         const store = tenantStorage.getStore();
         const tenantId = store ? store.get('tenantId') : null;
 
         if (tenantId && !this.tenantId) {
             this.tenantId = tenantId;
         }
-        next();
     });
 };
