@@ -8,7 +8,7 @@ const tenantMiddleware = async (req, res, next) => {
     // 1. Try Header (useful for public tenant pages or before login)
     const tenantSlug = req.headers['x-tenant-slug'];
     if (tenantSlug) {
-        const tenant = await Tenant.findOne({ slug: tenantSlug });
+        const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${tenantSlug}$`, 'i') } });
         if (tenant) tenantId = tenant._id;
     }
 
