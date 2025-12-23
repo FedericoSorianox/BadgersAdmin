@@ -32,6 +32,10 @@ const Sidebar = ({ isOpen, onClose }) => {
                             src={branding?.sidebarLogoUrl || branding?.logoUrl || "/badgers-logo.jpg"}
                             alt={branding?.name || "GymWorksPro"}
                             className="h-10 w-auto max-w-[120px] rounded-xl object-contain bg-white"
+                            onError={(e) => {
+                                e.target.onerror = null; // Prevent infinite loop
+                                e.target.src = "/gymworkspro-logo.png";
+                            }}
                         />
                         <div>
                             <h1 className="font-bold text-base leading-tight" style={{ color: 'var(--text-on-primary, white)' }}>

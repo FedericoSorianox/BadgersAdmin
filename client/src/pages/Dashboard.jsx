@@ -664,14 +664,14 @@ const Dashboard = () => {
                         <DollarSign size={20} />
                         Nueva Venta
                     </button>
-                    <button
+                    {/* <button
                         onClick={() => setNewExpenseModalOpen(true)}
                         style={{ backgroundColor: 'var(--btn-new-expense, #dc2626)' }}
                         className="hover:brightness-90 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm"
                     >
                         <TrendingDown size={20} />
                         Nuevo Gasto
-                    </button>
+                    </button> */}
                     <button
                         onClick={() => setNewFiadoModalOpen(true)}
                         style={{ backgroundColor: 'var(--btn-new-fiado, #f59e0b)' }}
@@ -911,7 +911,7 @@ const Dashboard = () => {
             {newExpenseModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-                        <h3 className="text-xl font-bold text-slate-800 mb-4">Nuevo Gasto</h3>
+                        {/* <h3 className="text-xl font-bold text-slate-800 mb-4">Nuevo Gasto</h3>
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
@@ -931,7 +931,7 @@ const Dashboard = () => {
                                     onChange={(e) => setNewExpenseForm({ ...newExpenseForm, amount: Number(e.target.value) })}
                                 />
                             </div>
-                        </div>
+                        </div> */}
                         <div className="flex gap-3 mt-6">
                             <button
                                 onClick={() => setNewExpenseModalOpen(false)}
