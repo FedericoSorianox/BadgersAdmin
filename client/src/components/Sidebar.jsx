@@ -31,7 +31,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         <img
                             src={branding?.sidebarLogoUrl || branding?.logoUrl || "/badgers-logo.jpg"}
                             alt={branding?.name || "GymWorksPro"}
-                            className="w-10 h-10 rounded-xl object-cover bg-white"
+                            className="h-10 w-auto max-w-[120px] rounded-xl object-contain bg-white"
                         />
                         <div>
                             <h1 className="font-bold text-base leading-tight" style={{ color: 'var(--text-on-primary, white)' }}>
