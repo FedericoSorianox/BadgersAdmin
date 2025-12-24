@@ -30,7 +30,7 @@ router.get('/', auth, isSuperAdmin, async (req, res) => {
 // @access  Public
 router.get('/public/:slug', async (req, res) => {
     try {
-        const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${req.params.slug}$`, 'i') } }).select('name slug branding');
+        const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${req.params.slug}$`, 'i') } }).select('name slug branding partners');
         if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
         res.json(tenant);
     } catch (err) {

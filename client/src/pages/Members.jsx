@@ -1,7 +1,7 @@
 
 
 import { useState, useEffect } from 'react';
-import { Search, Loader2, UserPlus, Edit2, Check, X, BarChart2, Trash2, Eye } from 'lucide-react';
+import { Search, Loader2, UserPlus, Edit2, Check, X, BarChart2, Trash2, Eye, MessageCircle, Filter } from 'lucide-react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Modal from '../components/Modal';
@@ -11,6 +11,7 @@ const Members = () => {
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterNotWhatsapp, setFilterNotWhatsapp] = useState(false);
 
     // Analytics State
     const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
@@ -37,6 +38,7 @@ const Members = () => {
         birthDate: '',
         comments: '',
         active: true,
+        isInWhatsappGroup: false,
         photoUrl: ''
     });
     const [imageFile, setImageFile] = useState(null);
@@ -76,6 +78,7 @@ const Members = () => {
                 birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split('T')[0] : '',
                 comments: member.comments || '',
                 active: member.active,
+                isInWhatsappGroup: member.isInWhatsappGroup || false,
                 photoUrl: member.photoUrl || ''
             });
             setImagePreview(member.photoUrl ? (member.photoUrl.startsWith('http') ? member.photoUrl : `${API_URL}${member.photoUrl}`) : null);
@@ -90,6 +93,7 @@ const Members = () => {
                 birthDate: '',
                 comments: '',
                 active: true,
+                isInWhatsappGroup: false,
                 photoUrl: ''
             });
             setImagePreview(null);
@@ -110,6 +114,7 @@ const Members = () => {
             formDataToSend.append('birthDate', formData.birthDate);
             formDataToSend.append('comments', formData.comments);
             formDataToSend.append('active', formData.active);
+            formDataToSend.append('isInWhatsappGroup', formData.isInWhatsappGroup);
 
             if (imageFile) {
                 formDataToSend.append('image', imageFile);
@@ -146,9 +151,26 @@ const Members = () => {
         }
     };
 
+    const handleToggleWhatsapp = async (member) => {
+        try {
+            const updatedStatus = !member.isInWhatsappGroup;
+            // Optimistic update
+            setMembers(members.map(m => m._id === member._id ? { ...m, isInWhatsappGroup: updatedStatus } : m));
+
+            await axios.put(`${API_URL}/api/members/${member._id}`, {
+                ...member,
+                isInWhatsappGroup: updatedStatus
+            });
+        } catch (error) {
+            console.error("Error updating whatsapp status", error);
+            fetchMembers(); // Revert on error
+        }
+    };
+
     const filteredMembers = members.filter(member =>
-        member.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.ci?.includes(searchTerm)
+        (member.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            member.ci?.includes(searchTerm)) &&
+        (!filterNotWhatsapp || !member.isInWhatsappGroup)
     );
 
 
@@ -672,6 +694,17 @@ const Members = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    <button
+                        onClick={() => setFilterNotWhatsapp(!filterNotWhatsapp)}
+                        className={`px-4 py-2 rounded-xl border flex items-center gap-2 font-medium transition-all ${filterNotWhatsapp
+                            ? 'bg-blue-100 text-blue-700 border-blue-200'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                        title="Ver solo los que NO están en el grupo"
+                    >
+                        <Filter size={20} />
+                        <span className="hidden sm:inline">{filterNotWhatsapp ? 'Faltan en Grupo' : 'Filtrar WhatsApp'}</span>
+                    </button>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -680,6 +713,7 @@ const Members = () => {
                             <tr>
                                 <th className="px-6 py-4">Socio</th>
                                 <th className="px-6 py-4">Cédula</th>
+                                <th className="px-6 py-4">WhatsApp</th>
                                 <th className="px-6 py-4">Plan</th>
                                 <th className="px-6 py-4">Estado</th>
                                 <th className="px-6 py-4 text-right">Acciones</th>
@@ -712,6 +746,31 @@ const Members = () => {
                                     </td>
                                     <td className="px-6 py-4 text-slate-500 font-mono">
                                         {member.ci}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={() => handleToggleWhatsapp(member)}
+                                                className={`p-2 rounded-full transition-colors ${member.isInWhatsappGroup
+                                                    ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                                    : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                                                    }`}
+                                                title={member.isInWhatsappGroup ? "En el grupo" : "Marcar como agregado al grupo"}
+                                            >
+                                                {member.isInWhatsappGroup ? <Check size={16} /> : <MessageCircle size={16} />}
+                                            </button>
+                                            {member.phone && (
+                                                <a
+                                                    href={`https://wa.me/${member.phone.replace(/\D/g, '').startsWith('0') ? '598' + member.phone.replace(/\D/g, '').substring(1) : member.phone.replace(/\D/g, '')}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-slate-400 hover:text-green-600 transition-colors"
+                                                    title="Abrir Chat"
+                                                >
+                                                    <MessageCircle size={18} />
+                                                </a>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-slate-600">
                                         {member.planType || 'Estándar'}

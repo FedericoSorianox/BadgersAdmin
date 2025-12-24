@@ -2,8 +2,13 @@ import { useState, useEffect } from 'react';
 import { Save, Calculator } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { useTenant } from '../context/TenantContext';
 
 const Admin = () => {
+    const { partners } = useTenant();
+    const partner1Name = partners && partners[0]?.name ? partners[0].name : 'Fede';
+    const partner2Name = partners && partners[1]?.name ? partners[1].name : 'Gonza';
+
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
 
@@ -202,7 +207,7 @@ const Admin = () => {
                         <h3 className="text-lg font-bold text-slate-700 mb-4">Horas Base Mensuales</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">Horas Fede</label>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Horas {partner1Name}</label>
                                 <input
                                     type="number"
                                     className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -211,7 +216,7 @@ const Admin = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">Horas Gonza</label>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Horas {partner2Name}</label>
                                 <input
                                     type="number"
                                     className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -225,7 +230,7 @@ const Admin = () => {
                         <h3 className="text-lg font-bold text-slate-700 mb-4">Días Libres (Reducen pago)</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres Fede</label>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres {partner1Name}</label>
                                 <input
                                     type="number"
                                     className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -234,7 +239,7 @@ const Admin = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres Gonza</label>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres {partner2Name}</label>
                                 <input
                                     type="number"
                                     className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -251,7 +256,7 @@ const Admin = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-center mb-2">
-                        <p className="text-sm font-bold text-slate-400 uppercase">FEDE</p>
+                        <p className="text-sm font-bold text-slate-400 uppercase">{partner1Name}</p>
                         <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
                             Neto: {(Number(config.fedeHours) * ((26 - Number(config.fedeDaysOff)) / 26)).toFixed(1)}h
                         </span>
@@ -270,7 +275,7 @@ const Admin = () => {
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-center mb-2">
-                        <p className="text-sm font-bold text-slate-400 uppercase">GONZA</p>
+                        <p className="text-sm font-bold text-slate-400 uppercase">{partner2Name}</p>
                         <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
                             Neto: {(Number(config.gonzaHours) * ((26 - Number(config.gonzaDaysOff)) / 26)).toFixed(1)}h
                         </span>

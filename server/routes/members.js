@@ -25,7 +25,8 @@ router.post('/', upload.single('image'), async (req, res) => {
             planCost: Number(req.body.planCost),
             birthDate: req.body.birthDate,
             comments: req.body.comments,
-            active: req.body.active === 'true' || req.body.active === true
+            active: req.body.active === 'true' || req.body.active === true,
+            isInWhatsappGroup: req.body.isInWhatsappGroup === 'true' || req.body.isInWhatsappGroup === true
         };
 
         // If an image was uploaded, save its path
@@ -51,7 +52,8 @@ router.put('/:id', upload.single('image'), async (req, res) => {
             planCost: Number(req.body.planCost),
             birthDate: req.body.birthDate,
             comments: req.body.comments,
-            active: req.body.active === 'true' || req.body.active === true
+            active: req.body.active === 'true' || req.body.active === true,
+            isInWhatsappGroup: req.body.isInWhatsappGroup === 'true' || req.body.isInWhatsappGroup === true
         };
 
         // If a new image was uploaded, update the path

@@ -14,6 +14,8 @@ export const TenantProvider = ({ children }) => {
         textColor: '#ffffff'
     });
 
+    const [partners, setPartners] = useState([]);
+
     const [tenantId, setTenantId] = useState(null);
 
     const [loading, setLoading] = useState(true);
@@ -135,6 +137,7 @@ export const TenantProvider = ({ children }) => {
                                     ...data.branding,
                                     name: data.name // Ensure we have the tenant name if needed
                                 });
+                                setPartners(data.partners || []);
                                 setTenantId(data._id);
 
                                 // Apply colors
@@ -198,6 +201,7 @@ export const TenantProvider = ({ children }) => {
 
     const value = {
         branding,
+        partners,
         tenantId
     };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote } from 'lucide-react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL, EXCLUDED_MEMBERS } from '../config';
@@ -33,7 +33,8 @@ const Dashboard = () => {
         membersList: [],
         paymentsList: [],
         remindersSent: [], // New state for tracking sent reminders
-        notesMap: {} // memberId -> note string
+        notesMap: {}, // memberId -> note string
+        birthdaysList: [] // Members with birthday this month
     });
 
     const [debts, setDebts] = useState([]);
@@ -112,7 +113,19 @@ const Dashboard = () => {
                 remindersSent: new Set(remindersSent), // Convert to Set for faster lookup
                 notesMap: payments
                     .filter(p => Number(p.month) === currentMonth && Number(p.year) === currentYear && p.type === 'Nota')
-                    .reduce((acc, p) => ({ ...acc, [p.memberId]: p.comments }), {})
+                    .reduce((acc, p) => ({ ...acc, [p.memberId]: p.comments }), {}),
+                birthdaysList: members.filter(m => {
+                    if (!m.birthDate || !m.active) return false;
+                    const bdate = new Date(m.birthDate);
+                    // Check if month matches current month (0-indexed vs 1-indexed checks)
+                    // currentMonth is 1-indexed (e.g. 12 for Dec)
+                    // bdate.getUTCMonth() returns 0-11. Let's use getMonth() + 1
+                    return (bdate.getMonth() + 1) === currentMonth;
+                }).sort((a, b) => {
+                    const dayA = new Date(a.birthDate).getDate();
+                    const dayB = new Date(b.birthDate).getDate();
+                    return dayA - dayB;
+                })
             });
 
         } catch (error) {
@@ -846,6 +859,48 @@ const Dashboard = () => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+            </div>
+
+            {/* Birthdays Section */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2">
+                        <Calendar className="text-pink-500" />
+                        Cumpleaños del Mes
+                    </h3>
+                </div>
+
+                {stats.birthdaysList.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl">
+                        No hay cumpleañeros este mes.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {stats.birthdaysList.map(m => {
+                            const bdate = new Date(m.birthDate);
+                            const day = bdate.getDate();
+                            const age = new Date().getFullYear() - bdate.getFullYear();
+                            const isToday = new Date().getDate() === day && (new Date().getMonth() + 1) === (new Date().getMonth() + 1); // Simple check
+
+                            return (
+                                <div key={m._id} className={`p-4 rounded-xl border flex items-center gap-4 ${isToday ? 'bg-pink-50 border-pink-200' : 'bg-white border-slate-100'}`}>
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${isToday ? 'bg-pink-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                        {day}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-700">{m.fullName}</p>
+                                        <p className="text-xs text-slate-400">Cumple {age} años</p>
+                                    </div>
+                                    {isToday && (
+                                        <span className="ml-auto px-2 py-1 bg-pink-100 text-pink-600 text-xs font-bold rounded-full">
+                                            ¡Hoy!
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
