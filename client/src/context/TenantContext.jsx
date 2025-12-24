@@ -9,7 +9,7 @@ export const TenantProvider = ({ children }) => {
         name: 'Badgers Admin',
         primaryColor: '#000000', // Badgers Black
         secondaryColor: '#1a1a1a', // Badgers Dark
-        logoUrl: '/badgers-logo.jpg',
+        logoUrl: '/gymworkspro-logo.png',
         sidebarText: 'Badgers Admin',
         textColor: '#ffffff'
     });

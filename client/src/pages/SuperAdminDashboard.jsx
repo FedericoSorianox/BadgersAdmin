@@ -14,14 +14,16 @@ const SuperAdminDashboard = () => {
         secondaryColor: '#2c3e50',
         logoUrl: '',
         sidebarText: '',
-        sidebarLogoUrl: '',
         textColor: '#ffffff',
         menuHoverColor: '',
         menuActiveColor: '',
         dashboardTitleColor: '',
+        partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
+        instructorHourlyRate: 0,
         adminUsername: '',
         adminPassword: ''
     });
+    const [uploading, setUploading] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -76,7 +78,7 @@ const SuperAdminDashboard = () => {
                     secondaryColor: '#2c3e50',
                     logoUrl: '',
                     sidebarText: '',
-                    sidebarLogoUrl: '',
+                    sidebarText: '',
                     textColor: '#ffffff',
                     menuHoverColor: '',
                     menuActiveColor: '',
@@ -100,13 +102,17 @@ const SuperAdminDashboard = () => {
             slug: tenant.slug,
             primaryColor: tenant.branding.primaryColor,
             secondaryColor: tenant.branding.secondaryColor,
+            primaryColor: tenant.branding.primaryColor,
+            secondaryColor: tenant.branding.secondaryColor,
             logoUrl: tenant.branding.logoUrl || '',
             sidebarText: tenant.branding.sidebarText || '',
-            sidebarLogoUrl: tenant.branding.sidebarLogoUrl || '',
             textColor: tenant.branding.textColor || '#ffffff',
             menuHoverColor: tenant.branding.menuHoverColor || '',
             menuActiveColor: tenant.branding.menuActiveColor || '',
-            dashboardTitleColor: tenant.branding.dashboardTitleColor || ''
+            menuActiveColor: tenant.branding.menuActiveColor || '',
+            dashboardTitleColor: tenant.branding.dashboardTitleColor || '',
+            partners: tenant.partners && tenant.partners.length >= 2 ? tenant.partners : [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
+            instructorHourlyRate: tenant.instructorHourlyRate || 0
         });
         setShowModal(true);
     };
@@ -122,6 +128,35 @@ const SuperAdminDashboard = () => {
             if (res.ok) fetchTenants();
         } catch (error) {
             console.error(error);
+        }
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/images/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setNewTenant(prev => ({ ...prev, logoUrl: data.imageUrl }));
+            } else {
+                alert('Error uploading image');
+            }
+        } catch (error) {
+            console.error('Error uploading:', error);
+            alert('Error updating image');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -167,7 +202,6 @@ const SuperAdminDashboard = () => {
                                 secondaryColor: '#2c3e50',
                                 logoUrl: '',
                                 sidebarText: '',
-                                sidebarLogoUrl: '',
                                 textColor: '#ffffff',
                                 menuHoverColor: '',
                                 menuActiveColor: '',
@@ -178,6 +212,9 @@ const SuperAdminDashboard = () => {
                                 newMemberButtonColor: '',
                                 newProductButtonColor: '',
                                 saveButtonColor: '',
+                                saveButtonColor: '',
+                                partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
+                                instructorHourlyRate: 0,
                                 adminUsername: '',
                                 adminPassword: ''
                             });
@@ -262,6 +299,24 @@ const SuperAdminDashboard = () => {
                                         value={newTenant.slug}
                                         onChange={e => setNewTenant({ ...newTenant, slug: e.target.value })}
                                     />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Logo del Gimnasio</label>
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="text"
+                                            placeholder="https://..."
+                                            className="w-full p-2 border border-slate-200 rounded-lg"
+                                            value={newTenant.logoUrl}
+                                            onChange={e => setNewTenant({ ...newTenant, logoUrl: e.target.value })}
+                                        />
+                                        <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 p-2 rounded-lg border border-slate-300 transition-colors">
+                                            <span className="text-xs font-semibold text-slate-600">Upload</span>
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                                        </label>
+                                    </div>
+                                    {uploading && <p className="text-xs text-blue-500 mt-1">Uploading...</p>}
                                 </div>
 
                                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -491,26 +546,54 @@ const SuperAdminDashboard = () => {
                                     </div>
                                 </div>
 
+
+
+                                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                    <h4 className="font-semibold text-slate-800 mb-3">Socios (Partners)</h4>
+                                    <div className="space-y-3">
+                                        {newTenant.partners.map((partner, index) => (
+                                            <div key={index} className="flex gap-3">
+                                                <div className="flex-1">
+                                                    <label className="text-xs text-slate-500 mb-1 block">Nombre Socio {index + 1}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full p-2 border border-slate-200 rounded-lg"
+                                                        value={partner.name}
+                                                        onChange={e => {
+                                                            const updatedPartners = [...newTenant.partners];
+                                                            updatedPartners[index].name = e.target.value;
+                                                            setNewTenant({ ...newTenant, partners: updatedPartners });
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="w-24">
+                                                    <label className="text-xs text-slate-500 mb-1 block">% Reparto</label>
+                                                    <input
+                                                        type="number"
+                                                        className="w-full p-2 border border-slate-200 rounded-lg"
+                                                        value={partner.percentage}
+                                                        onChange={e => {
+                                                            const updatedPartners = [...newTenant.partners];
+                                                            updatedPartners[index].percentage = parseFloat(e.target.value) || 0;
+                                                            setNewTenant({ ...newTenant, partners: updatedPartners });
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Logo URL (General)</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor Hora Instructor ($)</label>
                                     <input
-                                        type="text"
-                                        placeholder="https://..."
+                                        type="number"
                                         className="w-full p-2 border border-slate-200 rounded-lg"
-                                        value={newTenant.logoUrl}
-                                        onChange={e => setNewTenant({ ...newTenant, logoUrl: e.target.value })}
+                                        value={newTenant.instructorHourlyRate}
+                                        onChange={e => setNewTenant({ ...newTenant, instructorHourlyRate: parseFloat(e.target.value) || 0 })}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Logo Menu (Opcional)</label>
-                                    <input
-                                        type="text"
-                                        placeholder="https://... (Si es diferente al general)"
-                                        className="w-full p-2 border border-slate-200 rounded-lg"
-                                        value={newTenant.sidebarLogoUrl}
-                                        onChange={e => setNewTenant({ ...newTenant, sidebarLogoUrl: e.target.value })}
-                                    />
-                                </div>
+
 
                                 <div className="flex justify-end gap-3 mt-6">
                                     <button

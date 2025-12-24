@@ -72,6 +72,7 @@ app.get('/fix-promote-admin', async (req, res) => {
 app.use(require('./middleware/tenant'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tenants', require('./routes/tenants'));
+app.use('/api/images', require('./routes/images'));
 app.use('/api/members', require('./routes/members'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/finance', require('./routes/finance'));

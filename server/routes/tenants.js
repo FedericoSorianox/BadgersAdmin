@@ -42,7 +42,7 @@ router.get('/public/:slug', async (req, res) => {
 // @desc    Create a new tenant
 // @access  Super Admin
 router.post('/', auth, isSuperAdmin, async (req, res) => {
-    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, sidebarLogoUrl, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor, adminUsername, adminPassword } = req.body;
+    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor, partners, instructorHourlyRate, adminUsername, adminPassword } = req.body;
 
     try {
         let tenant = await Tenant.findOne({ slug });
@@ -66,12 +66,13 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
                 secondaryColor: secondaryColor || '#2c3e50',
                 logoUrl,
                 sidebarText, // Let's use schema default if undefined
-                sidebarLogoUrl,
                 textColor: textColor || '#ffffff',
                 menuHoverColor,
                 menuActiveColor,
                 dashboardTitleColor
-            }
+            },
+            partners: partners || [],
+            instructorHourlyRate: instructorHourlyRate || 0
         });
 
         const savedTenant = await tenant.save();
@@ -100,12 +101,15 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
 // @desc    Update tenant
 // @access  Super Admin
 router.put('/:id', auth, isSuperAdmin, async (req, res) => {
-    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, sidebarLogoUrl, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor } = req.body;
+    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor, partners, instructorHourlyRate } = req.body;
 
     // Construct update object
     const updateFields = {};
     if (name) updateFields.name = name;
+    if (name) updateFields.name = name;
     if (slug) updateFields.slug = slug;
+    if (partners) updateFields.partners = partners;
+    if (instructorHourlyRate !== undefined) updateFields.instructorHourlyRate = instructorHourlyRate;
 
     // For branding, we want to update specific fields but keep others if not provided? 
     // Or just overwrite branding? Let's assume we send the full branding state or merge it.
@@ -121,7 +125,6 @@ router.put('/:id', auth, isSuperAdmin, async (req, res) => {
     if (secondaryColor !== undefined) brandingUpdate['branding.secondaryColor'] = secondaryColor;
     if (logoUrl !== undefined) brandingUpdate['branding.logoUrl'] = logoUrl;
     if (sidebarText !== undefined) brandingUpdate['branding.sidebarText'] = sidebarText;
-    if (sidebarLogoUrl !== undefined) brandingUpdate['branding.sidebarLogoUrl'] = sidebarLogoUrl;
     if (textColor !== undefined) brandingUpdate['branding.textColor'] = textColor;
     if (menuHoverColor !== undefined) brandingUpdate['branding.menuHoverColor'] = menuHoverColor;
     if (menuActiveColor !== undefined) brandingUpdate['branding.menuActiveColor'] = menuActiveColor;

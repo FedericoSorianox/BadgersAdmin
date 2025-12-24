@@ -7,7 +7,6 @@ const TenantSchema = new mongoose.Schema({
         primaryColor: { type: String, default: '#3498db' },
         secondaryColor: { type: String, default: '#2c3e50' },
         logoUrl: { type: String }, // General logo
-        sidebarLogoUrl: { type: String }, // Specific sidebar image if different
         sidebarText: { type: String }, // Text to replace "Badgers Admin"
         textColor: { type: String, default: '#ffffff' }, // Text color for sidebar/primary actions
         menuHoverColor: { type: String }, // Color when hovering menu items
@@ -20,6 +19,11 @@ const TenantSchema = new mongoose.Schema({
         newProductButtonColor: { type: String },
         saveButtonColor: { type: String }
     },
+    partners: [{
+        name: { type: String, default: '' },
+        percentage: { type: Number, default: 0 }
+    }],
+    instructorHourlyRate: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now }
 });
 

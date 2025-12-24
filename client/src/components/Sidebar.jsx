@@ -29,7 +29,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <div className="flex items-center justify-between gap-3 px-2 py-4 mb-4">
                     <div className="flex items-center gap-2">
                         <img
-                            src={branding?.sidebarLogoUrl || branding?.logoUrl || "/badgers-logo.jpg"}
+                            src={branding?.logoUrl || "/gymworkspro-logo.png"}
                             alt={branding?.name || "GymWorksPro"}
                             className="h-10 w-auto max-w-[120px] rounded-xl object-contain bg-white"
                             onError={(e) => {
@@ -39,7 +39,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         />
                         <div>
                             <h1 className="font-bold text-base leading-tight" style={{ color: 'var(--text-on-primary, white)' }}>
-                                {branding?.sidebarText || branding?.name || "GymWorksPro"}
+                                {branding?.name || "GymWorksPro"}
                             </h1>
                         </div>
                     </div>
@@ -81,16 +81,17 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </nav>
 
                 <div className="mt-auto px-4 py-6 border-t border-slate-800">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col items-center text-center gap-1">
+                        <p className="text-sm font-medium text-white">Contacto</p>
+                        <p className="text-xs text-slate-400">admin@gymworkspro.com</p>
+                    </div>
+                    {/* GymWorks Pro Logo */}
+                    <div className="mt-4 pt-4 border-t border-white/10 flex justify-center">
                         <img
-                            src="/badgers-logo.jpg"
-                            alt="Admin"
-                            className="w-8 h-8 rounded-full object-cover"
+                            src="/gymworkspro-logo.png"
+                            alt="Powered by GymWorks Pro"
+                            className="w-32 h-auto opacity-90 hover:opacity-100 transition-opacity"
                         />
-                        <div>
-                            <p className="text-sm font-medium">Administrador</p>
-                            <p className="text-xs text-slate-500">admin@gymworkspro.com</p>
-                        </div>
                     </div>
                 </div>
             </div>
