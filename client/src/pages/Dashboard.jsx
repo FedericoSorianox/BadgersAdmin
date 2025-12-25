@@ -117,13 +117,12 @@ const Dashboard = () => {
                 birthdaysList: members.filter(m => {
                     if (!m.birthDate || !m.active) return false;
                     const bdate = new Date(m.birthDate);
-                    // Check if month matches current month (0-indexed vs 1-indexed checks)
-                    // currentMonth is 1-indexed (e.g. 12 for Dec)
-                    // bdate.getUTCMonth() returns 0-11. Let's use getMonth() + 1
-                    return (bdate.getMonth() + 1) === currentMonth;
+                    // Check if month matches current month
+                    // Use UTC to ensure we get the stored date, not the timezone adjusted one
+                    return (bdate.getUTCMonth() + 1) === currentMonth;
                 }).sort((a, b) => {
-                    const dayA = new Date(a.birthDate).getDate();
-                    const dayB = new Date(b.birthDate).getDate();
+                    const dayA = new Date(a.birthDate).getUTCDate();
+                    const dayB = new Date(b.birthDate).getUTCDate();
                     return dayA - dayB;
                 })
             });
@@ -880,9 +879,10 @@ const Dashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {stats.birthdaysList.map(m => {
                             const bdate = new Date(m.birthDate);
-                            const day = bdate.getDate();
+                            const day = bdate.getUTCDate();
                             const age = new Date().getFullYear() - bdate.getFullYear();
-                            const isToday = new Date().getDate() === day && (new Date().getMonth() + 1) === (new Date().getMonth() + 1); // Simple check
+                            // Compare local today with UTC birthday day to celebrate on the correct calendar day
+                            const isToday = new Date().getDate() === day && (new Date().getMonth() + 1) === (new Date().getMonth() + 1);
 
                             return (
                                 <div key={m._id} className={`p-4 rounded-xl border flex items-center gap-4 ${isToday ? 'bg-pink-50 border-pink-200' : 'bg-white border-slate-100'}`}>
