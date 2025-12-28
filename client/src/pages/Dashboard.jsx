@@ -23,6 +23,7 @@ const Dashboard = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [modalType, setModalType] = useState(null); // 'active', 'inactive', 'stock', 'payments'
     const [searchTerm, setSearchTerm] = useState('');
+    const [debtSearchTerm, setDebtSearchTerm] = useState('');
     const [stats, setStats] = useState({
         activeMembers: 0,
         inactiveMembers: 0,
@@ -748,6 +749,17 @@ const Dashboard = () => {
                     </div>
                 </div>
 
+                <div className="relative mb-6 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Buscar socio en deudas..."
+                        className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        value={debtSearchTerm}
+                        onChange={(e) => setDebtSearchTerm(e.target.value)}
+                    />
+                </div>
+
                 {debts.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl">
                         No hay deudas pendientes en este momento.
@@ -781,7 +793,9 @@ const Dashboard = () => {
                                     acc[mId].totalDebt += remaining;
                                     acc[mId].count += 1;
                                     return acc;
-                                }, {})).map(group => (
+                                }, {})).filter(group =>
+                                    group.name.toLowerCase().includes(debtSearchTerm.toLowerCase())
+                                ).map(group => (
                                     <tr key={group.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
