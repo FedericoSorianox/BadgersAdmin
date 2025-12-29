@@ -104,10 +104,10 @@ const Admin = () => {
         if (totalEffectiveHours <= 0) return;
 
         // New distribution logic:
-        // 40% split 50/50
-        // 60% split by EFFECTIVE hours worked
-        const fixedPortion = grossProfit * 0.40;
-        const variablePortion = grossProfit * 0.60;
+        // 50% split 50/50
+        // 50% split by EFFECTIVE hours worked
+        const fixedPortion = grossProfit * 0.50;
+        const variablePortion = grossProfit * 0.50;
 
         const fixedFede = fixedPortion * 0.50;
         const fixedGonza = fixedPortion * 0.50;
