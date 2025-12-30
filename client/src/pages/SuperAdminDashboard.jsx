@@ -42,8 +42,18 @@ const SuperAdminDashboard = () => {
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_URL}/api/tenants`, {
-                headers: { 'Authorization': `Bearer ${token} ` }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
+
+            if (res.status === 401) {
+                // Token expired or invalid
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                localStorage.removeItem('isAuthenticated');
+                window.location.href = '/login';
+                return;
+            }
+
             const data = await res.json();
             if (res.ok) setTenants(data);
         } catch (error) {
@@ -68,6 +78,15 @@ const SuperAdminDashboard = () => {
                 },
                 body: JSON.stringify(newTenant)
             });
+
+            if (res.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                localStorage.removeItem('isAuthenticated');
+                window.location.href = '/login';
+                return;
+            }
+
             if (res.ok) {
                 setShowModal(false);
                 setEditingId(null);
@@ -77,7 +96,6 @@ const SuperAdminDashboard = () => {
                     primaryColor: '#3498db',
                     secondaryColor: '#2c3e50',
                     logoUrl: '',
-                    sidebarText: '',
                     sidebarText: '',
                     textColor: '#ffffff',
                     menuHoverColor: '',
@@ -125,6 +143,15 @@ const SuperAdminDashboard = () => {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+
+            if (res.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                localStorage.removeItem('isAuthenticated');
+                window.location.href = '/login';
+                return;
+            }
+
             if (res.ok) fetchTenants();
         } catch (error) {
             console.error(error);
@@ -146,6 +173,15 @@ const SuperAdminDashboard = () => {
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             });
+
+            if (res.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                localStorage.removeItem('isAuthenticated');
+                window.location.href = '/login';
+                return;
+            }
+
             const data = await res.json();
             if (res.ok) {
                 setNewTenant(prev => ({ ...prev, logoUrl: data.imageUrl }));
