@@ -329,7 +329,8 @@ const SuperAdminDashboard = () => {
             {
                 showModal && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+                        {/* Modal Container: Fixed height to ensure internal scrolling works */}
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
                             <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
                                 <h3 className="text-xl font-bold text-slate-800">{editingId ? 'Editar Gimnasio' : 'Crear Nuevo Gimnasio'}</h3>
                                 <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
