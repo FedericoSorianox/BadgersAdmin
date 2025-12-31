@@ -83,7 +83,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <div className="mt-auto px-4 py-6 border-t border-slate-800">
                     <div className="flex flex-col items-center text-center gap-1">
                         <p className="text-sm font-medium text-white">Contacto</p>
-                        <p className="text-xs text-slate-400">admin@gymworkspro.com</p>
+                        <p className="text-xs text-slate-400">contacto@vanguardlab.uy</p>
                     </div>
                     {/* GymWorks Pro Logo */}
                     <div className="mt-4 pt-4 border-t border-white/10 flex justify-center">
