@@ -248,7 +248,6 @@ const SuperAdminDashboard = () => {
                                 newMemberButtonColor: '',
                                 newProductButtonColor: '',
                                 saveButtonColor: '',
-                                saveButtonColor: '',
                                 partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
                                 instructorHourlyRate: 0,
                                 adminUsername: '',
@@ -311,345 +310,504 @@ const SuperAdminDashboard = () => {
             {
                 showModal && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
                             <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
                                 <h3 className="text-xl font-bold text-slate-800">{editingId ? 'Editar Gimnasio' : 'Crear Nuevo Gimnasio'}</h3>
+                                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                                    <span className="text-2xl font-light">×</span>
+                                </button>
                             </div>
-                            <form onSubmit={handleSave} className="p-6 space-y-4 overflow-y-auto">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        value={newTenant.name}
-                                        onChange={e => setNewTenant({ ...newTenant, name: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Slug (URL ID)</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        value={newTenant.slug}
-                                        onChange={e => setNewTenant({ ...newTenant, slug: e.target.value })}
-                                    />
-                                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Logo del Gimnasio</label>
-                                    <div className="flex gap-2 items-center">
-                                        <input
-                                            type="text"
-                                            placeholder="https://..."
-                                            className="w-full p-2 border border-slate-200 rounded-lg"
-                                            value={newTenant.logoUrl}
-                                            onChange={e => setNewTenant({ ...newTenant, logoUrl: e.target.value })}
-                                        />
-                                        <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 p-2 rounded-lg border border-slate-300 transition-colors">
-                                            <span className="text-xs font-semibold text-slate-600">Upload</span>
-                                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
-                                        </label>
-                                    </div>
-                                    {uploading && <p className="text-xs text-blue-500 mt-1">Uploading...</p>}
-                                </div>
-
-                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                    <h4 className="font-semibold text-slate-700 mb-3">{editingId ? 'Actualizar Credenciales Admin' : 'Usuario Administrador Inicial'}</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Nuevo Usuario (Opcional)' : 'Usuario Admin'}</label>
-                                            <input
-                                                type="text"
-                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                value={newTenant.adminUsername}
-                                                onChange={e => setNewTenant({ ...newTenant, adminUsername: e.target.value })}
-                                                placeholder={editingId ? 'Dejar vacío para mantener actual' : "Ej: admin_cobra"}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Nueva Contraseña (Opcional)' : 'Contraseña Admin'}</label>
-                                            <input
-                                                type="password"
-                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                value={newTenant.adminPassword}
-                                                onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
-                                                placeholder={editingId ? 'Dejar vacío para mantener actual' : "••••••••"}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Color Primario</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.primaryColor}
-                                                onChange={e => setNewTenant({ ...newTenant, primaryColor: e.target.value })}
-                                            />
-                                            <input
-                                                type="text"
-                                                className="w-full p-2 border border-slate-200 rounded-lg"
-                                                value={newTenant.primaryColor}
-                                                onChange={e => setNewTenant({ ...newTenant, primaryColor: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Color Secundario</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.secondaryColor}
-                                                onChange={e => setNewTenant({ ...newTenant, secondaryColor: e.target.value })}
-                                            />
-                                            <input
-                                                type="text"
-                                                className="w-full p-2 border border-slate-200 rounded-lg"
-                                                value={newTenant.secondaryColor}
-                                                onChange={e => setNewTenant({ ...newTenant, secondaryColor: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Extended Branding Colors */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Color Menu Hover</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.menuHoverColor || '#000000'}
-                                                onChange={e => setNewTenant({ ...newTenant, menuHoverColor: e.target.value })}
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="#..."
-                                                className="w-full p-2 border border-slate-200 rounded-lg"
-                                                value={newTenant.menuHoverColor || ''}
-                                                onChange={e => setNewTenant({ ...newTenant, menuHoverColor: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Color Menu Activo</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.menuActiveColor || '#000000'}
-                                                onChange={e => setNewTenant({ ...newTenant, menuActiveColor: e.target.value })}
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="#..."
-                                                className="w-full p-2 border border-slate-200 rounded-lg"
-                                                value={newTenant.menuActiveColor || ''}
-                                                onChange={e => setNewTenant({ ...newTenant, menuActiveColor: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Color Título Dashboard</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.dashboardTitleColor || '#000000'}
-                                                onChange={e => setNewTenant({ ...newTenant, dashboardTitleColor: e.target.value })}
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="#..."
-                                                className="w-full p-2 border border-slate-200 rounded-lg"
-                                                value={newTenant.dashboardTitleColor || ''}
-                                                onChange={e => setNewTenant({ ...newTenant, dashboardTitleColor: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Button Colors */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nueva Venta</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.newSaleButtonColor || '#22c55e'}
-                                                onChange={e => setNewTenant({ ...newTenant, newSaleButtonColor: e.target.value })}
-                                            />
-                                            <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newSaleButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newSaleButtonColor: e.target.value })} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nuevo Gasto</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.newExpenseButtonColor || '#ef4444'}
-                                                onChange={e => setNewTenant({ ...newTenant, newExpenseButtonColor: e.target.value })}
-                                            />
-                                            <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newExpenseButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newExpenseButtonColor: e.target.value })} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nuevo Fiado</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.newFiadoButtonColor || '#f59e0b'}
-                                                onChange={e => setNewTenant({ ...newTenant, newFiadoButtonColor: e.target.value })}
-                                            />
-                                            <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newFiadoButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newFiadoButtonColor: e.target.value })} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nuevo Socio</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.newMemberButtonColor || '#3b82f6'}
-                                                onChange={e => setNewTenant({ ...newTenant, newMemberButtonColor: e.target.value })}
-                                            />
-                                            <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newMemberButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newMemberButtonColor: e.target.value })} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nuevo Producto</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.newProductButtonColor || '#3b82f6'}
-                                                onChange={e => setNewTenant({ ...newTenant, newProductButtonColor: e.target.value })}
-                                            />
-                                            <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newProductButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newProductButtonColor: e.target.value })} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Guardar (General)</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.saveButtonColor || '#3b82f6'}
-                                                onChange={e => setNewTenant({ ...newTenant, saveButtonColor: e.target.value })}
-                                            />
-                                            <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.saveButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, saveButtonColor: e.target.value })} />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Extended Branding Text/Logos */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Texto del Menu (Sidebar)</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Ej: Cobra Kai Admin"
-                                            className="w-full p-2 border border-slate-200 rounded-lg"
-                                            value={newTenant.sidebarText}
-                                            onChange={e => setNewTenant({ ...newTenant, sidebarText: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Color Texto Menu</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="color"
-                                                className="h-10 w-10 rounded-lg cursor-pointer"
-                                                value={newTenant.textColor}
-                                                onChange={e => setNewTenant({ ...newTenant, textColor: e.target.value })}
-                                            />
-                                            <input
-                                                type="text"
-                                                className="w-full p-2 border border-slate-200 rounded-lg"
-                                                value={newTenant.textColor}
-                                                onChange={e => setNewTenant({ ...newTenant, textColor: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-
-
-                                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                                    <h4 className="font-semibold text-slate-800 mb-3">Socios (Partners)</h4>
-                                    <div className="space-y-3">
-                                        {newTenant.partners.map((partner, index) => (
-                                            <div key={index} className="flex gap-3">
-                                                <div className="flex-1">
-                                                    <label className="text-xs text-slate-500 mb-1 block">Nombre Socio {index + 1}</label>
+                            <div className="flex-1 overflow-hidden">
+                                <form onSubmit={handleSave} className="flex flex-col lg:flex-row h-full">
+                                    {/* Left Column: Form Inputs */}
+                                    <div className="flex-1 overflow-y-auto p-6 space-y-6 border-r border-slate-100">
+                                        <div className="space-y-4">
+                                            <h4 className="font-bold text-slate-900 border-b pb-2">Información General</h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
                                                     <input
                                                         type="text"
-                                                        className="w-full p-2 border border-slate-200 rounded-lg"
-                                                        value={partner.name}
-                                                        onChange={e => {
-                                                            const updatedPartners = [...newTenant.partners];
-                                                            updatedPartners[index].name = e.target.value;
-                                                            setNewTenant({ ...newTenant, partners: updatedPartners });
-                                                        }}
+                                                        required
+                                                        className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                        value={newTenant.name}
+                                                        onChange={e => setNewTenant({ ...newTenant, name: e.target.value })}
                                                     />
                                                 </div>
-                                                <div className="w-24">
-                                                    <label className="text-xs text-slate-500 mb-1 block">% Reparto</label>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Slug (URL ID)</label>
                                                     <input
-                                                        type="number"
-                                                        className="w-full p-2 border border-slate-200 rounded-lg"
-                                                        value={partner.percentage}
-                                                        onChange={e => {
-                                                            const updatedPartners = [...newTenant.partners];
-                                                            updatedPartners[index].percentage = parseFloat(e.target.value) || 0;
-                                                            setNewTenant({ ...newTenant, partners: updatedPartners });
-                                                        }}
+                                                        type="text"
+                                                        required
+                                                        className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                        value={newTenant.slug}
+                                                        onChange={e => setNewTenant({ ...newTenant, slug: e.target.value })}
                                                     />
                                                 </div>
                                             </div>
-                                        ))}
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Logo del Gimnasio</label>
+                                                <div className="flex gap-2 items-center">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="https://..."
+                                                        className="w-full p-2 border border-slate-200 rounded-lg"
+                                                        value={newTenant.logoUrl}
+                                                        onChange={e => setNewTenant({ ...newTenant, logoUrl: e.target.value })}
+                                                    />
+                                                    <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 p-2 rounded-lg border border-slate-300 transition-colors shrink-0">
+                                                        <span className="text-xs font-semibold text-slate-600">Upload</span>
+                                                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                                                    </label>
+                                                </div>
+                                                {uploading && <p className="text-xs text-blue-500 mt-1">Uploading...</p>}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <h4 className="font-bold text-slate-900 border-b pb-2">Apariencia y Colores</h4>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Color Primario (Acentos)</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.primaryColor}
+                                                            onChange={e => setNewTenant({ ...newTenant, primaryColor: e.target.value })}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            className="w-full p-2 border border-slate-200 rounded-lg"
+                                                            value={newTenant.primaryColor}
+                                                            onChange={e => setNewTenant({ ...newTenant, primaryColor: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Color Secundario (Sidebar)</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.secondaryColor}
+                                                            onChange={e => setNewTenant({ ...newTenant, secondaryColor: e.target.value })}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            className="w-full p-2 border border-slate-200 rounded-lg"
+                                                            value={newTenant.secondaryColor}
+                                                            onChange={e => setNewTenant({ ...newTenant, secondaryColor: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Extended Branding Colors */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Color Menu Hover</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.menuHoverColor || '#000000'}
+                                                            onChange={e => setNewTenant({ ...newTenant, menuHoverColor: e.target.value })}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="#..."
+                                                            className="w-full p-2 border border-slate-200 rounded-lg"
+                                                            value={newTenant.menuHoverColor || ''}
+                                                            onChange={e => setNewTenant({ ...newTenant, menuHoverColor: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Color Menu Activo</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.menuActiveColor || '#000000'}
+                                                            onChange={e => setNewTenant({ ...newTenant, menuActiveColor: e.target.value })}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="#..."
+                                                            className="w-full p-2 border border-slate-200 rounded-lg"
+                                                            value={newTenant.menuActiveColor || ''}
+                                                            onChange={e => setNewTenant({ ...newTenant, menuActiveColor: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Color Título Dashboard</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.dashboardTitleColor || '#000000'}
+                                                            onChange={e => setNewTenant({ ...newTenant, dashboardTitleColor: e.target.value })}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="#..."
+                                                            className="w-full p-2 border border-slate-200 rounded-lg"
+                                                            value={newTenant.dashboardTitleColor || ''}
+                                                            onChange={e => setNewTenant({ ...newTenant, dashboardTitleColor: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Color Texto Menu</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.textColor || '#ffffff'}
+                                                            onChange={e => setNewTenant({ ...newTenant, textColor: e.target.value })}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            className="w-full p-2 border border-slate-200 rounded-lg"
+                                                            value={newTenant.textColor}
+                                                            onChange={e => setNewTenant({ ...newTenant, textColor: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Texto del Menu (Sidebar)</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Ej: Cobra Kai Admin"
+                                                        className="w-full p-2 border border-slate-200 rounded-lg"
+                                                        value={newTenant.sidebarText}
+                                                        onChange={e => setNewTenant({ ...newTenant, sidebarText: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <h5 className="font-semibold text-slate-800 pt-2">Botones de Acción</h5>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nueva Venta</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.newSaleButtonColor || '#22c55e'}
+                                                            onChange={e => setNewTenant({ ...newTenant, newSaleButtonColor: e.target.value })}
+                                                        />
+                                                        <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newSaleButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newSaleButtonColor: e.target.value })} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nuevo Gasto</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.newExpenseButtonColor || '#ef4444'}
+                                                            onChange={e => setNewTenant({ ...newTenant, newExpenseButtonColor: e.target.value })}
+                                                        />
+                                                        <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newExpenseButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newExpenseButtonColor: e.target.value })} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nuevo Fiado</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.newFiadoButtonColor || '#f59e0b'}
+                                                            onChange={e => setNewTenant({ ...newTenant, newFiadoButtonColor: e.target.value })}
+                                                        />
+                                                        <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newFiadoButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newFiadoButtonColor: e.target.value })} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nuevo Socio</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.newMemberButtonColor || '#3b82f6'}
+                                                            onChange={e => setNewTenant({ ...newTenant, newMemberButtonColor: e.target.value })}
+                                                        />
+                                                        <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newMemberButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newMemberButtonColor: e.target.value })} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Nuevo Producto</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.newProductButtonColor || '#3b82f6'}
+                                                            onChange={e => setNewTenant({ ...newTenant, newProductButtonColor: e.target.value })}
+                                                        />
+                                                        <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.newProductButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, newProductButtonColor: e.target.value })} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Btn: Guardar (General)</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
+                                                            value={newTenant.saveButtonColor || '#3b82f6'}
+                                                            onChange={e => setNewTenant({ ...newTenant, saveButtonColor: e.target.value })}
+                                                        />
+                                                        <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.saveButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, saveButtonColor: e.target.value })} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <h4 className="font-bold text-slate-900 border-b pb-2">Configuración Avanzada</h4>
+
+                                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                                <h4 className="font-semibold text-slate-700 mb-3">{editingId ? 'Actualizar Credenciales Admin' : 'Usuario Administrador Inicial'}</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Nuevo Usuario (Opcional)' : 'Usuario Admin'}</label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                            value={newTenant.adminUsername}
+                                                            onChange={e => setNewTenant({ ...newTenant, adminUsername: e.target.value })}
+                                                            placeholder={editingId ? 'Dejar vacío para mantener actual' : "Ej: admin_cobra"}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Nueva Contraseña (Opcional)' : 'Contraseña Admin'}</label>
+                                                        <input
+                                                            type="password"
+                                                            className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                            value={newTenant.adminPassword}
+                                                            onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
+                                                            placeholder={editingId ? 'Dejar vacío para mantener actual' : "••••••••"}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                                <h4 className="font-semibold text-slate-800 mb-3">Socios (Partners)</h4>
+                                                <div className="space-y-3">
+                                                    {newTenant.partners.map((partner, index) => (
+                                                        <div key={index} className="flex gap-3">
+                                                            <div className="flex-1">
+                                                                <label className="text-xs text-slate-500 mb-1 block">Nombre Socio {index + 1}</label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-full p-2 border border-slate-200 rounded-lg"
+                                                                    value={partner.name}
+                                                                    onChange={e => {
+                                                                        const updatedPartners = [...newTenant.partners];
+                                                                        updatedPartners[index].name = e.target.value;
+                                                                        setNewTenant({ ...newTenant, partners: updatedPartners });
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div className="w-24">
+                                                                <label className="text-xs text-slate-500 mb-1 block">% Reparto</label>
+                                                                <input
+                                                                    type="number"
+                                                                    className="w-full p-2 border border-slate-200 rounded-lg"
+                                                                    value={partner.percentage}
+                                                                    onChange={e => {
+                                                                        const updatedPartners = [...newTenant.partners];
+                                                                        updatedPartners[index].percentage = parseFloat(e.target.value) || 0;
+                                                                        setNewTenant({ ...newTenant, partners: updatedPartners });
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Valor Hora Instructor ($)</label>
+                                                <input
+                                                    type="number"
+                                                    className="w-full p-2 border border-slate-200 rounded-lg"
+                                                    value={newTenant.instructorHourlyRate}
+                                                    onChange={e => setNewTenant({ ...newTenant, instructorHourlyRate: parseFloat(e.target.value) || 0 })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end gap-3 pt-6 border-t font-medium">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowModal(false)}
+                                                className="px-6 py-2 text-slate-600 hover:bg-slate-50 rounded-lg border border-slate-200"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md"
+                                            >
+                                                {editingId ? 'Guardar Cambios' : 'Crear Gimnasio'}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor Hora Instructor ($)</label>
-                                    <input
-                                        type="number"
-                                        className="w-full p-2 border border-slate-200 rounded-lg"
-                                        value={newTenant.instructorHourlyRate}
-                                        onChange={e => setNewTenant({ ...newTenant, instructorHourlyRate: parseFloat(e.target.value) || 0 })}
-                                    />
-                                </div>
+                                    {/* Right Column: Live Preview */}
+                                    <div className="hidden lg:block w-[450px] bg-slate-50 p-6 overflow-y-auto border-l border-slate-200">
+                                        <div className="sticky top-0">
+                                            <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                                <span className="bg-blue-100 text-blue-600 p-1 rounded text-xs">VISTA PREVIA</span>
+                                                Dashboard Preview
+                                            </h4>
 
+                                            {/* Preview Container: Aspect-ratio monitor-like */}
+                                            <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-slate-300 flex flex-col h-[500px]">
+                                                <div className="flex h-full">
+                                                    {/* Sidebar Preview */}
+                                                    <div
+                                                        className="w-1/3 p-3 flex flex-col gap-3 transition-colors duration-300"
+                                                        style={{ backgroundColor: newTenant.secondaryColor }}
+                                                    >
+                                                        {/* Logo / Brand */}
+                                                        <div className="mb-2">
+                                                            {newTenant.logoUrl ? (
+                                                                <img src={newTenant.logoUrl} alt="Logo" className="w-10 h-10 object-contain mx-auto bg-white/10 rounded p-1" />
+                                                            ) : (
+                                                                <div className="h-10 w-10 mx-auto bg-white/20 rounded flex items-center justify-center font-bold text-white">
+                                                                    {newTenant.name?.substring(0, 2).toUpperCase() || 'GYM'}
+                                                                </div>
+                                                            )}
+                                                            <div className="text-center font-bold text-xs mt-2 break-words" style={{ color: newTenant.textColor }}>
+                                                                {newTenant.sidebarText || newTenant.name || 'Your Gym'}
+                                                            </div>
+                                                        </div>
 
-                                <div className="flex justify-end gap-3 mt-6">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowModal(false)}
-                                        className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md"
-                                    >
-                                        {editingId ? 'Guardar Cambios' : 'Crear Gimnasio'}
-                                    </button>
-                                </div>
-                            </form>
+                                                        {/* Menu Items */}
+                                                        <div className="space-y-1">
+                                                            <div
+                                                                className="p-2 rounded text-[10px] font-bold shadow-sm"
+                                                                style={{
+                                                                    backgroundColor: newTenant.menuActiveColor,
+                                                                    color: newTenant.textColor
+                                                                }}
+                                                            >
+                                                                Dashboard
+                                                            </div>
+                                                            <div
+                                                                className="p-2 rounded text-[10px] opacity-80"
+                                                                style={{
+                                                                    backgroundColor: newTenant.menuHoverColor || 'transparent',
+                                                                    color: newTenant.textColor
+                                                                }}
+                                                            >
+                                                                Miembros (Hover)
+                                                            </div>
+                                                            <div className="p-2 rounded text-[10px] opacity-60 flex gap-2 items-center" style={{ color: newTenant.textColor }}>
+                                                                <span>Instructores</span>
+                                                            </div>
+                                                            <div className="p-2 rounded text-[10px] opacity-60 flex gap-2 items-center" style={{ color: newTenant.textColor }}>
+                                                                <span>Pagos</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Main Content Preview */}
+                                                    <div className="flex-1 bg-slate-50 overflow-y-auto">
+                                                        {/* Top Header */}
+                                                        <div className="h-12 bg-white shadow-sm flex items-center px-4 justify-between">
+                                                            <div className="h-3 w-20 bg-slate-100 rounded"></div>
+                                                            <div className="h-8 w-8 bg-slate-200 rounded-full"></div>
+                                                        </div>
+
+                                                        <div className="p-4">
+                                                            {/* Dashboard Title */}
+                                                            <h2 className="text-sm font-bold mb-3" style={{ color: newTenant.dashboardTitleColor }}>
+                                                                Panel de Control
+                                                            </h2>
+
+                                                            {/* Buttons Preview Grid */}
+                                                            <div className="grid grid-cols-2 gap-2 mb-4">
+                                                                <button
+                                                                    className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
+                                                                    style={{ backgroundColor: newTenant.newSaleButtonColor }}
+                                                                >
+                                                                    + Venta
+                                                                </button>
+                                                                <button
+                                                                    className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
+                                                                    style={{ backgroundColor: newTenant.newExpenseButtonColor }}
+                                                                >
+                                                                    - Gasto
+                                                                </button>
+                                                                <button
+                                                                    className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
+                                                                    style={{ backgroundColor: newTenant.newFiadoButtonColor }}
+                                                                >
+                                                                    + Fiado
+                                                                </button>
+                                                                <button
+                                                                    className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
+                                                                    style={{ backgroundColor: newTenant.newMemberButtonColor }}
+                                                                >
+                                                                    + Socio
+                                                                </button>
+                                                                <button
+                                                                    className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
+                                                                    style={{ backgroundColor: newTenant.newProductButtonColor }}
+                                                                >
+                                                                    + Prod.
+                                                                </button>
+                                                                <button
+                                                                    className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
+                                                                    style={{ backgroundColor: newTenant.saveButtonColor }}
+                                                                >
+                                                                    Guardar
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Dummy Content Cards */}
+                                                            <div className="space-y-2">
+                                                                <div className="bg-white p-2 rounded shadow-sm border border-slate-100">
+                                                                    <div className="flex justify-between mb-1">
+                                                                        <div className="h-2 w-10 bg-slate-200 rounded"></div>
+                                                                        <div className="h-2 w-4 bg-green-200 rounded"></div>
+                                                                    </div>
+                                                                    <div className="h-4 w-16 bg-slate-100 rounded mb-1"></div>
+                                                                </div>
+                                                                <div className="bg-white p-2 rounded shadow-sm border border-slate-100">
+                                                                    <div className="flex justify-between mb-1">
+                                                                        <div className="h-2 w-10 bg-slate-200 rounded"></div>
+                                                                    </div>
+                                                                    <div className="h-4 w-16 bg-slate-100 rounded mb-1"></div>
+                                                                </div>
+                                                                <div className="bg-white p-2 rounded shadow-sm border border-slate-100 opacity-50">
+                                                                    <div className="h-2 w-full bg-slate-100 rounded"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-3 text-center leading-relaxed">
+                                                Esta vista previa muestra cómo se aplicarán los colores seleccionados en la estructura principal del dashboard.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
-                )}
+                )
+            }
         </div>
     );
 };
