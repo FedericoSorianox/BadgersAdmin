@@ -18,6 +18,12 @@ const SuperAdminDashboard = () => {
         menuHoverColor: '',
         menuActiveColor: '',
         dashboardTitleColor: '',
+        newSaleButtonColor: '',
+        newExpenseButtonColor: '',
+        newFiadoButtonColor: '',
+        newMemberButtonColor: '',
+        newProductButtonColor: '',
+        saveButtonColor: '',
         partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
         instructorHourlyRate: 0,
         adminUsername: '',
@@ -101,6 +107,14 @@ const SuperAdminDashboard = () => {
                     menuHoverColor: '',
                     menuActiveColor: '',
                     dashboardTitleColor: '',
+                    newSaleButtonColor: '',
+                    newExpenseButtonColor: '',
+                    newFiadoButtonColor: '',
+                    newMemberButtonColor: '',
+                    newProductButtonColor: '',
+                    saveButtonColor: '',
+                    partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
+                    instructorHourlyRate: 0,
                     adminUsername: '',
                     adminPassword: ''
                 });
@@ -115,20 +129,25 @@ const SuperAdminDashboard = () => {
 
     const handleEdit = (tenant) => {
         setEditingId(tenant._id);
+        const branding = tenant.branding || {};
+
         setNewTenant({
             name: tenant.name,
             slug: tenant.slug,
-            primaryColor: tenant.branding.primaryColor,
-            secondaryColor: tenant.branding.secondaryColor,
-            primaryColor: tenant.branding.primaryColor,
-            secondaryColor: tenant.branding.secondaryColor,
-            logoUrl: tenant.branding.logoUrl || '',
-            sidebarText: tenant.branding.sidebarText || '',
-            textColor: tenant.branding.textColor || '#ffffff',
-            menuHoverColor: tenant.branding.menuHoverColor || '',
-            menuActiveColor: tenant.branding.menuActiveColor || '',
-            menuActiveColor: tenant.branding.menuActiveColor || '',
-            dashboardTitleColor: tenant.branding.dashboardTitleColor || '',
+            primaryColor: branding.primaryColor || '#3498db',
+            secondaryColor: branding.secondaryColor || '#2c3e50',
+            logoUrl: branding.logoUrl || '',
+            sidebarText: branding.sidebarText || '',
+            textColor: branding.textColor || '#ffffff',
+            menuHoverColor: branding.menuHoverColor || '',
+            menuActiveColor: branding.menuActiveColor || '',
+            dashboardTitleColor: branding.dashboardTitleColor || '',
+            newSaleButtonColor: branding.newSaleButtonColor || '',
+            newExpenseButtonColor: branding.newExpenseButtonColor || '',
+            newFiadoButtonColor: branding.newFiadoButtonColor || '',
+            newMemberButtonColor: branding.newMemberButtonColor || '',
+            newProductButtonColor: branding.newProductButtonColor || '',
+            saveButtonColor: branding.saveButtonColor || '',
             partners: tenant.partners && tenant.partners.length >= 2 ? tenant.partners : [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
             instructorHourlyRate: tenant.instructorHourlyRate || 0
         });
@@ -318,7 +337,7 @@ const SuperAdminDashboard = () => {
                                 </button>
                             </div>
 
-                            <div className="flex-1 overflow-hidden">
+                            <div className="flex-1 min-h-0">
                                 <form onSubmit={handleSave} className="flex flex-col lg:flex-row h-full">
                                     {/* Left Column: Form Inputs */}
                                     <div className="flex-1 overflow-y-auto p-6 space-y-6 border-r border-slate-100">
@@ -376,7 +395,7 @@ const SuperAdminDashboard = () => {
                                                         <input
                                                             type="color"
                                                             className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
-                                                            value={newTenant.primaryColor}
+                                                            value={newTenant.primaryColor || '#3498db'}
                                                             onChange={e => setNewTenant({ ...newTenant, primaryColor: e.target.value })}
                                                         />
                                                         <input
@@ -393,7 +412,7 @@ const SuperAdminDashboard = () => {
                                                         <input
                                                             type="color"
                                                             className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0"
-                                                            value={newTenant.secondaryColor}
+                                                            value={newTenant.secondaryColor || '#2c3e50'}
                                                             onChange={e => setNewTenant({ ...newTenant, secondaryColor: e.target.value })}
                                                         />
                                                         <input
@@ -675,7 +694,7 @@ const SuperAdminDashboard = () => {
                                                     {/* Sidebar Preview */}
                                                     <div
                                                         className="w-1/3 p-3 flex flex-col gap-3 transition-colors duration-300"
-                                                        style={{ backgroundColor: newTenant.secondaryColor }}
+                                                        style={{ backgroundColor: newTenant.secondaryColor || '#2c3e50' }}
                                                     >
                                                         {/* Logo / Brand */}
                                                         <div className="mb-2">
@@ -686,7 +705,7 @@ const SuperAdminDashboard = () => {
                                                                     {newTenant.name?.substring(0, 2).toUpperCase() || 'GYM'}
                                                                 </div>
                                                             )}
-                                                            <div className="text-center font-bold text-xs mt-2 break-words" style={{ color: newTenant.textColor }}>
+                                                            <div className="text-center font-bold text-xs mt-2 break-words" style={{ color: newTenant.textColor || '#ffffff' }}>
                                                                 {newTenant.sidebarText || newTenant.name || 'Your Gym'}
                                                             </div>
                                                         </div>
@@ -696,8 +715,8 @@ const SuperAdminDashboard = () => {
                                                             <div
                                                                 className="p-2 rounded text-[10px] font-bold shadow-sm"
                                                                 style={{
-                                                                    backgroundColor: newTenant.menuActiveColor,
-                                                                    color: newTenant.textColor
+                                                                    backgroundColor: newTenant.menuActiveColor || '#000000',
+                                                                    color: newTenant.textColor || '#ffffff'
                                                                 }}
                                                             >
                                                                 Dashboard
@@ -706,15 +725,15 @@ const SuperAdminDashboard = () => {
                                                                 className="p-2 rounded text-[10px] opacity-80"
                                                                 style={{
                                                                     backgroundColor: newTenant.menuHoverColor || 'transparent',
-                                                                    color: newTenant.textColor
+                                                                    color: newTenant.textColor || '#ffffff'
                                                                 }}
                                                             >
                                                                 Miembros (Hover)
                                                             </div>
-                                                            <div className="p-2 rounded text-[10px] opacity-60 flex gap-2 items-center" style={{ color: newTenant.textColor }}>
+                                                            <div className="p-2 rounded text-[10px] opacity-60 flex gap-2 items-center" style={{ color: newTenant.textColor || '#ffffff' }}>
                                                                 <span>Instructores</span>
                                                             </div>
-                                                            <div className="p-2 rounded text-[10px] opacity-60 flex gap-2 items-center" style={{ color: newTenant.textColor }}>
+                                                            <div className="p-2 rounded text-[10px] opacity-60 flex gap-2 items-center" style={{ color: newTenant.textColor || '#ffffff' }}>
                                                                 <span>Pagos</span>
                                                             </div>
                                                         </div>
@@ -730,7 +749,7 @@ const SuperAdminDashboard = () => {
 
                                                         <div className="p-4">
                                                             {/* Dashboard Title */}
-                                                            <h2 className="text-sm font-bold mb-3" style={{ color: newTenant.dashboardTitleColor }}>
+                                                            <h2 className="text-sm font-bold mb-3" style={{ color: newTenant.dashboardTitleColor || '#000000' }}>
                                                                 Panel de Control
                                                             </h2>
 
@@ -738,37 +757,37 @@ const SuperAdminDashboard = () => {
                                                             <div className="grid grid-cols-2 gap-2 mb-4">
                                                                 <button
                                                                     className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
-                                                                    style={{ backgroundColor: newTenant.newSaleButtonColor }}
+                                                                    style={{ backgroundColor: newTenant.newSaleButtonColor || '#22c55e' }}
                                                                 >
                                                                     + Venta
                                                                 </button>
                                                                 <button
                                                                     className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
-                                                                    style={{ backgroundColor: newTenant.newExpenseButtonColor }}
+                                                                    style={{ backgroundColor: newTenant.newExpenseButtonColor || '#ef4444' }}
                                                                 >
                                                                     - Gasto
                                                                 </button>
                                                                 <button
                                                                     className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
-                                                                    style={{ backgroundColor: newTenant.newFiadoButtonColor }}
+                                                                    style={{ backgroundColor: newTenant.newFiadoButtonColor || '#f59e0b' }}
                                                                 >
                                                                     + Fiado
                                                                 </button>
                                                                 <button
                                                                     className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
-                                                                    style={{ backgroundColor: newTenant.newMemberButtonColor }}
+                                                                    style={{ backgroundColor: newTenant.newMemberButtonColor || '#3b82f6' }}
                                                                 >
                                                                     + Socio
                                                                 </button>
                                                                 <button
                                                                     className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
-                                                                    style={{ backgroundColor: newTenant.newProductButtonColor }}
+                                                                    style={{ backgroundColor: newTenant.newProductButtonColor || '#3b82f6' }}
                                                                 >
                                                                     + Prod.
                                                                 </button>
                                                                 <button
                                                                     className="text-[10px] font-bold text-white py-2 rounded shadow-sm hover:opacity-90 transition-opacity"
-                                                                    style={{ backgroundColor: newTenant.saveButtonColor }}
+                                                                    style={{ backgroundColor: newTenant.saveButtonColor || '#3b82f6' }}
                                                                 >
                                                                     Guardar
                                                                 </button>
