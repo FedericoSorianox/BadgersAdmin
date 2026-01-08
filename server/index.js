@@ -18,7 +18,9 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5001',
     'https://gymworkspro.com',
-    'https://www.gymworkspro.com'
+    'https://www.gymworkspro.com',
+    'https://the-badgers.com',
+    'https://www.the-badgers.com'
 ];
 
 app.use(cors({
@@ -75,6 +77,7 @@ app.use('/api/tenants', require('./routes/tenants'));
 app.use('/api/images', require('./routes/images'));
 app.use('/api/members', require('./routes/members'));
 app.use('/api/products', require('./routes/products'));
+app.use('/api/productos', require('./routes/products'));
 app.use('/api/finance', require('./routes/finance'));
 app.use('/api/debts', require('./routes/debts'));
 app.use('/api/settings', require('./routes/settings'));
