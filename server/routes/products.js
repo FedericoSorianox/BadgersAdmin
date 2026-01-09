@@ -6,7 +6,8 @@ const { upload } = require('../config/cloudinary');
 // Get all products
 router.get('/', async (req, res) => {
     try {
-        const products = await Product.find().sort({ name: 1 });
+        const query = { tenantId: req.tenantId || null };
+        const products = await Product.find(query).sort({ name: 1 });
         res.json(products);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -27,6 +28,10 @@ router.post('/', upload.single('image'), async (req, res) => {
         // If an image was uploaded, save its path
         if (req.file) {
             productData.imageUrl = req.file.path;
+        }
+
+        if (req.tenantId) {
+            productData.tenantId = req.tenantId;
         }
 
         const product = new Product(productData);

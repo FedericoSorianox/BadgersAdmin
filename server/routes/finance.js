@@ -9,7 +9,7 @@ const Product = require('../models/Product');
 router.get('/', async (req, res) => {
     try {
         const { month, year } = req.query;
-        let query = {};
+        let query = { tenantId: req.tenantId || null };
         if (month) query.month = month;
         if (year) query.year = year;
 
@@ -23,7 +23,8 @@ router.get('/', async (req, res) => {
 // Get payments by member ID
 router.get('/member/:memberId', async (req, res) => {
     try {
-        const payments = await Payment.find({ memberId: req.params.memberId }).sort({ date: -1 });
+        const query = { memberId: req.params.memberId, tenantId: req.tenantId || null };
+        const payments = await Payment.find(query).sort({ date: -1 });
         res.json(payments);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -33,7 +34,8 @@ router.get('/member/:memberId', async (req, res) => {
 // Get expenses
 router.get('/expenses', async (req, res) => {
     try {
-        const expenses = await Expense.find().sort({ date: -1 });
+        const query = { tenantId: req.tenantId || null };
+        const expenses = await Expense.find(query).sort({ date: -1 });
         res.json(expenses);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -42,7 +44,9 @@ router.get('/expenses', async (req, res) => {
 
 // Register payment
 router.post('/', async (req, res) => {
-    const payment = new Payment(req.body);
+    const paymentData = req.body;
+    if (req.tenantId) paymentData.tenantId = req.tenantId;
+    const payment = new Payment(paymentData);
     try {
         // If it's a product sale, deduct stock
         if (req.body.type === 'Producto' && req.body.productId) {
@@ -70,12 +74,15 @@ router.post('/note', async (req, res) => {
         const { memberId, memberName, month, year, comments } = req.body;
 
         // Check if there is already a note for this month
-        let existingNote = await Payment.findOne({
+        let query = {
             memberId,
             month,
             year,
-            type: 'Nota'
-        });
+            type: 'Nota',
+            tenantId: req.tenantId || null
+        };
+
+        let existingNote = await Payment.findOne(query);
 
         if (existingNote) {
             existingNote.comments = comments;
@@ -90,7 +97,8 @@ router.post('/note', async (req, res) => {
             year,
             amount: 0,
             type: 'Nota',
-            comments
+            comments,
+            tenantId: req.tenantId || null
         });
 
         const savedNote = await newNote.save();
@@ -102,7 +110,9 @@ router.post('/note', async (req, res) => {
 
 // Register expense
 router.post('/expenses', async (req, res) => {
-    const expense = new Expense(req.body);
+    const expenseData = req.body;
+    if (req.tenantId) expenseData.tenantId = req.tenantId;
+    const expense = new Expense(expenseData);
     try {
         const newExpense = await expense.save();
         res.status(201).json(newExpense);
@@ -134,16 +144,17 @@ router.delete('/expenses/:id', async (req, res) => {
 // Dashboard Stats
 router.get('/stats', async (req, res) => {
     try {
-        const activeMembers = await Member.countDocuments({ active: true });
-        const inactiveMembers = await Member.countDocuments({ active: false });
+        const query = { tenantId: req.tenantId || null };
+        const activeMembers = await Member.countDocuments({ ...query, active: true });
+        const inactiveMembers = await Member.countDocuments({ ...query, active: false });
 
         // Financials for current month (or all time if preferred, let's do all time for now or provide query)
         // Let's do a simple aggregation for now
 
-        const payments = await Payment.find();
+        const payments = await Payment.find(query);
         const totalIncome = payments.reduce((acc, curr) => acc + curr.amount, 0);
 
-        const expenses = await Expense.find();
+        const expenses = await Expense.find(query);
         const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
         res.json({

@@ -7,7 +7,8 @@ const Payment = require('../models/Payment');
 // Get pending debts
 router.get('/', async (req, res) => {
     try {
-        const debts = await Debt.find({ status: 'pending' })
+        const query = { status: 'pending', tenantId: req.tenantId || null };
+        const debts = await Debt.find(query)
             .sort({ date: -1 })
             .populate('memberId', 'fullName ci photoUrl');
         res.json(debts);
@@ -39,7 +40,9 @@ router.post('/', async (req, res) => {
             memberName,
             products,
             totalAmount,
-            status: 'pending'
+            totalAmount,
+            status: 'pending',
+            tenantId: req.tenantId || null
         });
 
         const newDebt = await debt.save();

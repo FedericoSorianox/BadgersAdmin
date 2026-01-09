@@ -6,7 +6,8 @@ const { upload } = require('../config/cloudinary');
 // Get all members
 router.get('/', async (req, res) => {
     try {
-        const members = await Member.find().sort({ fullName: 1 });
+        const query = { tenantId: req.tenantId || null };
+        const members = await Member.find(query).sort({ fullName: 1 });
         res.json(members);
     } catch (err) {
         console.error('Error in GET /members:', err);
@@ -32,6 +33,10 @@ router.post('/', upload.single('image'), async (req, res) => {
         // If an image was uploaded, save its path
         if (req.file) {
             memberData.photoUrl = req.file.path;
+        }
+
+        if (req.tenantId) {
+            memberData.tenantId = req.tenantId;
         }
 
         const member = new Member(memberData);
