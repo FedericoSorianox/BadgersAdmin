@@ -299,7 +299,7 @@ const Finances = () => {
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
                     >
-                        {[2023, 2024, 2025].map(year => (
+                        {Array.from({ length: (currentYear + 1) - 2023 + 1 }, (_, i) => 2023 + i).map(year => (
                             <option key={year} value={year}>{year}</option>
                         ))}
                     </select>
