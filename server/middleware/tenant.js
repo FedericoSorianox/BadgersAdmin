@@ -54,11 +54,16 @@ const tenantMiddleware = async (req, res, next) => {
     const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
 
     // Enforcement Logic
+    // Enforcement Logic - RELAXED for Legacy Support
+    // We allow requests without a tenantId to proceed, which will result in req.tenantId usually being undefined/null.
+    // Controllers will then query { tenantId: null }, accessing the legacy/global data.
+    /* 
     if (!isPublicPath) {
         if (!tenantId && !isSuper) {
             return res.status(401).json({ message: 'Identificación de gimnasio requerida. Use el subdominio correcto.' });
         }
     }
+    */
 
     if (tenantId) {
         tenantStorage.run(new Map([['tenantId', tenantId]]), () => {
