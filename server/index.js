@@ -27,20 +27,28 @@ app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
+
         // Check against allowed exact matches
         if (allowedOrigins.indexOf(origin) !== -1) {
             return callback(null, true);
         }
 
         // Check for subdomains of gymworkspro.com
-        if (origin.endsWith('.gymworkspro.com')) {
+        if (origin.endsWith('.gymworkspro.com') || origin.endsWith('.the-badgers.com')) {
+            return callback(null, true);
+        }
+
+        // Also allow local development subdomains
+        if (origin.includes('localhost:')) {
             return callback(null, true);
         }
 
         const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
         return callback(new Error(msg), false);
     },
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-slug'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));

@@ -47,31 +47,33 @@ export const TenantProvider = ({ children }) => {
 
         // 2. Identify Slug
         let slug = null;
-        let rootDomain = import.meta.env.VITE_ROOT_DOMAIN || 'localhost';
 
-        // Auto-detect prod domain
-        if (hostname.endsWith('gymworkspro.com') && rootDomain === 'localhost') {
-            rootDomain = 'gymworkspro.com';
-        }
+        // List of possible root domains
+        const rootDomains = [
+            import.meta.env.VITE_ROOT_DOMAIN,
+            'gymworkspro.com',
+            'the-badgers.com',
+            'localhost'
+        ].filter(Boolean);
 
-        const escapedRoot = rootDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`^(.*)\\.${escapedRoot}$`, 'i');
-        const match = hostname.match(regex);
-
-        if (hostname !== rootDomain && hostname !== `www.${rootDomain}` && match && match[1]) {
-            const potentialSlug = match[1];
-            if (potentialSlug !== 'www') {
-                slug = potentialSlug;
+        for (const rootDomain of rootDomains) {
+            if (hostname === rootDomain || hostname === `www.${rootDomain}`) {
+                slug = null;
+                break;
+            }
+            if (hostname.endsWith(`.${rootDomain}`)) {
+                slug = hostname.replace(`.${rootDomain}`, '').replace('www.', '');
+                break;
             }
         }
 
         const resolveTenant = async () => {
             if (slug) {
                 console.log('Detected Tenant Slug:', slug);
-                try {
-                    // Apply header to axios for subsequent calls
-                    axios.defaults.headers.common['x-tenant-slug'] = slug;
+                // ALWAYS set the header if we have a slug, immediately
+                axios.defaults.headers.common['x-tenant-slug'] = slug;
 
+                try {
                     const res = await fetch(`${API_URL}/api/tenants/public/${slug}`);
                     if (res.ok) {
                         const data = await res.json();
@@ -99,8 +101,7 @@ export const TenantProvider = ({ children }) => {
                             if (data.branding.saveButtonColor) root.style.setProperty('--btn-save', data.branding.saveButtonColor);
                         }
                     } else {
-                        console.warn(`Tenant "${slug}" not found or error loading branding`);
-                        delete axios.defaults.headers.common['x-tenant-slug'];
+                        console.warn(`Tenant branding fetch failed for "${slug}" (Status: ${res.status})`);
                     }
                 } catch (error) {
                     console.error("Failed to load tenant branding", error);

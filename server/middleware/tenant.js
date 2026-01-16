@@ -4,35 +4,42 @@ const jwt = require('jsonwebtoken');
 
 const tenantMiddleware = async (req, res, next) => {
     let tenantId = null;
+    let isSuper = false;
 
-    // 1. Try Header (useful for public tenant pages or before login)
-    const tenantSlug = req.headers['x-tenant-slug'];
-    if (tenantSlug) {
-        // Case-insensitive search for the slug
-        const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${tenantSlug}$`, 'i') } });
-        if (tenant) {
-            tenantId = tenant._id;
-        } else {
-            // If a slug was provided but NO tenant found, this is a target error.
-            return res.status(404).json({ message: `Gimnasio "${tenantSlug}" no encontrado.` });
-        }
-    }
-
-    // 2. Try User Token (Stronger/Override)
+    // 1. Check User Token FIRST (Strongest identifier)
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.split(' ')[1];
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-            if (decoded.user && decoded.user.tenantId) {
-                tenantId = decoded.user.tenantId;
-            } else if (decoded.user && decoded.user.role === 'superadmin') {
-                // SuperAdmins don't have a tenantId fixed, they access what is requested via slug or global
-                // If they are on a slug-specific route, we use the tenantId from slug
-                // If no slug, they stay global (tenantId = null)
+            if (decoded.user) {
+                if (decoded.user.role === 'superadmin') {
+                    isSuper = true;
+                } else if (decoded.user.tenantId) {
+                    tenantId = decoded.user.tenantId;
+                }
             }
         } catch (e) {
-            // Token invalid, let auth middleware handle later if needed
+            // Token invalid, let auth middleware handle later
+        }
+    }
+
+    // 2. Check Header (Secondary identifier or for public access)
+    const tenantSlug = req.headers['x-tenant-slug'];
+    if (tenantSlug) {
+        try {
+            const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${tenantSlug}$`, 'i') } });
+            if (tenant) {
+                // If token already has a tenantId, they MUST match (unless SuperAdmin)
+                if (tenantId && tenantId.toString() !== tenant._id.toString() && !isSuper) {
+                    return res.status(403).json({ message: 'Acceso denegado: El gimnasio no coincide con su sesión.' });
+                }
+                tenantId = tenant._id;
+            } else {
+                return res.status(404).json({ message: `Gimnasio "${tenantSlug}" no encontrado.` });
+            }
+        } catch (error) {
+            console.error('Tenant resolution error:', error);
         }
     }
 
@@ -46,26 +53,10 @@ const tenantMiddleware = async (req, res, next) => {
 
     const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
 
-    // If we are NOT on a public path and still have no tenantId:
-    // We allow SuperAdmin to proceed without tenantId (Global view)
-    // But regular users or unauthenticated requests to private data must be blocked.
-    if (!tenantId && !isPublicPath) {
-        // Check if user is SuperAdmin (requires re-verifying token briefly or trusting previous check)
-        // For simplicity, we check if the request is NOT to the superadmin allowed origins/paths if we wanted,
-        // but the safest is to check the token again or pass the user object.
-
-        let isSuper = false;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            try {
-                const token = authHeader.split(' ')[1];
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-                if (decoded.user && decoded.user.role === 'superadmin') isSuper = true;
-            } catch (e) { }
-        }
-
-        if (!isSuper) {
-            // Block access to private routes without valid tenant identification
-            return res.status(401).json({ message: 'Identificación de gimnasio requerida.' });
+    // Enforcement Logic
+    if (!isPublicPath) {
+        if (!tenantId && !isSuper) {
+            return res.status(401).json({ message: 'Identificación de gimnasio requerida. Use el subdominio correcto.' });
         }
     }
 
@@ -75,7 +66,6 @@ const tenantMiddleware = async (req, res, next) => {
             next();
         });
     } else {
-        // Proceed without tenantId context (Global/SuperAdmin)
         next();
     }
 };
