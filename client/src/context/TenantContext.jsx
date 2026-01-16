@@ -57,7 +57,13 @@ export const TenantProvider = ({ children }) => {
             return;
         }
 
-        const rootDomain = import.meta.env.VITE_ROOT_DOMAIN || 'localhost';
+        let rootDomain = import.meta.env.VITE_ROOT_DOMAIN || 'localhost';
+
+        // Auto-detect production domain if running on gymworkspro.com but env is localhost
+        // This fixes the issue where branding doesn't load because VITE_ROOT_DOMAIN is missing in prod
+        if (window.location.hostname.endsWith('gymworkspro.com') && rootDomain === 'localhost') {
+            rootDomain = 'gymworkspro.com';
+        }
 
         // Escape rootDomain for Regex (e.g., "." -> "\.")
         const escapedRoot = rootDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
