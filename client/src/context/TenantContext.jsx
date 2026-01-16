@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
+import API_URL from '../config';
 
 const TenantContext = createContext();
 
@@ -15,200 +17,121 @@ export const TenantProvider = ({ children }) => {
     });
 
     const [partners, setPartners] = useState([]);
-
     const [tenantId, setTenantId] = useState(null);
-
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Set initial/default colors immediately to match invalid/loading state
         const root = document.documentElement;
-        if (loading) {
-            root.style.setProperty('--primary', '#000000');
-            root.style.setProperty('--secondary', '#1a1a1a');
-            root.style.setProperty('--text-on-primary', '#ffffff');
-        }
+
+        // Set initial/default colors
+        root.style.setProperty('--primary', '#000000');
+        root.style.setProperty('--secondary', '#1a1a1a');
+        root.style.setProperty('--text-on-primary', '#ffffff');
 
         const hostname = window.location.hostname;
-        let slug = null;
+        const pathname = window.location.pathname;
 
-        // Parse subdomain
-        // Case 1: localhost (e.g., cobrakai.localhost)
-        // Case 2: production (e.g., cobrakai.badgers.com)
-        const parts = hostname.split('.');
-
-        // SKIP branding if on superadmin route
-        if (window.location.pathname.startsWith('/superadmin')) {
-            console.log('Super Admin Route - Skipping Tenant Branding');
+        // 1. Skip branding if on superadmin route
+        if (pathname.startsWith('/superadmin')) {
             setBranding({
                 name: 'GymWorksPro Panel',
                 primaryColor: '#000000',
                 secondaryColor: '#1a1a1a',
                 sidebarText: 'GymWorksPro SuperAdmin',
                 textColor: '#ffffff',
-                logoUrl: '/badgers-logo.jpg' // Use generic logo or GymWorksPro specific if available
+                logoUrl: '/badgers-logo.jpg'
             });
-            const root = document.documentElement;
-            root.style.setProperty('--primary', '#000000');
-            root.style.setProperty('--secondary', '#1a1a1a');
-            root.style.setProperty('--text-on-primary', '#ffffff');
-
             setLoading(false);
             return;
         }
 
+        // 2. Identify Slug
+        let slug = null;
         let rootDomain = import.meta.env.VITE_ROOT_DOMAIN || 'localhost';
 
-        // Auto-detect production domain if running on gymworkspro.com but env is localhost
-        // This fixes the issue where branding doesn't load because VITE_ROOT_DOMAIN is missing in prod
-        if (window.location.hostname.endsWith('gymworkspro.com') && rootDomain === 'localhost') {
+        // Auto-detect prod domain
+        if (hostname.endsWith('gymworkspro.com') && rootDomain === 'localhost') {
             rootDomain = 'gymworkspro.com';
         }
 
-        // Escape rootDomain for Regex (e.g., "." -> "\.")
         const escapedRoot = rootDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-        // Regex to capture subdomain:
-        // ^(.*)\.ROOT_DOMAIN$
-        // e.g. "^(.*)\.gymworkspro\.com$"
-        // If local: "^(.*)\.localhost$"
-
-        // Case 1: Subdomain exists (e.g. cobra.gymworkspro.com or cobra.localhost)
         const regex = new RegExp(`^(.*)\\.${escapedRoot}$`, 'i');
         const match = hostname.match(regex);
 
-        if (hostname === rootDomain || hostname === `www.${rootDomain}`) {
-            // Root Domain (Landing / SuperAdmin)
-            console.log(`Detected Root Domain: ${rootDomain}`);
-            setBranding({
-                name: 'GymWorksPro',
-                primaryColor: '#000000',
-                secondaryColor: '#1a1a1a',
-                sidebarText: 'GymWorksPro',
-                textColor: '#ffffff',
-                logoUrl: '/badgers-logo.jpg' // Generic Logo
-            });
-            const root = document.documentElement;
-            root.style.setProperty('--primary', '#000000');
-            root.style.setProperty('--secondary', '#1a1a1a');
-            root.style.setProperty('--text-on-primary', '#ffffff');
-            setLoading(false);
-            return;
-        }
-
-        if (match && match[1]) {
+        if (hostname !== rootDomain && hostname !== `www.${rootDomain}` && match && match[1]) {
             const potentialSlug = match[1];
             if (potentialSlug !== 'www') {
                 slug = potentialSlug;
-            } else {
-                // www.root.com is treated as root above usually, but if regex caught it:
-                // Handled by the first if block ideally, but safety check:
-                setLoading(false);
-                return;
             }
-        } else {
-            // Fallback for weird cases or IP access (treat as root/no tenant)
-            // Or if we are on a completely different domain not matching ROOT_DOMAIN
-            console.log('Hostname does not match ROOT_DOMAIN, assuming standalone or misconfig');
         }
 
-        if (slug) {
-            console.log('Detected Tenant Slug:', slug);
-            // Set Global Axios Header
-            // We need to import axios to set this if we want it global
-            // Dynamic import to avoid top-level dependency if preferred, or just rely on window/global config
-            // Better: We should probably export a configured axios instance, but changing the global default is easiest for now
-            // given the codebase uses raw 'axios' imports.
-            import('axios').then(axios => {
-                axios.default.defaults.headers.common['x-tenant-slug'] = slug;
+        const resolveTenant = async () => {
+            if (slug) {
+                console.log('Detected Tenant Slug:', slug);
+                try {
+                    // Apply header to axios for subsequent calls
+                    axios.defaults.headers.common['x-tenant-slug'] = slug;
 
-                // Fetch branding AFTER setting the header
-                // Note: We used to call fetchBranding here inside the promise, or outside?
-                // `fetchBranding` below relies on API call.
+                    const res = await fetch(`${API_URL}/api/tenants/public/${slug}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.branding) {
+                            setBranding({
+                                ...data.branding,
+                                name: data.name
+                            });
+                            setPartners(data.partners || []);
+                            setTenantId(data._id);
 
-                const fetchBranding = async () => {
-                    try {
-                        // Fetch branding for this tenant
-                        // We can reuse the same endpoint but now the header is set!
-                        // Or call a specific public endpoint by slug
-                        const API_URL = (await import('../config')).default;
-                        const res = await fetch(`${API_URL}/api/tenants/public/${slug}`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data.branding) {
-                                setBranding({
-                                    ...data.branding,
-                                    name: data.name // Ensure we have the tenant name if needed
-                                });
-                                setPartners(data.partners || []);
-                                setTenantId(data._id);
+                            // Apply dynamic colors
+                            root.style.setProperty('--primary', data.branding.primaryColor);
+                            root.style.setProperty('--secondary', data.branding.secondaryColor);
+                            root.style.setProperty('--text-on-primary', data.branding.textColor || '#ffffff');
 
-                                // Apply colors
-                                const root = document.documentElement;
-                                root.style.setProperty('--primary', data.branding.primaryColor);
-                                root.style.setProperty('--secondary', data.branding.secondaryColor);
-                                // Set text color on primary background
-                                root.style.setProperty('--text-on-primary', data.branding.textColor || '#ffffff');
-
-                                // Extended colors
-                                if (data.branding.menuHoverColor) root.style.setProperty('--menu-hover', data.branding.menuHoverColor);
-                                if (data.branding.menuActiveColor) root.style.setProperty('--menu-active', data.branding.menuActiveColor);
-                                if (data.branding.dashboardTitleColor) root.style.setProperty('--dashboard-title', data.branding.dashboardTitleColor);
-
-                                // Button Colors
-                                if (data.branding.newSaleButtonColor) root.style.setProperty('--btn-new-sale', data.branding.newSaleButtonColor);
-                                if (data.branding.newExpenseButtonColor) root.style.setProperty('--btn-new-expense', data.branding.newExpenseButtonColor);
-                                if (data.branding.newFiadoButtonColor) root.style.setProperty('--btn-new-fiado', data.branding.newFiadoButtonColor);
-                                if (data.branding.newMemberButtonColor) root.style.setProperty('--btn-new-member', data.branding.newMemberButtonColor);
-                                if (data.branding.newProductButtonColor) root.style.setProperty('--btn-new-product', data.branding.newProductButtonColor);
-                                if (data.branding.saveButtonColor) root.style.setProperty('--btn-save', data.branding.saveButtonColor);
-                            }
+                            if (data.branding.menuHoverColor) root.style.setProperty('--menu-hover', data.branding.menuHoverColor);
+                            if (data.branding.menuActiveColor) root.style.setProperty('--menu-active', data.branding.menuActiveColor);
+                            if (data.branding.dashboardTitleColor) root.style.setProperty('--dashboard-title', data.branding.dashboardTitleColor);
+                            if (data.branding.newSaleButtonColor) root.style.setProperty('--btn-new-sale', data.branding.newSaleButtonColor);
+                            if (data.branding.newExpenseButtonColor) root.style.setProperty('--btn-new-expense', data.branding.newExpenseButtonColor);
+                            if (data.branding.newFiadoButtonColor) root.style.setProperty('--btn-new-fiado', data.branding.newFiadoButtonColor);
+                            if (data.branding.newMemberButtonColor) root.style.setProperty('--btn-new-member', data.branding.newMemberButtonColor);
+                            if (data.branding.newProductButtonColor) root.style.setProperty('--btn-new-product', data.branding.newProductButtonColor);
+                            if (data.branding.saveButtonColor) root.style.setProperty('--btn-save', data.branding.saveButtonColor);
                         }
-                    } catch (error) {
-                        console.error("Failed to load tenant branding", error);
-                    } finally {
-                        setLoading(false);
+                    } else {
+                        console.warn(`Tenant "${slug}" not found or error loading branding`);
+                        delete axios.defaults.headers.common['x-tenant-slug'];
                     }
-                };
+                } catch (error) {
+                    console.error("Failed to load tenant branding", error);
+                }
+            } else {
+                // Root Domain or No Slug
+                delete axios.defaults.headers.common['x-tenant-slug'];
+                setBranding({
+                    name: 'GymWorksPro',
+                    primaryColor: '#000000',
+                    secondaryColor: '#1a1a1a',
+                    sidebarText: 'GymWorksPro',
+                    textColor: '#ffffff',
+                    logoUrl: '/badgers-logo.jpg'
+                });
+            }
+            setLoading(false);
+        };
 
-                fetchBranding();
-            });
-
-        } else {
-            // Fallback or System Admin View (no tenant header)
-            import('axios').then(axios => {
-                delete axios.default.defaults.headers.common['x-tenant-slug'];
-                setLoading(false);
-            });
-            // Reset to defaults if needed
-            setBranding({
-                name: 'Badgers Admin',
-                primaryColor: '#000000',
-                secondaryColor: '#1a1a1a',
-                sidebarText: 'Badgers Admin',
-                textColor: '#ffffff',
-                logoUrl: '/badgers-logo.jpg' // Default logo
-            });
-            // Reset extended vars
-            const root = document.documentElement;
-            root.style.setProperty('--primary', '#000000');
-            root.style.setProperty('--secondary', '#1a1a1a');
-            root.style.setProperty('--text-on-primary', '#ffffff');
-
-            root.style.removeProperty('--menu-hover');
-            root.style.removeProperty('--menu-active');
-            root.style.removeProperty('--dashboard-title');
-        }
-
+        resolveTenant();
     }, []);
 
-    const value = {
-        branding,
-        partners,
-        tenantId
-    };
+    const value = { branding, partners, tenantId };
 
-    if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+        );
+    }
 
     return (
         <TenantContext.Provider value={value}>

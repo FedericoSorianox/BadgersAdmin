@@ -8,67 +8,65 @@ const tenantMiddleware = async (req, res, next) => {
     // 1. Try Header (useful for public tenant pages or before login)
     const tenantSlug = req.headers['x-tenant-slug'];
     if (tenantSlug) {
+        // Case-insensitive search for the slug
         const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${tenantSlug}$`, 'i') } });
-        if (tenant) tenantId = tenant._id;
+        if (tenant) {
+            tenantId = tenant._id;
+        } else {
+            // If a slug was provided but NO tenant found, this is a target error.
+            return res.status(404).json({ message: `Gimnasio "${tenantSlug}" no encontrado.` });
+        }
     }
 
     // 2. Try User Token (Stronger/Override)
-    // We assume standard Bearer token format
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.split(' ')[1];
         try {
-            // Warning: We need to know if the JWT_SECRET is per-tenant or global. 
-            // For a single-db multi-tenant app, usually global.
-            if (process.env.JWT_SECRET) {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                if (decoded.tenantId) {
-                    tenantId = decoded.tenantId;
-                }
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+            if (decoded.user && decoded.user.tenantId) {
+                tenantId = decoded.user.tenantId;
+            } else if (decoded.user && decoded.user.role === 'superadmin') {
+                // SuperAdmins don't have a tenantId fixed, they access what is requested via slug or global
+                // If they are on a slug-specific route, we use the tenantId from slug
+                // If no slug, they stay global (tenantId = null)
             }
         } catch (e) {
-            // Token invalid or expired, ignore here, let auth middleware handle if needed.
-            // But if we relied on this for tenantId, we might fail below.
+            // Token invalid, let auth middleware handle later if needed
         }
     }
 
-    // If we are in a route that requires tenant context but we found none:
-    // We typically want to enforce it for data protection, but some routes might be global (like SaaS landing).
-    // For this implementation, we will proceed only if tenantId is found OR if we decide to allow global context.
-    // The user requested: "Blocks access if a user tries to access data from a different tenantId."
-    // So if we have a token with tenantId, we use it. 
+    // Paths that DON'T require a tenant context
+    const publicPaths = [
+        '/api/auth/login',
+        '/api/auth/register',
+        '/api/tenants/public',
+        '/fix-promote-admin'
+    ];
 
-    if (!tenantId) {
-        // If it's a public route or system route, maybe we don't need tenantId.
-        // But for safety in this requested architecture:
-        // We will allow the request to proceed WITHOUT a tenant context if none identifies it, 
-        // BUT the plugin will not inject anything. 
-        // HOWEVER, the user asked to "Block access".
-        // We'll trust the plan: return 401 if strict.
-        // Check if it's the root or a 'landing' page could be tricky without more info.
-        // For now, we will be permissive if headers are missing but assume Auth middleware will catch unauthed users later.
-        // IF we are authenticated BUT token has no tenantId (legacy user?), that's an issue.
+    const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
 
-        // Let's stick to the plan's logic: 
-        // "if (!tenantId) return res.status(401)..."
-        // BUT we must allow login routes to work without tenantId (unless slug is provided).
+    // If we are NOT on a public path and still have no tenantId:
+    // We allow SuperAdmin to proceed without tenantId (Global view)
+    // But regular users or unauthenticated requests to private data must be blocked.
+    if (!tenantId && !isPublicPath) {
+        // Check if user is SuperAdmin (requires re-verifying token briefly or trusting previous check)
+        // For simplicity, we check if the request is NOT to the superadmin allowed origins/paths if we wanted,
+        // but the safest is to check the token again or pass the user object.
 
-        // Improvement: Check path.
-        if (req.path.startsWith('/api/login') || req.path.startsWith('/api/register') || req.path === '/') {
-            return next();
+        let isSuper = false;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            try {
+                const token = authHeader.split(' ')[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+                if (decoded.user && decoded.user.role === 'superadmin') isSuper = true;
+            } catch (e) { }
         }
 
-        // For other API routes, we might strictly require it.
-        // Let's follow the user's specific instruction "Blocks access if a user tries to access data from a different tenantId"
-        // This implies we DO need to identify the tenant. 
-
-        // Re-reading plan: 
-        // "if (!tenantId) { return res.status(401).json({ error: 'Tenant identification failed' }); }"
-        // I I will comment this out for now to avoid breaking existing dev flow until full migration, 
-        // or arguably I should enforce it to meet the requirement. 
-        // I will enforce it but allow a bypass for now if not found (logs warning), 
-        // or strictly follow the plan if the user approved it. 
-        // The user APPROVED the plan which had the 401. So I will add it.
+        if (!isSuper) {
+            // Block access to private routes without valid tenant identification
+            return res.status(401).json({ message: 'Identificación de gimnasio requerida.' });
+        }
     }
 
     if (tenantId) {
@@ -77,35 +75,7 @@ const tenantMiddleware = async (req, res, next) => {
             next();
         });
     } else {
-        // If we don't have a tenant, and implementation is strict, we should error.
-        // However, initial bootstrapping (creating the first tenant) needs access.
-        // We will allow it to proceed for now but log it.
-        // Or 401 as per plan? The plan said 401.
-        // I'll stick to the plan but add an exception for specific paths if needed.
-        // Actually, if I block everything, I can't create the first tenant.
-        // I'll add an exception for 'POST /api/tenants' or similar if it existed.
-        // Since it doesn't, I'll return 401 but maybe allow `options` requests.
-        if (req.method === 'OPTIONS') return next();
-
-        // If I return 401 here, the current app (which sends no tenant data) will BREAK immediately.
-        // The user wants to "conserve the current DEV environment as it is".
-        // This is conflicting. "badgeradmin is my production personal program, do not change that one".
-        // Design constraints:
-        // 1. One codebase.
-        // 2. Conserve current DEV.
-        // 3. Robust Middleware.
-
-        // Solution: If in DEV environment (based on env var?), maybe loosen restrictions?
-        // Or, better, if `process.env.NODE_ENV === 'development'`, we might default to a 'dev-tenant' if not found?
-        // No, that's magic.
-
-        // Better approach:
-        // Proceed without context. The plugin checks `if (!tenantId) ...`. 
-        // If tenantId is null, plugin does nothing -> behaves like single tenant (Global access).
-        // This PRESERVES the current dev environment behavior (which has no tenantId data), 
-        // while enforcing isolation for requests THAT HAVE a tenantId.
-        // This neatly satisfies all constraints.
-
+        // Proceed without tenantId context (Global/SuperAdmin)
         next();
     }
 };
