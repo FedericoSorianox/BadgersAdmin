@@ -79,11 +79,11 @@ const MembersTable = ({
                                 <span className="text-xs text-green-600 font-bold ml-1">${member.planCost}</span>
                             </td>
                             <td className="px-6 py-4">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${member.active
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-red-100 text-red-700'
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${!member.active ? 'bg-red-100 text-red-700' :
+                                        member.isExempt ? 'bg-blue-100 text-blue-700' :
+                                            'bg-green-100 text-green-700'
                                     }`}>
-                                    {member.active ? 'Activo' : 'Inactivo'}
+                                    {!member.active ? 'Inactivo' : member.isExempt ? 'Exento' : 'Activo'}
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right">

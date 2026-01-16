@@ -90,7 +90,7 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
 
                 const paidIds = new Set(detailedPayments.map(p => String(p.memberId || '')));
                 const paidCis = new Set(detailedPayments.map(p => String(p.memberCi || '')));
-                const activeMembers = members.filter(m => m.active);
+                const activeMembers = members.filter(m => m.active && !m.isExempt);
 
                 const paidList = activeMembers.filter(m =>
                     (m._id && paidIds.has(String(m._id))) ||
@@ -99,7 +99,7 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
 
                 const pendingList = activeMembers.filter(m =>
                     !((m._id && paidIds.has(String(m._id))) ||
-                        (m.ci && paidCis.has(String(m.ci)))) && !m.isExempt
+                        (m.ci && paidCis.has(String(m.ci))))
                 );
 
                 return (
