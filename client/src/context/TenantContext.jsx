@@ -53,7 +53,8 @@ export const TenantProvider = ({ children }) => {
             import.meta.env.VITE_ROOT_DOMAIN,
             'gymworkspro.com',
             'the-badgers.com',
-            'localhost'
+            'localhost',
+            'badgersadminuy.netlify.app'
         ].filter(Boolean);
 
         for (const rootDomain of rootDomains) {
