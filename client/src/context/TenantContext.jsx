@@ -58,7 +58,7 @@ export const TenantProvider = ({ children }) => {
 
         for (const rootDomain of rootDomains) {
             if (hostname === rootDomain || hostname === `www.${rootDomain}`) {
-                slug = null;
+                slug = 'badgers';
                 break;
             }
             if (hostname.endsWith(`.${rootDomain}`)) {
