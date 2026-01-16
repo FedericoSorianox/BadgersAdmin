@@ -12,6 +12,7 @@ const MemberSchema = new mongoose.Schema({
     planType: { type: String, default: 'Libre' },
     planCost: { type: Number, default: 2000 }, // Stored snapshot of cost
     active: { type: Boolean, default: true },
+    isExempt: { type: Boolean, default: false },
     isInWhatsappGroup: { type: Boolean, default: false },
     photoUrl: { type: String },
     medicalInfo: { type: String },

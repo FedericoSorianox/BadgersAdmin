@@ -27,6 +27,7 @@ router.post('/', upload.single('image'), async (req, res) => {
             birthDate: req.body.birthDate,
             comments: req.body.comments,
             active: req.body.active === 'true' || req.body.active === true,
+            isExempt: req.body.isExempt === 'true' || req.body.isExempt === true,
             isInWhatsappGroup: req.body.isInWhatsappGroup === 'true' || req.body.isInWhatsappGroup === true
         };
 
@@ -58,6 +59,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
             birthDate: req.body.birthDate,
             comments: req.body.comments,
             active: req.body.active === 'true' || req.body.active === true,
+            isExempt: req.body.isExempt === 'true' || req.body.isExempt === true,
             isInWhatsappGroup: req.body.isInWhatsappGroup === 'true' || req.body.isInWhatsappGroup === true
         };
 

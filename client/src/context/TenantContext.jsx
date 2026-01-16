@@ -57,56 +57,53 @@ export const TenantProvider = ({ children }) => {
             return;
         }
 
-        // Simple logic: if more than 1 part for localhost, or more than 2 for domain
-        // Adjust based on your deployment. For localhost:5173 
-        // localhost -> 1 part (no tenant)
-        // cobrakai.localhost -> 2 parts (tenant = cobrakai)
+        const rootDomain = import.meta.env.VITE_ROOT_DOMAIN || 'localhost';
 
-        if (hostname.includes('localhost')) {
-            if (parts.length > 1 && parts[0] !== 'www') {
-                slug = parts[0];
+        // Escape rootDomain for Regex (e.g., "." -> "\.")
+        const escapedRoot = rootDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Regex to capture subdomain:
+        // ^(.*)\.ROOT_DOMAIN$
+        // e.g. "^(.*)\.gymworkspro\.com$"
+        // If local: "^(.*)\.localhost$"
+
+        // Case 1: Subdomain exists (e.g. cobra.gymworkspro.com or cobra.localhost)
+        const regex = new RegExp(`^(.*)\\.${escapedRoot}$`, 'i');
+        const match = hostname.match(regex);
+
+        if (hostname === rootDomain || hostname === `www.${rootDomain}`) {
+            // Root Domain (Landing / SuperAdmin)
+            console.log(`Detected Root Domain: ${rootDomain}`);
+            setBranding({
+                name: 'GymWorksPro',
+                primaryColor: '#000000',
+                secondaryColor: '#1a1a1a',
+                sidebarText: 'GymWorksPro',
+                textColor: '#ffffff',
+                logoUrl: '/badgers-logo.jpg' // Generic Logo
+            });
+            const root = document.documentElement;
+            root.style.setProperty('--primary', '#000000');
+            root.style.setProperty('--secondary', '#1a1a1a');
+            root.style.setProperty('--text-on-primary', '#ffffff');
+            setLoading(false);
+            return;
+        }
+
+        if (match && match[1]) {
+            const potentialSlug = match[1];
+            if (potentialSlug !== 'www') {
+                slug = potentialSlug;
+            } else {
+                // www.root.com is treated as root above usually, but if regex caught it:
+                // Handled by the first if block ideally, but safety check:
+                setLoading(false);
+                return;
             }
         } else {
-            // Production Domain Logic
-
-            // CASE A: Legacy Domain (The Badgers)
-            // e.g. badgersadminuy.netlify.app
-            if (hostname.includes('badgersadminuy.netlify.app')) {
-                // Determine if this is a Tenant or Root (Legacy Root is Badgers)
-                // netlify.app subdomains are usually 'site-name.netlify.app' which matches 'badgersadminuy'
-                // so parts[0] is 'badgersadminuy'.
-                // If we want to support tenants ON netlify, we can't easily doing sub-sub domains (as discussed).
-                // So we assume this domain is ONLY for the main badgers tenant.
-                console.log('Detected Legacy Domain (Badgers)');
-                setLoading(false);
-                return; // Default state is already Badgers, so we just stop loading logic.
-            }
-
-            // CASE B: Product Domain (GymWorksPro)
-            // e.g. gymworkspro.com or tenant.gymworkspro.com
-            if (hostname.includes('gymworkspro.com')) {
-                if (parts.length > 2 && parts[0] !== 'www') {
-                    // e.g. cobra.gymworkspro.com
-                    slug = parts[0];
-                } else {
-                    // e.g. gymworkspro.com (Root)
-                    console.log('Detected Product Root (GymWorksPro)');
-                    setBranding({
-                        name: 'GymWorksPro',
-                        primaryColor: '#000000',
-                        secondaryColor: '#1a1a1a',
-                        sidebarText: 'GymWorksPro',
-                        textColor: '#ffffff',
-                        logoUrl: '/badgers-logo.jpg' // Generic Logo
-                    });
-                    const root = document.documentElement;
-                    root.style.setProperty('--primary', '#000000');
-                    root.style.setProperty('--secondary', '#1a1a1a');
-                    root.style.setProperty('--text-on-primary', '#ffffff');
-                    setLoading(false);
-                    return;
-                }
-            }
+            // Fallback for weird cases or IP access (treat as root/no tenant)
+            // Or if we are on a completely different domain not matching ROOT_DOMAIN
+            console.log('Hostname does not match ROOT_DOMAIN, assuming standalone or misconfig');
         }
 
         if (slug) {

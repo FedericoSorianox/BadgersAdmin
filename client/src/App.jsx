@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import { Toaster } from 'sonner';
 import Login from './pages/Login';
 
 import Dashboard from './pages/Dashboard';
@@ -26,6 +27,8 @@ import { TenantProvider } from './context/TenantContext';
 function App() {
   return (
     <TenantProvider>
+      <Toaster richColors position="top-right" />
+
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />

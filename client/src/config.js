@@ -1,14 +1,7 @@
 const isProduction = import.meta.env.MODE === 'production';
 
 // List of members exempt from paying fees and should not appear as Active/Pending
-export const EXCLUDED_MEMBERS = [
-    'Federico Soriano',
-    'Gonzalo Fernandez',
-    'Uiller Aguero',
-    'Andrea Lostorto',
-    'Guillermo Viera',
-    'Mariana Peralta'
-];
+// export const EXCLUDED_MEMBERS = []; // Deprecated, moved to DB field isExempt
 
 export const API_URL = import.meta.env.VITE_API_URL || (isProduction
     ? 'https://badgersadmin-backend.onrender.com' // Production URL

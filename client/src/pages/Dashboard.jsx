@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
-import { API_URL, EXCLUDED_MEMBERS } from '../config';
+import { API_URL } from '../config';
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, iconClass, onClick }) => (
     <div
@@ -84,7 +84,7 @@ const Dashboard = () => {
 
             // Active members count
             const activeMembersCount = members.filter(m =>
-                m.active && !EXCLUDED_MEMBERS.includes(m.fullName)
+                m.active && !m.isExempt
             ).length;
             const inactiveMembersCount = members.length - activeMembersCount;
 

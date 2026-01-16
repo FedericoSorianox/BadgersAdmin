@@ -31,6 +31,73 @@ router.get('/member/:memberId', async (req, res) => {
     }
 });
 
+// Annual Analytics Endpoint (Optimized)
+router.get('/analytics/annual', async (req, res) => {
+    try {
+        const { year } = req.query;
+        if (!year) return res.status(400).json({ message: 'Year is required' });
+
+        const tenantId = req.tenantId || null;
+        const targetYear = Number(year);
+
+        const pipeline = [
+            {
+                $match: {
+                    tenantId: tenantId,
+                    $or: [
+                        { year: targetYear },
+                        {
+                            date: {
+                                $gte: new Date(`${targetYear}-01-01`),
+                                $lte: new Date(`${targetYear}-12-31`)
+                            }
+                        }
+                    ],
+                    $or: [
+                        { type: 'Cuota' },
+                        { type: { $exists: false } },
+                        { type: null }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    computedMonth: {
+                        $ifNull: [
+                            "$month",
+                            { $month: "$date" }
+                        ]
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: "$computedMonth",
+                    count: { $sum: 1 },
+                    revenue: { $sum: "$amount" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    month: "$_id",
+                    count: 1,
+                    revenue: 1
+                }
+            },
+            {
+                $sort: { month: 1 }
+            }
+        ];
+
+        const results = await Payment.aggregate(pipeline);
+        res.json(results);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // Get expenses
 router.get('/expenses', async (req, res) => {
     try {
