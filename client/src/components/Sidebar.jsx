@@ -16,8 +16,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         { path: '/admin', icon: Settings, label: 'Admin' },
     ];
 
-    console.log("Branding in Sidebar:", branding); // Debugging
-
     return (
         <>
             <div className={`
