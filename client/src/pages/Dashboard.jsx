@@ -99,7 +99,7 @@ const Dashboard = () => {
                     .map(p => String(p.memberId))
             );
 
-            const paidCount = members.filter(m => m.active && paidThisMonthIds.has(String(m._id))).length;
+            const paidCount = members.filter(m => m.active && !m.isExempt && paidThisMonthIds.has(String(m._id))).length;
             const sortedProducts = [...products].sort((a, b) => Number(a.stock) - Number(b.stock));
 
             setStats({
@@ -517,7 +517,7 @@ const Dashboard = () => {
                     .map(p => String(p.memberId))
             );
 
-            const activeMembers = stats.membersList.filter(m => m.active);
+            const activeMembers = stats.membersList.filter(m => m.active && !m.isExempt);
             const pendingList = activeMembers.filter(m => !paidThisMonthIds.has(String(m._id)));
             const paidList = activeMembers.filter(m => paidThisMonthIds.has(String(m._id)));
 
