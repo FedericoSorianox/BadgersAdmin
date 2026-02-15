@@ -4,7 +4,7 @@ const isProduction = import.meta.env.MODE === 'production';
 // export const EXCLUDED_MEMBERS = []; // Deprecated, moved to DB field isExempt
 
 export const API_URL = import.meta.env.VITE_API_URL || (isProduction
-    ? 'https://badgersadmin-backend.onrender.com' // Production URL
+    ? 'https://gymworkspro-be-aqd16v-b23908-187-77-5-193.traefik.me' // Production URL
     : 'http://localhost:5001');
 
 export default API_URL;

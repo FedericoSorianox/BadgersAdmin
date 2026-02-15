@@ -29,9 +29,10 @@ router.get('/', async (req, res) => {
 // Update Settings
 router.post('/', async (req, res) => {
     try {
-        const { fedeHours, gonzaHours, fedeDaysOff, gonzaDaysOff, instructors } = req.body;
+        const { fedeHours, gonzaHours, fedeDaysOff, gonzaDaysOff, instructors, plans } = req.body;
 
         let settings = await Settings.findOne({ key: 'admin_config' });
+
         if (!settings) {
             settings = new Settings({ key: 'admin_config' });
         }
@@ -41,6 +42,7 @@ router.post('/', async (req, res) => {
         settings.fedeDaysOff = fedeDaysOff;
         settings.gonzaDaysOff = gonzaDaysOff;
         settings.instructors = instructors;
+        if (plans) settings.plans = plans;
 
         const updatedSettings = await settings.save();
         res.json(updatedSettings);

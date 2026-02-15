@@ -9,6 +9,11 @@ const settingsSchema = new mongoose.Schema({
     instructors: [{
         name: String,
         hours: { type: Number, default: 0 }
+    }],
+    plans: [{
+        name: { type: String, required: true },
+        cost: { type: Number, required: true },
+        type: { type: String, enum: ['Individual', 'Familiar'], default: 'Individual' }
     }]
 }, { timestamps: true });
 

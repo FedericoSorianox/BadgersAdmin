@@ -17,6 +17,8 @@ const MemberSchema = new mongoose.Schema({
     photoUrl: { type: String },
     medicalInfo: { type: String },
     comments: { type: String },
+    familyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
+    isFamilyHead: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 

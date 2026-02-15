@@ -2,19 +2,21 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../Modal';
 import { API_URL } from '../../config';
 
-const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData }) => {
+const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], members = [] }) => {
     const [formData, setFormData] = useState({
         fullName: '',
         ci: '',
         phone: '',
-        planType: 'Libre',
-        planCost: 2000,
+        planType: '',
+        planCost: 0,
         birthDate: '',
         comments: '',
         active: true,
         isInWhatsappGroup: false,
         photoUrl: '',
-        isExempt: false
+        isExempt: false,
+        familyId: '',
+        isFamilyHead: false
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -26,14 +28,16 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                     fullName: initialData.fullName || '',
                     ci: initialData.ci || '',
                     phone: initialData.phone || '',
-                    planType: initialData.planType || 'Libre',
-                    planCost: initialData.planCost || 2000,
+                    planType: initialData.planType || '',
+                    planCost: initialData.planCost || 0,
                     birthDate: initialData.birthDate ? new Date(initialData.birthDate).toISOString().split('T')[0] : '',
                     comments: initialData.comments || '',
                     active: initialData.active !== undefined ? initialData.active : true,
                     isInWhatsappGroup: initialData.isInWhatsappGroup || false,
                     photoUrl: initialData.photoUrl || '',
-                    isExempt: initialData.isExempt || false
+                    isExempt: initialData.isExempt || false,
+                    familyId: initialData.familyId || '',
+                    isFamilyHead: initialData.isFamilyHead || false
                 });
                 setImagePreview(initialData.photoUrl ? (initialData.photoUrl.startsWith('http') ? initialData.photoUrl : `${API_URL}${initialData.photoUrl}`) : null);
             } else {
@@ -41,20 +45,59 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                     fullName: '',
                     ci: '',
                     phone: '',
-                    planType: 'Libre',
-                    planCost: 2000,
+                    planType: plans.length > 0 ? plans[0].name : '',
+                    planCost: plans.length > 0 ? plans[0].cost : 0,
                     birthDate: '',
                     comments: '',
                     active: true,
                     isInWhatsappGroup: false,
                     photoUrl: '',
-                    isExempt: false
+                    isExempt: false,
+                    familyId: '',
+                    isFamilyHead: false
                 });
                 setImagePreview(null);
             }
             setImageFile(null);
         }
-    }, [isOpen, initialData]);
+    }, [isOpen, initialData, plans]);
+
+    const handlePlanChange = (e) => {
+        const selectedPlanName = e.target.value;
+        const selectedPlan = plans.find(p => p.name === selectedPlanName);
+
+        if (selectedPlan) {
+            setFormData(prev => ({
+                ...prev,
+                planType: selectedPlanName,
+                planCost: selectedPlan.cost,
+                isFamilyHead: selectedPlan.type === 'Familiar', // Default to head if family
+                familyId: ''
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, planType: selectedPlanName }));
+        }
+    };
+
+    const handleFamilyHeadChange = (e) => {
+        const headId = e.target.value;
+        if (headId === 'me') {
+            const selectedPlan = plans.find(p => p.name === formData.planType);
+            setFormData(prev => ({
+                ...prev,
+                isFamilyHead: true,
+                familyId: '',
+                planCost: selectedPlan ? selectedPlan.cost : prev.planCost
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                isFamilyHead: false,
+                familyId: headId,
+                planCost: 0
+            }));
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -70,6 +113,8 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData }) => {
         formDataToSend.append('active', formData.active);
         formDataToSend.append('isInWhatsappGroup', formData.isInWhatsappGroup);
         formDataToSend.append('isExempt', formData.isExempt);
+        formDataToSend.append('familyId', formData.familyId);
+        formDataToSend.append('isFamilyHead', formData.isFamilyHead);
 
         if (imageFile) {
             formDataToSend.append('image', imageFile);
@@ -77,6 +122,8 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData }) => {
 
         await onSubmit(formDataToSend);
     };
+
+    const currentPlan = plans.find(p => p.name === formData.planType);
 
     return (
         <Modal
@@ -117,14 +164,56 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Costo Plan ($)</label>
-                        <input
-                            type="number"
-                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.planCost}
-                            onChange={(e) => setFormData({ ...formData, planCost: Number(e.target.value) })}
-                        />
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Plan</label>
+                        <select
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            value={formData.planType}
+                            onChange={handlePlanChange}
+                        >
+                            <option value="">Seleccionar Plan</option>
+                            {plans.map((plan, idx) => (
+                                <option key={idx} value={plan.name}>{plan.name} - ${plan.cost}</option>
+                            ))}
+                            <option value="Otro">Otro / Personalizado</option>
+                        </select>
                     </div>
+                </div>
+
+                {/* Family Plan Logic */}
+                {currentPlan && currentPlan.type === 'Familiar' && (
+                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                        <label className="block text-sm font-medium text-blue-900 mb-2">Configuración Familiar</label>
+                        <select
+                            className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            value={formData.isFamilyHead ? 'me' : formData.familyId}
+                            onChange={handleFamilyHeadChange}
+                        >
+                            <option value="me">Soy el Titular (Paga la cuota)</option>
+                            {members
+                                .filter(m => m.isFamilyHead && m._id !== initialData?._id) // Show other heads, exclude self
+                                .map(m => (
+                                    <option key={m._id} value={m._id}>
+                                        Inluído en plan de: {m.fullName}
+                                    </option>
+                                ))
+                            }
+                        </select>
+                        <p className="text-xs text-blue-600 mt-2">
+                            {formData.isFamilyHead
+                                ? "Este socio pagará el total del plan familiar."
+                                : "Este socio NO paga cuota (cubierto por el titular)."}
+                        </p>
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Costo Final ($)</label>
+                    <input
+                        type="number"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={formData.planCost}
+                        onChange={(e) => setFormData({ ...formData, planCost: Number(e.target.value) })}
+                    />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
@@ -147,19 +236,6 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                         value={formData.comments}
                         onChange={(e) => setFormData({ ...formData, comments: e.target.value })}
                     ></textarea>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Plan</label>
-                    <select
-                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                        value={formData.planType}
-                        onChange={(e) => setFormData({ ...formData, planType: e.target.value })}
-                    >
-                        <option value="Libre">Libre</option>
-                        <option value="2 Veces x Semana">2 Veces x Semana</option>
-                        <option value="Pase Diario">Pase Diario</option>
-                        <option value="Otro">Otro</option>
-                    </select>
                 </div>
 
                 <div>

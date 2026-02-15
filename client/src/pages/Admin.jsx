@@ -18,7 +18,8 @@ const Admin = () => {
         gonzaHours: 8,
         fedeDaysOff: 0,
         gonzaDaysOff: 0,
-        instructors: []
+        instructors: [],
+        plans: []
     });
 
     const [results, setResults] = useState({
@@ -74,7 +75,8 @@ const Admin = () => {
                     gonzaHours: settings.gonzaHours,
                     fedeDaysOff: settings.fedeDaysOff,
                     gonzaDaysOff: settings.gonzaDaysOff,
-                    instructors: settings.instructors || []
+                    instructors: settings.instructors || [],
+                    plans: settings.plans || []
                 }));
             } catch (error) {
                 console.error('Error fetching settings:', error);
@@ -109,8 +111,8 @@ const Admin = () => {
         const fixedPortion = grossProfit * 0.50;
         const variablePortion = grossProfit * 0.50;
 
-        const fixedFede = fixedPortion * 0.50;
-        const fixedGonza = fixedPortion * 0.50;
+        const fixedFede = fixedPortion * 0.60;
+        const fixedGonza = fixedPortion * 0.40;
 
         const variableFede = (variablePortion * effectiveFedeHours) / totalEffectiveHours;
         const variableGonza = (variablePortion * effectiveGonzaHours) / totalEffectiveHours;
@@ -138,7 +140,8 @@ const Admin = () => {
                 gonzaHours: config.gonzaHours,
                 fedeDaysOff: config.fedeDaysOff,
                 gonzaDaysOff: config.gonzaDaysOff,
-                instructors: config.instructors
+                instructors: config.instructors,
+                plans: config.plans
             });
             alert('Configuración guardada exitosamente');
         } catch (error) {
@@ -165,6 +168,25 @@ const Admin = () => {
     const removeInstructor = (index) => {
         const newInstructors = config.instructors.filter((_, i) => i !== index);
         setConfig({ ...config, instructors: newInstructors });
+    };
+
+    // --- PLANS MANAGEMENT ---
+    const handlePlanChange = (index, field, value) => {
+        const newPlans = [...config.plans];
+        newPlans[index][field] = value;
+        setConfig({ ...config, plans: newPlans });
+    };
+
+    const addPlan = () => {
+        setConfig({
+            ...config,
+            plans: [...config.plans, { name: '', cost: 0, type: 'Individual' }]
+        });
+    };
+
+    const removePlan = (index) => {
+        const newPlans = config.plans.filter((_, i) => i !== index);
+        setConfig({ ...config, plans: newPlans });
     };
 
     const formatCurrency = (value) => {
@@ -262,16 +284,7 @@ const Admin = () => {
                         </span>
                     </div>
                     <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.fedeAmount)}</p>
-                    <div className="space-y-2 pt-4 border-t border-slate-100">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Parte fija:</span>
-                            <span className="font-medium text-slate-800">{formatCurrency(results.fixedFede)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Por horas:</span>
-                            <span className="font-medium text-slate-800">{formatCurrency(results.variableFede)}</span>
-                        </div>
-                    </div>
+
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-center mb-2">
@@ -281,16 +294,80 @@ const Admin = () => {
                         </span>
                     </div>
                     <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.gonzaAmount)}</p>
-                    <div className="space-y-2 pt-4 border-t border-slate-100">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Parte fija:</span>
-                            <span className="font-medium text-slate-800">{formatCurrency(results.fixedGonza)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Por horas:</span>
-                            <span className="font-medium text-slate-800">{formatCurrency(results.variableGonza)}</span>
-                        </div>
-                    </div>
+
+                </div>
+            </div>
+
+            {/* Plans Management Section */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mt-8">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-700">Planes de Membresía</h3>
+                    <button onClick={addPlan} className="text-sm text-blue-600 font-bold hover:underline">
+                        + Agregar Plan
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bgslate-50 text-slate-500 font-bold text-sm uppercase">
+                            <tr>
+                                <th className="px-6 py-3 rounded-l-lg">Nombre del Plan</th>
+                                <th className="px-6 py-3">Costo Mensual</th>
+                                <th className="px-6 py-3">Tipo</th>
+                                <th className="px-6 py-3 rounded-r-lg"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {config.plans.map((plan, index) => (
+                                <tr key={index}>
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="text"
+                                            className="w-full border-b border-slate-200 focus:border-blue-500 outline-none py-1"
+                                            value={plan.name}
+                                            onChange={(e) => handlePlanChange(index, 'name', e.target.value)}
+                                            placeholder="Ej: Plan Mensual"
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="relative">
+                                            <span className="absolute left-0 top-1 text-slate-400">$</span>
+                                            <input
+                                                type="number"
+                                                className="w-full pl-4 border-b border-slate-200 focus:border-blue-500 outline-none py-1"
+                                                value={plan.cost}
+                                                onChange={(e) => handlePlanChange(index, 'cost', Number(e.target.value))}
+                                            />
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <select
+                                            className="w-full border-b border-slate-200 focus:border-blue-500 outline-none py-1 bg-transparent"
+                                            value={plan.type}
+                                            onChange={(e) => handlePlanChange(index, 'type', e.target.value)}
+                                        >
+                                            <option value="Individual">Individual</option>
+                                            <option value="Familiar">Familiar</option>
+                                        </select>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => removePlan(index)}
+                                            className="text-red-400 hover:text-red-600 text-sm font-bold"
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {config.plans.length === 0 && (
+                                <tr>
+                                    <td colSpan="4" className="text-center py-6 text-slate-400">
+                                        No hay planes configurados.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

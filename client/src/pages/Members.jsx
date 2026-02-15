@@ -35,9 +35,21 @@ const Members = () => {
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [viewMember, setViewMember] = useState(null);
 
+    const [plans, setPlans] = useState([]);
+
     useEffect(() => {
         fetchMembers();
+        fetchPlans();
     }, []);
+
+    const fetchPlans = async () => {
+        try {
+            const response = await axios.get(`${API_URL}/api/settings`);
+            setPlans(response.data.plans || []);
+        } catch (error) {
+            console.error("Error fetching plans", error);
+        }
+    };
 
     const fetchMembers = async () => {
         setLoading(true);
@@ -157,6 +169,8 @@ const Members = () => {
                 onClose={() => setModalOpen(false)}
                 onSubmit={handleSubmit}
                 initialData={editingMember}
+                plans={plans}
+                members={members}
             />
 
             <MemberDetailModal

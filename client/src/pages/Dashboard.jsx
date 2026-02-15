@@ -37,7 +37,8 @@ const Dashboard = () => {
         notesMap: {}, // memberId -> note string
         birthdaysList: [], // Members with birthday this month
         instructors: [],
-        expenses: []
+        expenses: [],
+        plans: []
     });
 
     const [debts, setDebts] = useState([]);
@@ -95,6 +96,7 @@ const Dashboard = () => {
             setDebts(fetchedDebts);
 
             // Calculate Metrics
+            const sortedProducts = [...products].sort((a, b) => Number(a.stock) - Number(b.stock));
             const stockCount = products.reduce((acc, p) => acc + (Number(p.stock) > 0 ? 1 : 0), 0);
 
             // Payments logic
@@ -102,9 +104,8 @@ const Dashboard = () => {
             const currentYear = new Date().getFullYear();
 
             // Active members count
-            const activeMembersCount = members.filter(m =>
-                m.active && !m.isExempt
-            ).length;
+            const activeMembers = members.filter(m => m.active && !m.isExempt);
+            const activeMembersCount = activeMembers.length;
             const inactiveMembersCount = members.length - activeMembersCount;
 
             // Paid members for current month
@@ -118,15 +119,15 @@ const Dashboard = () => {
                     .map(p => String(p.memberId))
             );
 
-            const paidCount = members.filter(m => m.active && !m.isExempt && paidThisMonthIds.has(String(m._id))).length;
-            const sortedProducts = [...products].sort((a, b) => Number(a.stock) - Number(b.stock));
+            const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
+            const paidBillableCount = billableMembers.filter(m => paidThisMonthIds.has(String(m._id))).length;
 
             setStats({
                 activeMembers: activeMembersCount,
                 inactiveMembers: inactiveMembersCount,
                 stockCount,
-                paidCount,
-                pendingCount: activeMembersCount - paidCount,
+                paidCount: paidBillableCount,
+                pendingCount: billableMembers.length - paidBillableCount,
                 products: sortedProducts,
                 membersList: members,
                 paymentsList: payments,
@@ -146,7 +147,8 @@ const Dashboard = () => {
                     return dayA - dayB;
                 }),
                 instructors: settings.instructors || [],
-                expenses: expenses
+                expenses: expenses,
+                plans: settings.plans || []
             });
 
         } catch (error) {
@@ -591,8 +593,9 @@ const Dashboard = () => {
             );
 
             const activeMembers = stats.membersList.filter(m => m.active && !m.isExempt);
-            const pendingList = activeMembers.filter(m => !paidThisMonthIds.has(String(m._id)));
-            const paidList = activeMembers.filter(m => paidThisMonthIds.has(String(m._id)));
+            const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
+            const pendingList = billableMembers.filter(m => !paidThisMonthIds.has(String(m._id)));
+            const paidList = billableMembers.filter(m => paidThisMonthIds.has(String(m._id)));
 
             const filteredPending = pendingList.filter(m =>
                 m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
