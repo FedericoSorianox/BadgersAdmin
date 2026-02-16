@@ -37,8 +37,8 @@ const Sidebar = ({ isOpen, onClose }) => {
                                 e.target.src = "/gymworkspro-logo.png";
                             }}
                         />
-                        <div>
-                            <h1 className="font-bold text-base leading-tight" style={{ color: 'var(--text-on-primary, white)' }}>
+                        <div className="min-w-0 flex-1">
+                            <h1 className="font-bold text-base leading-tight truncate" style={{ color: 'var(--text-on-primary, white)' }}>
                                 {branding?.name || "GymWorksPro"}
                             </h1>
                         </div>

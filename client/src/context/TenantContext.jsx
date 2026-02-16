@@ -74,9 +74,9 @@ export const TenantProvider = ({ children }) => {
                 axios.defaults.headers.common['x-tenant-slug'] = slug;
 
                 try {
-                    const res = await fetch(`${API_URL}/api/tenants/public/${slug}`);
-                    if (res.ok) {
-                        const data = await res.json();
+                    const res = await axios.get(`${API_URL}/api/tenants/public/${slug}`, { timeout: 8000 });
+                    if (res.status === 200) {
+                        const data = res.data;
                         if (data.branding) {
                             setBranding({
                                 ...data.branding,
@@ -100,8 +100,6 @@ export const TenantProvider = ({ children }) => {
                             if (data.branding.newProductButtonColor) root.style.setProperty('--btn-new-product', data.branding.newProductButtonColor);
                             if (data.branding.saveButtonColor) root.style.setProperty('--btn-save', data.branding.saveButtonColor);
                         }
-                    } else {
-                        console.warn(`Tenant branding fetch failed for "${slug}" (Status: ${res.status})`);
                     }
                 } catch (error) {
                     console.error("Failed to load tenant branding", error);
