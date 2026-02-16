@@ -1,0 +1,15 @@
+#!/usr/bin/expect -f
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no root@187.77.5.193
+expect {
+  "password:" { send "(qQtLDMPTy7sPB3vXM58\r" }
+  timeout { puts "Connection timed out"; exit 1 }
+  eof { puts "Connection failed"; exit 1 }
+}
+expect -re "\[#$]"
+send "docker service inspect gymworkspro-be-aqd16v > /tmp/service_spec.json\r"
+expect -re "\[#$]"
+send "cat /tmp/service_spec.json\r"
+expect -re "\[#$]"
+send "exit\r"
+expect eof

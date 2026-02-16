@@ -1,0 +1,13 @@
+#!/usr/bin/expect -f
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no root@187.77.5.193
+expect {
+  "password:" { send "(qQtLDMPTy7sPB3vXM58\r" }
+  timeout { puts "Connection timed out"; exit 1 }
+  eof { puts "Connection failed"; exit 1 }
+}
+expect -re "\[#$]"
+send "docker logs dokploy --tail 50\r"
+expect -re "\[#$]"
+send "exit\r"
+expect eof
