@@ -1,0 +1,21 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@187.77.5.193
+expect {
+  "password:" { send "(qQtLDMPTy7sPB3vXM58\r" }
+  timeout { puts "Connection timed out"; exit 1 }
+  eof { puts "Connection failed"; exit 1 }
+}
+expect -re "\[#$]"
+# Remove bad labels
+send "docker service update --label-rm traefik.http.routers.gymworkspro-be-sslip.rule --label-rm traefik.http.routers.gymworkspro-be-sslip.entrypoints --label-rm traefik.http.routers.gymworkspro-be-sslip.tls.certresolver --label-rm traefik.http.services.gymworkspro-be-sslip.loadbalancer.server.port --container-label-rm traefik.http.routers.gymworkspro-be-sslip.rule --container-label-rm traefik.http.routers.gymworkspro-be-sslip.entrypoints --container-label-rm traefik.http.routers.gymworkspro-be-sslip.tls.certresolver --container-label-rm traefik.http.services.gymworkspro-be-sslip.loadbalancer.server.port gymworkspro-be-aqd16v\r"
+expect -re "\[#$]"
+# Add correct labels with clear escaping
+# Using hex code \x60 for backtick to avoid shell escaping hell if possible, or simple escape
+# Host(`gymworkspro-api.187.77.5.193.sslip.io`)
+send "docker service update --label-add 'traefik.http.routers.gymworkspro-be-sslip.rule=Host(`gymworkspro-api.187.77.5.193.sslip.io`)' --label-add 'traefik.http.routers.gymworkspro-be-sslip.entrypoints=websecure' --label-add 'traefik.http.routers.gymworkspro-be-sslip.tls.certresolver=letsencrypt' --label-add 'traefik.http.services.gymworkspro-be-sslip.loadbalancer.server.port=5001' gymworkspro-be-aqd16v\r"
+expect -re "\[#$]"
+send "docker service inspect --format '{{json .Spec.Labels}}' gymworkspro-be-aqd16v\r"
+expect -re "\[#$]"
+send "exit\r"
+expect eof
