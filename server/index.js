@@ -11,6 +11,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
+// Force 5000 to match Dokploy Container Port UI, or use env if provided
 const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
