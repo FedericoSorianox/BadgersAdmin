@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["cd client && npm install"]
+cmds = ["cd client && npm install && npm install serve"]
 
 [phases.build]
 cmds = ["cd client && npm run build"]
 
 [start]
-cmd = "cd client && npx serve -s dist -l 3000"
+cmd = "cd client && ./node_modules/.bin/serve -s dist -l 3000"
