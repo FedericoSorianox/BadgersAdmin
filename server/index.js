@@ -11,7 +11,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
-// Force 5000 to match Dokploy Container Port UI, or use env if provided
+// En Dokploy, el puerto suele venir por variable de entorno. 
+// Forzamos a que si no existe, use el 5000 que tienes configurado en la UI.
 const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
@@ -52,7 +53,17 @@ mongoose.connect(process.env.MONGODB_URI)
     .catch(err => console.log(err));
 
 app.get('/', (req, res) => {
-    res.send('Martial Arts Admin API');
+    res.send('Martial Arts Admin API - Running');
+});
+
+// Ruta de Salud para verificar que el contenedor responde
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        port: PORT,
+        node_env: process.env.NODE_ENV,
+        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    });
 });
 
 // TEMPORARY: Promote 'admin' to superadmin (Remove after use)
@@ -86,5 +97,10 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notifications', require('./routes/notifications'));
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log('--------------------------------------------------');
+    console.log(`🚀 SERVIDOR ARRANCADO`);
+    console.log(`📡 Puerto: ${PORT}`);
+    console.log(`🌍 IP: 0.0.0.0`);
+    console.log(`🛠️  Entorno: ${process.env.NODE_ENV || 'development'}`);
+    console.log('--------------------------------------------------');
 });
