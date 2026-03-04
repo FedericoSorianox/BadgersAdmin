@@ -6,13 +6,26 @@ const MembersTable = ({
     onView,
     onEdit,
     onDelete,
-    onToggleWhatsapp
+    onToggleWhatsapp,
+    selectedMembers = [],
+    onSelectMember,
+    onSelectAll
 }) => {
+    const isAllSelected = members.length > 0 && selectedMembers.length === members.length;
+
     return (
         <div className="overflow-x-auto">
             <table className="w-full text-left">
                 <thead className="bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">
                     <tr>
+                        <th className="px-6 py-4 w-12 text-center">
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                                checked={isAllSelected}
+                                onChange={onSelectAll}
+                            />
+                        </th>
                         <th className="px-6 py-4">Socio</th>
                         <th className="px-6 py-4">Cédula</th>
                         <th className="px-6 py-4">WhatsApp</th>
@@ -23,7 +36,15 @@ const MembersTable = ({
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                     {members.map((member) => (
-                        <tr key={member._id} className="hover:bg-slate-50/80 transition-colors">
+                        <tr key={member._id} className={`hover:bg-slate-50/80 transition-colors ${selectedMembers.includes(member._id) ? 'bg-blue-50/50' : ''}`}>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                                    checked={selectedMembers.includes(member._id)}
+                                    onChange={() => onSelectMember(member._id)}
+                                />
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center gap-3">
                                     <div

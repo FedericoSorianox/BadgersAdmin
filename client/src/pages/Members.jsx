@@ -1,7 +1,7 @@
 
 
 import { useState, useEffect } from 'react';
-import { Loader2, UserPlus, BarChart2 } from 'lucide-react';
+import { Loader2, UserPlus, BarChart2, CreditCard } from 'lucide-react';
 import axios from 'axios';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import MemberFilters from '../components/members/MemberFilters';
 import MemberFormModal from '../components/members/MemberFormModal';
 import MemberAnalyticsModal from '../components/members/MemberAnalyticsModal';
 import MemberDetailModal from '../components/members/MemberDetailModal';
+import BulkPlanUpdateModal from '../components/members/BulkPlanUpdateModal';
 
 const Members = () => {
     const [members, setMembers] = useState([]);
@@ -36,6 +37,8 @@ const Members = () => {
     const [viewMember, setViewMember] = useState(null);
 
     const [plans, setPlans] = useState([]);
+    const [selectedMembers, setSelectedMembers] = useState([]);
+    const [bulkPlanOpen, setBulkPlanOpen] = useState(false);
 
     useEffect(() => {
         fetchMembers();
@@ -138,6 +141,39 @@ const Members = () => {
         setViewModalOpen(true);
     };
 
+    const handleSelectMember = (memberId) => {
+        if (selectedMembers.includes(memberId)) {
+            setSelectedMembers(selectedMembers.filter(id => id !== memberId));
+        } else {
+            setSelectedMembers([...selectedMembers, memberId]);
+        }
+    };
+
+    const handleSelectAll = () => {
+        if (selectedMembers.length === filteredMembers.length && filteredMembers.length > 0) {
+            setSelectedMembers([]);
+        } else {
+            setSelectedMembers(filteredMembers.map(m => m._id));
+        }
+    };
+
+    const handleBulkPlanUpdate = async (plan) => {
+        try {
+            await axios.put(`${API_URL}/api/members/bulk/plan`, {
+                memberIds: selectedMembers,
+                planType: plan.name,
+                planCost: plan.cost
+            });
+            toast.success('Planes actualizados correctamente');
+            setBulkPlanOpen(false);
+            setSelectedMembers([]);
+            fetchMembers();
+        } catch (error) {
+            console.error("Error updating plans", error);
+            toast.error("Error al actualizar planes");
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center items-center h-full">
@@ -182,6 +218,14 @@ const Members = () => {
                 }}
             />
 
+            <BulkPlanUpdateModal
+                isOpen={bulkPlanOpen}
+                onClose={() => setBulkPlanOpen(false)}
+                onSubmit={handleBulkPlanUpdate}
+                plans={plans}
+                selectedCount={selectedMembers.length}
+            />
+
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800">Socios</h1>
@@ -195,6 +239,15 @@ const Members = () => {
                         <BarChart2 size={20} />
                         <span className="hidden sm:inline">Analíticas</span>
                     </button>
+                    {selectedMembers.length > 0 && (
+                        <button
+                            onClick={() => setBulkPlanOpen(true)}
+                            className="bg-purple-100 text-purple-700 hover:bg-purple-200 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shadow-sm"
+                        >
+                            <CreditCard size={20} />
+                            <span className="hidden sm:inline">Cambiar Plan ({selectedMembers.length})</span>
+                        </button>
+                    )}
                     <button
                         onClick={() => handleOpenModal()}
                         style={{ backgroundColor: 'var(--btn-new-member, #2563eb)' }}
@@ -220,6 +273,9 @@ const Members = () => {
                     onEdit={handleOpenModal}
                     onDelete={handleDelete}
                     onToggleWhatsapp={handleToggleWhatsapp}
+                    selectedMembers={selectedMembers}
+                    onSelectMember={handleSelectMember}
+                    onSelectAll={handleSelectAll}
                 />
 
                 <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">

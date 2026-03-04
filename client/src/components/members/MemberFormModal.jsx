@@ -67,11 +67,25 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
         const selectedPlan = plans.find(p => p.name === selectedPlanName);
 
         if (selectedPlan) {
+            const isFamiliar = selectedPlan.type === 'Familiar';
+            let finalCost = selectedPlan.cost;
+
+            if (isFamiliar) {
+                const dependentCount = initialData && initialData._id
+                    ? members.filter(m => m.familyId === initialData._id && m.active).length
+                    : 0;
+                const totalActive = dependentCount + (formData.active ? 1 : 0);
+                if (totalActive > 0) {
+                    const billable = totalActive - Math.floor(totalActive / 3);
+                    finalCost = billable * selectedPlan.cost;
+                }
+            }
+
             setFormData(prev => ({
                 ...prev,
                 planType: selectedPlanName,
-                planCost: selectedPlan.cost,
-                isFamilyHead: selectedPlan.type === 'Familiar', // Default to head if family
+                planCost: finalCost,
+                isFamilyHead: isFamiliar, // Default to head if family
                 familyId: ''
             }));
         } else {
@@ -83,11 +97,24 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
         const headId = e.target.value;
         if (headId === 'me') {
             const selectedPlan = plans.find(p => p.name === formData.planType);
+            let finalCost = selectedPlan ? selectedPlan.cost : formData.planCost;
+
+            if (selectedPlan) {
+                const dependentCount = initialData && initialData._id
+                    ? members.filter(m => m.familyId === initialData._id && m.active).length
+                    : 0;
+                const totalActive = dependentCount + (formData.active ? 1 : 0);
+                if (totalActive > 0) {
+                    const billable = totalActive - Math.floor(totalActive / 3);
+                    finalCost = billable * selectedPlan.cost;
+                }
+            }
+
             setFormData(prev => ({
                 ...prev,
                 isFamilyHead: true,
                 familyId: '',
-                planCost: selectedPlan ? selectedPlan.cost : prev.planCost
+                planCost: finalCost
             }));
         } else {
             setFormData(prev => ({
@@ -200,7 +227,7 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
                         </select>
                         <p className="text-xs text-blue-600 mt-2">
                             {formData.isFamilyHead
-                                ? "Este socio pagará el total del plan familiar."
+                                ? "Este socio pagará por el grupo familiar (Promo 3x2 aplica automáticamente)."
                                 : "Este socio NO paga cuota (cubierto por el titular)."}
                         </p>
                     </div>
