@@ -15,7 +15,7 @@ const Admin = () => {
     const [config, setConfig] = useState({
         grossProfit: 0,
         fedeHours: 40,
-        gonzaHours: 8,
+        gonzaHours: 16,
         fedeDaysOff: 0,
         gonzaDaysOff: 0,
         instructors: [],
@@ -23,11 +23,11 @@ const Admin = () => {
     });
 
     const [results, setResults] = useState({
-        fixedFede: 0,
-        variableFede: 0,
+        hourlyPaymentFede: 0,
+        utilityFede: 0,
         fedeAmount: 0,
-        fixedGonza: 0,
-        variableGonza: 0,
+        hourlyPaymentGonza: 0,
+        utilityGonza: 0,
         gonzaAmount: 0
     });
 
@@ -71,8 +71,8 @@ const Admin = () => {
 
                 setConfig(prev => ({
                     ...prev,
-                    fedeHours: settings.fedeHours,
-                    gonzaHours: settings.gonzaHours,
+                    fedeHours: settings.fedeHours !== undefined ? settings.fedeHours : 40,
+                    gonzaHours: settings.gonzaHours !== undefined ? settings.gonzaHours : 16,
                     fedeDaysOff: settings.fedeDaysOff,
                     gonzaDaysOff: settings.gonzaDaysOff,
                     instructors: settings.instructors || [],
@@ -91,6 +91,7 @@ const Admin = () => {
 
     const handleCalculate = () => {
         const workingDays = 26;
+        const hourlyRate = 1000;
 
         // Effective hours calculation:
         // Adjust hours based on days worked vs max working days
@@ -100,30 +101,56 @@ const Admin = () => {
         const effectiveFedeHours = Number(config.fedeHours) * ((workingDays - Number(config.fedeDaysOff)) / workingDays);
         const effectiveGonzaHours = Number(config.gonzaHours) * ((workingDays - Number(config.gonzaDaysOff)) / workingDays);
 
-        const totalEffectiveHours = effectiveFedeHours + effectiveGonzaHours;
         const grossProfit = Number(config.grossProfit);
+        const totalEffectiveHours = effectiveFedeHours + effectiveGonzaHours;
 
         if (totalEffectiveHours <= 0) return;
 
-        // New distribution logic:
-        // 50% split 50/50
-        // 50% split by EFFECTIVE hours worked
-        const fixedPortion = grossProfit * 0.50;
-        const variablePortion = grossProfit * 0.50;
+        // 1. Pago por horas de cada uno (Horas * 1000)
+        let hourlyPaymentFede = effectiveFedeHours * hourlyRate;
+        let hourlyPaymentGonza = effectiveGonzaHours * hourlyRate;
 
-        const fixedFede = fixedPortion * 0.60;
-        const fixedGonza = fixedPortion * 0.40;
+        const totalHourlyPayment = hourlyPaymentFede + hourlyPaymentGonza;
+        let utility = 0;
+        let utilityPerPartner = 0;
+        let fedeAmount = 0;
+        let gonzaAmount = 0;
 
-        const variableFede = (variablePortion * effectiveFedeHours) / totalEffectiveHours;
-        const variableGonza = (variablePortion * effectiveGonzaHours) / totalEffectiveHours;
+        if (grossProfit >= totalHourlyPayment) {
+            // Caso 1: Alcanza para pagar las horas
+            // 2. Restar suma de pagos a Ganancia Bruta para Utilidad
+            utility = grossProfit - totalHourlyPayment;
+
+            // 3. Dividir Utilidad en dos partes iguales
+            utilityPerPartner = utility / 2;
+
+            // 4. Pago Final = Pago por Horas + Utilidad (50%)
+            fedeAmount = hourlyPaymentFede + utilityPerPartner;
+            gonzaAmount = hourlyPaymentGonza + utilityPerPartner;
+        } else {
+            // Caso 2: No alcanza. Reparto proporcional.
+            // La utilidad es 0 porque se distribuye toda la ganancia
+            utilityPerPartner = 0;
+            
+            // Calculamos el porcentaje de horas de cada uno
+            const percentageFede = effectiveFedeHours / totalEffectiveHours;
+            const percentageGonza = effectiveGonzaHours / totalEffectiveHours;
+
+            // Su "pago por horas" ahora es directamente su porcentaje de la ganancia
+            hourlyPaymentFede = grossProfit * percentageFede;
+            hourlyPaymentGonza = grossProfit * percentageGonza;
+
+            fedeAmount = hourlyPaymentFede;
+            gonzaAmount = hourlyPaymentGonza;
+        }
 
         setResults({
-            fixedFede,
-            variableFede,
-            fedeAmount: fixedFede + variableFede,
-            fixedGonza,
-            variableGonza,
-            gonzaAmount: fixedGonza + variableGonza
+            hourlyPaymentFede,
+            utilityFede: utilityPerPartner,
+            fedeAmount,
+            hourlyPaymentGonza,
+            utilityGonza: utilityPerPartner,
+            gonzaAmount
         });
     };
 
@@ -284,7 +311,16 @@ const Admin = () => {
                         </span>
                     </div>
                     <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.fedeAmount)}</p>
-
+                    <div className="space-y-1 text-sm text-slate-500 border-t border-slate-100 pt-3">
+                        <div className="flex justify-between">
+                            <span>Pago por horas ($1000/h):</span>
+                            <span className="font-medium text-slate-700">{formatCurrency(results.hourlyPaymentFede)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>Utilidad (50%):</span>
+                            <span className="font-medium text-slate-700">{formatCurrency(results.utilityFede)}</span>
+                        </div>
+                    </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-center mb-2">
@@ -294,7 +330,16 @@ const Admin = () => {
                         </span>
                     </div>
                     <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.gonzaAmount)}</p>
-
+                    <div className="space-y-1 text-sm text-slate-500 border-t border-slate-100 pt-3">
+                        <div className="flex justify-between">
+                            <span>Pago por horas ($1000/h):</span>
+                            <span className="font-medium text-slate-700">{formatCurrency(results.hourlyPaymentGonza)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>Utilidad (50%):</span>
+                            <span className="font-medium text-slate-700">{formatCurrency(results.utilityGonza)}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
