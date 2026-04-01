@@ -870,7 +870,7 @@ const Dashboard = () => {
             </div>
 
             {/* Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
                     title="SOCIOS ACTIVOS"
                     value={stats.activeMembers}
@@ -902,14 +902,6 @@ const Dashboard = () => {
                     icon={CreditCard}
                     iconClass="bg-amber-400 text-white"
                     onClick={() => openModal('payments')}
-                />
-                <StatCard
-                    title="DEUDAS ACTIVAS"
-                    value={debts.length}
-                    subtext="Fiados Pendientes"
-                    icon={Clock}
-                    iconClass="bg-red-500 text-white"
-                    onClick={() => { }}
                 />
             </div>
 

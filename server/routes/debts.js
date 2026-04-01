@@ -170,4 +170,17 @@ router.post('/pay-partial', async (req, res) => {
     }
 });
 
+// Public route to get pending debts for a specific member (Unprotected)
+router.get('/public/member/:memberId', async (req, res) => {
+    try {
+        const debts = await Debt.find({ 
+            memberId: req.params.memberId, 
+            status: 'pending' 
+        }).sort({ date: -1 });
+        res.json(debts);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router;

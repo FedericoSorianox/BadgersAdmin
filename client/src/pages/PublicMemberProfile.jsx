@@ -8,19 +8,22 @@ const PublicMemberProfile = () => {
     const { id } = useParams();
     const [member, setMember] = useState(null);
     const [payments, setPayments] = useState([]);
+    const [debts, setDebts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPublicData = useCallback(async () => {
         setLoading(true);
         try {
-            const [memberRes, financeRes] = await Promise.all([
+            const [memberRes, financeRes, debtsRes] = await Promise.all([
                 axios.get(`${API_URL}/api/members/public/${id}`),
-                axios.get(`${API_URL}/api/finance/member/${id}`)
+                axios.get(`${API_URL}/api/finance/member/${id}`),
+                axios.get(`${API_URL}/api/debts/public/member/${id}`)
             ]);
             
             setMember(memberRes.data);
             setPayments(financeRes.data || []);
+            setDebts(debtsRes.data || []);
         } catch (err) {
             console.error("Error fetching public member data", err);
             setError("No se pudo cargar la información. El socio puede no existir o hubo un problema de conexión.");
@@ -62,6 +65,20 @@ const PublicMemberProfile = () => {
         (p.type === 'Cuota' || !p.type)
     );
 
+    const totalDebt = debts.reduce((acc, d) => acc + (d.totalAmount - (d.paidAmount || 0)), 0);
+    const totalPendingAmount = (isPaid ? 0 : (member.planCost || 0)) + totalDebt;
+
+    // Combine and sort history
+    const history = [
+        ...payments.map(p => ({ ...p, isDebt: false })),
+        ...debts.map(d => ({ 
+            ...d, 
+            isDebt: true, 
+            amount: d.totalAmount - (d.paidAmount || 0),
+            productName: d.products?.map(p => p.productName).join(', ') || 'Fiado'
+        }))
+    ].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+
     return (
         <div className="min-h-screen bg-slate-50 pb-12">
             {/* Header Branding */}
@@ -94,8 +111,8 @@ const PublicMemberProfile = () => {
                             <p className="text-slate-500 font-medium">{member.planType || 'Personalizado'}</p>
                         </div>
 
-                        <div className={`mt-6 p-4 rounded-2xl flex items-center gap-4 ${isPaid ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                            {isPaid ? (
+                        <div className={`mt-6 p-4 rounded-2xl flex items-center gap-4 ${isPaid && totalDebt <= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                            {isPaid && totalDebt <= 0 ? (
                                 <>
                                     <div className="p-2 bg-green-200 rounded-full">
                                         <CheckCircle2 size={24} />
@@ -112,7 +129,8 @@ const PublicMemberProfile = () => {
                                     </div>
                                     <div>
                                         <p className="font-bold">Pendiente de Pago</p>
-                                        <p className="text-sm opacity-90">{new Date().toLocaleString('es-ES', { month: 'long' })} - ${member.planCost || 0}</p>
+                                        <p className="text-sm opacity-90">Total a Pagar: ${totalPendingAmount.toLocaleString()}</p>
+                                        {totalDebt > 0 && <p className="text-[10px] bg-red-200/50 px-1.5 py-0.5 rounded inline-block mt-1">Incluye ${totalDebt} de Fiados</p>}
                                     </div>
                                 </>
                             )}
@@ -142,30 +160,34 @@ const PublicMemberProfile = () => {
                     {/* History Section */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                         <div className="p-4 border-b border-slate-50 font-bold text-slate-800 flex items-center justify-between">
-                            <span>Últimos Pagos</span>
-                            <span className="text-xs text-slate-400 font-normal">Año {currentYear}</span>
+                            <span>Estado de Cuenta</span>
+                            <span className="text-xs text-slate-400 font-normal">Actualizado</span>
                         </div>
-                        <div className="divide-y divide-slate-50 max-h-64 overflow-y-auto">
-                            {payments.length === 0 ? (
+                        <div className="divide-y divide-slate-50 max-h-72 overflow-y-auto">
+                            {history.length === 0 ? (
                                 <div className="p-8 text-center text-slate-400 italic text-sm">
-                                    No hay registros históricos aún
+                                    No hay movimientos registrados
                                 </div>
                             ) : (
-                                payments.slice(0, 12).map((p, idx) => (
-                                    <div key={p._id || idx} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                history.slice(0, 15).map((item, idx) => (
+                                    <div key={item._id || idx} className={`p-4 flex items-center justify-between hover:bg-slate-50 transition-colors ${item.isDebt ? 'bg-red-50/30' : ''}`}>
                                         <div>
-                                            <p className="font-bold text-slate-700 text-sm">
-                                                {p.month && p.year ? 
-                                                    new Date(p.year, p.month - 1).toLocaleString('es-ES', { month: 'long' }) : 
+                                            <p className={`font-bold text-sm ${item.isDebt ? 'text-red-700' : 'text-slate-700'}`}>
+                                                {item.isDebt ? 'Fiado Pendiente' : (
+                                                    item.month && item.year ? 
+                                                    new Date(item.year, item.month - 1).toLocaleString('es-ES', { month: 'long' }) : 
                                                     'Pago Extra'
-                                                }
+                                                )}
                                             </p>
-                                            <p className="text-[10px] text-slate-400 uppercase">{p.type || 'Cuota'}</p>
+                                            <p className="text-[10px] text-slate-400 uppercase">{item.isDebt ? item.productName : (item.type || 'Cuota')}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm font-bold text-slate-800">${p.amount}</p>
+                                            <p className={`text-sm font-bold ${item.isDebt ? 'text-red-600' : 'text-slate-800'}`}>
+                                                ${item.amount.toLocaleString()}
+                                                {item.isDebt && <span className="block text-[8px] uppercase tracking-tighter">Deuda</span>}
+                                            </p>
                                             <p className="text-[10px] text-slate-400 font-medium">
-                                                {new Date(p.date || p.createdAt).toLocaleDateString('es-ES')}
+                                                {new Date(item.date || item.createdAt).toLocaleDateString('es-ES')}
                                             </p>
                                         </div>
                                     </div>
@@ -175,8 +197,8 @@ const PublicMemberProfile = () => {
                     </div>
                 </div>
 
-                <div className="mt-8 text-center">
-                    <p className="text-slate-400 text-xs italic">Para dudas o reclamos, contacta a Gerencia.</p>
+                <div className="mt-8 text-center px-6">
+                    <p className="text-slate-400 text-xs italic">La información mostrada incluye tu cuota mensual y consumos en cantina pendientes.</p>
                 </div>
             </div>
         </div>
