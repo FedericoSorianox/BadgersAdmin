@@ -89,10 +89,10 @@ router.put('/:id/pay', async (req, res) => {
     }
 });
 
-// Partial Batch Payment
+// Partial Batch Payment with Specific Adjustments support
 router.post('/pay-partial', async (req, res) => {
     try {
-        const { memberId, amount } = req.body;
+        const { memberId, amount, adjustments } = req.body;
         const payAmount = Number(amount);
 
         if (!payAmount || payAmount <= 0) {
@@ -108,35 +108,60 @@ router.post('/pay-partial', async (req, res) => {
         let remainingPayment = payAmount;
         let paidDebtsCount = 0;
 
-        // Iterate updates
+        // 1. Apply Specific Adjustments FIRST if provided
+        // adjustments: { debtId: amountToPay }
+        if (adjustments && typeof adjustments === 'object') {
+            for (const debt of debts) {
+                const adjAmount = Number(adjustments[debt._id]);
+                if (adjAmount && adjAmount > 0) {
+                    const toPay = Math.min(adjAmount, remainingPayment, (debt.totalAmount - (debt.paidAmount || 0)));
+                    
+                    debt.paidAmount = (debt.paidAmount || 0) + toPay;
+                    remainingPayment -= toPay;
+
+                    if (debt.paidAmount >= debt.totalAmount - 0.01) {
+                        debt.status = 'paid';
+                        debt.paidDate = new Date();
+                        debt.paidAmount = debt.totalAmount;
+                        paidDebtsCount++;
+                    }
+                    await debt.save();
+                }
+            }
+        }
+
+        // 2. Iterate updates with FIFO for the REMAINING balance
         for (const debt of debts) {
             if (remainingPayment <= 0) break;
+            
+            // Reload debt to get fresh state after adjustments
+            const freshDebt = await Debt.findById(debt._id);
+            if (freshDebt.status === 'paid') continue;
 
-            const debtTotal = debt.totalAmount;
-            const alreadyPaid = debt.paidAmount || 0;
+            const debtTotal = freshDebt.totalAmount;
+            const alreadyPaid = freshDebt.paidAmount || 0;
             const debtBalance = debtTotal - alreadyPaid;
 
-            // SKIP if for some reason it's already fully paid but status says pending (sanity check)
             if (debtBalance <= 0) {
-                debt.status = 'paid';
-                debt.paidAmount = debtTotal; // fix it
-                await debt.save();
+                freshDebt.status = 'paid';
+                freshDebt.paidAmount = debtTotal;
+                await freshDebt.save();
                 continue;
             }
 
             const paymentForThis = Math.min(remainingPayment, debtBalance);
 
-            debt.paidAmount = alreadyPaid + paymentForThis;
+            freshDebt.paidAmount = alreadyPaid + paymentForThis;
             remainingPayment -= paymentForThis;
 
-            if (debt.paidAmount >= debtTotal - 0.01) { // Tolerance for float
-                debt.status = 'paid';
-                debt.paidDate = new Date();
-                debt.paidAmount = debtTotal; // Cap it clean
+            if (freshDebt.paidAmount >= debtTotal - 0.01) {
+                freshDebt.status = 'paid';
+                freshDebt.paidDate = new Date();
+                freshDebt.paidAmount = debtTotal;
                 paidDebtsCount++;
             }
 
-            await debt.save();
+            await freshDebt.save();
         }
 
         const effectivePaid = payAmount - remainingPayment;

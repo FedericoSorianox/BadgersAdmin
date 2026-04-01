@@ -60,7 +60,14 @@ const Dashboard = () => {
     const [showFiadoProductDropdown, setShowFiadoProductDropdown] = useState(false);
 
     const [partialPayModalOpen, setPartialPayModalOpen] = useState(false);
-    const [partialPayForm, setPartialPayForm] = useState({ memberId: '', amount: '', memberName: '', maxAmount: 0 });
+    const [partialPayForm, setPartialPayForm] = useState({ 
+        memberId: '', 
+        amount: '', 
+        memberName: '', 
+        maxAmount: 0,
+        items: [],
+        adjustments: {} 
+    });
     const [pendingNotes, setPendingNotes] = useState({});
 
 
@@ -300,26 +307,50 @@ const Dashboard = () => {
     };
 
     const handlePartialSubmit = async () => {
-        if (!partialPayForm.amount || partialPayForm.amount <= 0) {
+        const totalToPay = Object.values(partialPayForm.adjustments).reduce((acc, val) => acc + Number(val || 0), 0) || Number(partialPayForm.amount);
+        
+        if (totalToPay <= 0) {
             alert('Ingrese un monto válido');
             return;
-        }
-        if (partialPayForm.amount > partialPayForm.maxAmount) {
-            if (!confirm('El monto es mayor a la deuda total. ¿Desea continuar y dejar saldo a favor?')) return;
         }
 
         try {
             await axios.post(`${API_URL}/api/debts/pay-partial`, {
                 memberId: partialPayForm.memberId,
-                amount: partialPayForm.amount
+                amount: totalToPay,
+                adjustments: partialPayForm.adjustments
             });
             setPartialPayModalOpen(false);
-            setPartialPayForm({ memberId: '', amount: '', memberName: '', maxAmount: 0 });
+            setPartialPayForm({ memberId: '', amount: '', memberName: '', maxAmount: 0, items: [], adjustments: {} });
             fetchData();
         } catch (error) {
             console.error('Error paying partial:', error);
             alert(error.response?.data?.message || 'Error al registrar el pago');
         }
+    };
+
+    const distributeFIFO = (total) => {
+        const amount = Number(total);
+        if (!amount || amount <= 0) return;
+
+        let remaining = amount;
+        const newAdjustments = {};
+        
+        const sortedItems = [...partialPayForm.items].sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        for (const item of sortedItems) {
+            if (remaining <= 0) break;
+            const balance = item.totalAmount - (item.paidAmount || 0);
+            const toPay = Math.min(remaining, balance);
+            newAdjustments[item._id] = toPay;
+            remaining -= toPay;
+        }
+
+        setPartialPayForm(prev => ({ 
+            ...prev, 
+            adjustments: newAdjustments,
+            amount: amount 
+        }));
     };
 
 
@@ -1113,7 +1144,9 @@ const Dashboard = () => {
                                                             memberId: group.id,
                                                             amount: '',
                                                             memberName: group.name,
-                                                            maxAmount: group.totalDebt
+                                                            maxAmount: group.totalDebt,
+                                                            items: group.items,
+                                                            adjustments: {}
                                                         });
                                                         setPartialPayModalOpen(true);
                                                     }}
@@ -1474,44 +1507,90 @@ const Dashboard = () => {
                 </div>
             )}
 
+
+
             {/* Partial Payment Modal */}
             {partialPayModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
-                        <h3 className="text-xl font-bold text-slate-800 mb-4">Pago Parcial</h3>
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">Pago Detallado / Parcial</h3>
                         <p className="text-sm text-slate-500 mb-4">
-                            Socio: <span className="font-bold text-slate-700">{partialPayForm.memberName}</span><br />
-                            Deuda Total: <span className="font-bold text-red-600">${partialPayForm.maxAmount.toLocaleString()}</span>
+                            Socio: <span className="font-bold text-slate-700">{partialPayForm.memberName}</span>
                         </p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Monto a Pagar</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        value={partialPayForm.amount}
-                                        onChange={(e) => setPartialPayForm({ ...partialPayForm, amount: Number(e.target.value) })}
-                                        autoFocus
-                                    />
-                                </div>
+
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 mini-scrollbar">
+                            <div className="space-y-3">
+                                {partialPayForm.items.map((item) => {
+                                    const balance = item.totalAmount - (item.paidAmount || 0);
+                                    return (
+                                        <div key={item._id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-700 truncate w-44">
+                                                        {item.products.map(p => p.productName).join(', ')}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400">{new Date(item.date).toLocaleDateString()}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xs font-bold text-red-600">${balance.toLocaleString()}</p>
+                                                    <p className="text-[9px] text-slate-400">Pendiente</p>
+                                                </div>
+                                            </div>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                                <input
+                                                    type="number"
+                                                    className="w-full pl-7 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                    placeholder="Monto a pagar..."
+                                                    value={partialPayForm.adjustments[item._id] || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setPartialPayForm(prev => ({
+                                                            ...prev,
+                                                            adjustments: { ...prev.adjustments, [item._id]: val }
+                                                        }));
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setPartialPayModalOpen(false)}
-                                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handlePartialSubmit}
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold"
-                            >
-                                Confirmar Pago
-                            </button>
+
+                        <div className="pt-4 border-t border-slate-100 space-y-3">
+                            <div className="flex bg-blue-50 p-3 rounded-xl items-center justify-between">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-blue-600 uppercase">Total a Cobrar</span>
+                                    <span className="text-xl font-black text-blue-700">
+                                        ${Object.values(partialPayForm.adjustments).reduce((acc, val) => acc + Number(val || 0), 0).toLocaleString()}
+                                    </span>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        const total = prompt("Monto total a distribuir (FIFO):", partialPayForm.totalDebt || partialPayForm.maxAmount);
+                                        if (total) distributeFIFO(total);
+                                    }}
+                                    className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-600 hover:text-white transition-all border border-blue-100"
+                                >
+                                    Distribuir Auto
+                                </button>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setPartialPayModalOpen(false)}
+                                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handlePartialSubmit}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-lg shadow-blue-200"
+                                >
+                                    Confirmar Cobro
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
