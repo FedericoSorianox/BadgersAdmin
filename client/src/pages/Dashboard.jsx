@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck } from 'lucide-react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
@@ -582,6 +582,10 @@ const Dashboard = () => {
         if (modalType === 'payments') {
             const currentMonth = new Date().getMonth() + 1;
             const currentYear = new Date().getFullYear();
+            const activeMembers = stats.membersList.filter(m => m.active && !m.isExempt);
+            const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
+
+            // Paid this month or has license this month
             const paidThisMonthIds = new Set(
                 stats.paymentsList
                     .filter(p =>
@@ -592,19 +596,66 @@ const Dashboard = () => {
                     .map(p => String(p.memberId))
             );
 
-            const activeMembers = stats.membersList.filter(m => m.active && !m.isExempt);
-            const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
-            const pendingList = billableMembers.filter(m => !paidThisMonthIds.has(String(m._id)));
+            const licensedThisMonthIds = new Set(
+                stats.paymentsList
+                    .filter(p =>
+                        Number(p.month) === currentMonth &&
+                        Number(p.year) === currentYear &&
+                        p.type === 'Licencia'
+                    )
+                    .map(p => String(p.memberId))
+            );
+
+            // Helper to check past debts (unpaid months without license)
+            const getPastDebts = (memberId) => {
+                const pastMonths = [];
+                // Check last 3 months for simplicity
+                for (let i = 1; i <= 3; i++) {
+                    const date = new Date();
+                    date.setMonth(date.getMonth() - i);
+                    const m = date.getMonth() + 1;
+                    const y = date.getFullYear();
+
+                    const hasPayment = stats.paymentsList.some(p => 
+                        String(p.memberId) === String(memberId) && 
+                        p.month === m && p.year === y && 
+                        (p.type === 'Cuota' || p.type === 'Licencia' || !p.type)
+                    );
+
+                    if (!hasPayment) {
+                        pastMonths.push(date.toLocaleString('es-ES', { month: 'short' }));
+                    }
+                }
+                return pastMonths;
+            };
+
+            const pendingList = billableMembers.filter(m => !paidThisMonthIds.has(String(m._id)) && !licensedThisMonthIds.has(String(m._id)));
             const paidList = billableMembers.filter(m => paidThisMonthIds.has(String(m._id)));
+            const licensedList = billableMembers.filter(m => licensedThisMonthIds.has(String(m._id)));
 
             const filteredPending = pendingList.filter(m =>
                 m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                m.ci.includes(searchTerm)
+                (m.ci && m.ci.includes(searchTerm))
             );
             const filteredPaid = paidList.filter(m =>
                 m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                m.ci.includes(searchTerm)
+                (m.ci && m.ci.includes(searchTerm))
             );
+
+            const handleRegisterLicense = async (member) => {
+                if (!confirm(`¿Marcar a ${member.fullName} con LICENCIA para ${new Date().toLocaleString('es-ES', { month: 'long' })}? No figurará como deuda.`)) return;
+                try {
+                    await axios.post(`${API_URL}/api/finance/license`, {
+                        memberId: member._id,
+                        memberName: member.fullName,
+                        month: currentMonth,
+                        year: currentYear
+                    });
+                    fetchData();
+                } catch (e) {
+                    alert('Error al registrar licencia');
+                }
+            };
 
             return (
                 <div className="space-y-6">
@@ -645,77 +696,90 @@ const Dashboard = () => {
                                 )}
                             </div>
                         </div>
-                        <div className="bg-red-50 rounded-xl p-4 max-h-[300px] overflow-y-auto divide-y divide-red-100">
-                            {filteredPending.map(m => (
-                                <div key={m._id} className="py-2 flex justify-between items-center">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
-                                            {(() => {
-                                                const noteContent = pendingNotes[m._id] !== undefined ? pendingNotes[m._id] : stats.notesMap[m._id];
-                                                return noteContent && (
-                                                    <span
-                                                        className={`px-2 py-0.5 text-[10px] font-bold rounded border cursor-pointer
-                                                            ${pendingNotes[m._id] !== undefined ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}
-                                                        `}
-                                                        onClick={() => handleAddNote(m)}
-                                                        title="Click para editar"
-                                                    >
-                                                        {noteContent}
+                        <div className="bg-red-50 rounded-xl p-4 max-h-[350px] overflow-y-auto divide-y divide-red-100">
+                            {filteredPending.map(m => {
+                                const pastDue = getPastDebts(m._id);
+                                return (
+                                    <div key={m._id} className="py-2 flex justify-between items-center">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-slate-700">{m.fullName}</span>
+                                                {pastDue.length > 0 && (
+                                                    <span className="px-1.5 py-0.5 bg-red-600 text-white text-[8px] font-black rounded uppercase animate-bounce">
+                                                        Debe {pastDue.join(', ')}
                                                     </span>
-                                                );
-                                            })()}
+                                                )}
+                                                {(() => {
+                                                    const noteContent = pendingNotes[m._id] !== undefined ? pendingNotes[m._id] : stats.notesMap[m._id];
+                                                    return noteContent && (
+                                                        <span
+                                                            className={`px-2 py-0.5 text-[10px] font-bold rounded border cursor-pointer
+                                                                ${pendingNotes[m._id] !== undefined ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}
+                                                            `}
+                                                            onClick={() => handleAddNote(m)}
+                                                            title="Click para editar"
+                                                        >
+                                                            {noteContent}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </div>
+                                            <span className="text-xs text-slate-500 font-medium">CI: {m.ci || 'N/A'} • ${m.planCost?.toLocaleString() || '2.000'}</span>
                                         </div>
-                                        <span className="text-xs text-slate-500">CI: {m.ci}</span>
+                                        <div className="flex gap-2 lg:gap-3">
+                                            <button
+                                                onClick={() => handleAddNote(m)}
+                                                className={`p-1.5 rounded-lg transition-colors
+                                                    ${pendingNotes[m._id] !== undefined ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-yellow-600 hover:bg-yellow-50'}
+                                                `}
+                                                title="Agregar Nota"
+                                            >
+                                                <StickyNote size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleRegisterLicense(m)}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                                                title="Marcar como Licencia (No asiste este mes)"
+                                            >
+                                                <Plane size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleQuickPayment(m)}
+                                                className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                                            >
+                                                Pagó
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => handleAddNote(m)}
-                                            className={`p-1.5 rounded-lg transition-colors
-                                                ${pendingNotes[m._id] !== undefined ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-yellow-600 hover:bg-yellow-50'}
-                                            `}
-                                            title="Agregar Nota"
-                                        >
-                                            <StickyNote size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handlePaymentReminder(m)}
-                                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border
-                                                ${stats.remindersSent.has(m._id)
-                                                    ? 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300'
-                                                    : 'bg-blue-100 border-transparent hover:bg-blue-200 text-blue-700'
-                                                }`}
-                                            title={stats.remindersSent.has(m._id) ? "Re-enviar recordatorio" : "Enviar recordatorio"}
-                                        >
-                                            {stats.remindersSent.has(m._id) ? (
-                                                <>
-                                                    <CheckCircle size={14} />
-                                                    Enviado
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <MessageCircle size={14} />
-                                                    Recordar
-                                                </>
-                                            )}
-                                        </button>
-                                        <button
-                                            onClick={() => handleQuickPayment(m)}
-                                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors"
-                                        >
-                                            Marcar como Pagado
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            {filteredPending.length === 0 && <p className="text-sm text-slate-400">No hay resultados.</p>}
+                                );
+                            })}
+                            {filteredPending.length === 0 && <p className="text-sm text-slate-400 py-4 text-center">No hay cobros pendientes este mes.</p>}
                         </div>
-                        <div>
+
+                        {/* Licensed List */}
+                        {licensedList.length > 0 && (
+                            <div className="mt-4">
+                                <h4 className="font-bold text-purple-600 mb-2 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                                    En Licencia ({licensedList.length})
+                                </h4>
+                                <div className="bg-purple-50/50 rounded-xl p-4 max-h-[150px] overflow-y-auto divide-y divide-purple-100 italic">
+                                    {licensedList.map(m => (
+                                        <div key={m._id} className="py-2 flex justify-between">
+                                            <span className="text-sm font-medium text-purple-800">{m.fullName}</span>
+                                            <span className="text-xs text-purple-400">Sin asistencia este mes</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="mt-4">
                             <h4 className="font-bold text-green-600 mb-2 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-600"></span>
                                 Pagados ({filteredPaid.length})
                             </h4>
-                            <div className="bg-green-50 rounded-xl p-4 max-h-[200px] overflow-y-auto divide-y divide-green-100">
+                            <div className="bg-green-50 rounded-xl p-4 max-h-[150px] overflow-y-auto divide-y divide-green-100">
                                 {filteredPaid.map(m => (
                                     <div key={m._id} className="py-2 flex justify-between">
                                         <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
@@ -727,6 +791,7 @@ const Dashboard = () => {
                     </div>
                 </div>
             );
+
         }
     };
 

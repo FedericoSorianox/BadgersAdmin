@@ -136,19 +136,42 @@ router.post('/', async (req, res) => {
 });
 
 // Create or update a status note (amount 0)
+// Update task.md [x] Create 'Licencia' registration endpoint in finance.js
+router.post('/license', async (req, res) => {
+    try {
+        const { memberId, memberName, month, year } = req.body;
+        const tenantId = req.tenantId || null;
+
+        // Check if already has a license for this period
+        let existing = await Payment.findOne({ memberId, month, year, type: 'Licencia', tenantId });
+        if (existing) return res.json(existing);
+
+        // Delete any existing "Cuota" payment if any (reverting it)
+        await Payment.deleteMany({ memberId, month, year, type: 'Cuota', tenantId });
+
+        const license = new Payment({
+            memberId,
+            memberName,
+            month,
+            year,
+            amount: 0,
+            type: 'Licencia',
+            tenantId
+        });
+
+        const saved = await license.save();
+        res.status(201).json(saved);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 router.post('/note', async (req, res) => {
     try {
         const { memberId, memberName, month, year, comments } = req.body;
+        const tenantId = req.tenantId || null;
 
-        // Check if there is already a note for this month
-        let query = {
-            memberId,
-            month,
-            year,
-            type: 'Nota',
-            tenantId: req.tenantId || null
-        };
-
+        let query = { memberId, month, year, type: 'Nota', tenantId };
         let existingNote = await Payment.findOne(query);
 
         if (existingNote) {
@@ -165,7 +188,7 @@ router.post('/note', async (req, res) => {
             amount: 0,
             type: 'Nota',
             comments,
-            tenantId: req.tenantId || null
+            tenantId
         });
 
         const savedNote = await newNote.save();

@@ -8,7 +8,7 @@ const paymentSchema = new mongoose.Schema({
     month: Number,
     year: Number,
     amount: Number,
-    type: { type: String, enum: ['Cuota', 'Producto', 'Venta', 'Nota'], default: 'Cuota' },
+    type: { type: String, enum: ['Cuota', 'Producto', 'Venta', 'Nota', 'Licencia'], default: 'Cuota' },
     comments: { type: String }, // For status notes (e.g., "Viaje", "Licencia")
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     quantity: { type: Number, default: 1 },

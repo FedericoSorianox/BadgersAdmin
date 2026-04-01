@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config';
-import { Loader2, CheckCircle2, XCircle, Calendar, User, Phone, CreditCard, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Calendar, User, Phone, CreditCard, AlertCircle, Plane } from 'lucide-react';
 
 const PublicMemberProfile = () => {
     const { id } = useParams();
@@ -59,14 +59,38 @@ const PublicMemberProfile = () => {
     // Determine status for current month
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
-    const isPaid = payments.some(p => 
+    const currentPayment = payments.find(p => 
         Number(p.month) === currentMonth && 
         Number(p.year) === currentYear && 
-        (p.type === 'Cuota' || !p.type)
+        (p.type === 'Cuota' || p.type === 'Licencia' || !p.type)
     );
 
-    const totalDebt = debts.reduce((acc, d) => acc + (d.totalAmount - (d.paidAmount || 0)), 0);
-    const totalPendingAmount = (isPaid ? 0 : (member.planCost || 0)) + totalDebt;
+    const isPaid = currentPayment && (currentPayment.type === 'Cuota' || !currentPayment.type);
+    const isLicensed = currentPayment && currentPayment.type === 'Licencia';
+
+    // Calculate Past Debt (last 3 months)
+    let pastDebtAmount = 0;
+    const pastMonthsPending = [];
+    for (let i = 1; i <= 3; i++) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const m = d.getMonth() + 1;
+        const y = d.getFullYear();
+
+        const hasRecord = payments.some(p => 
+            p.month === m && p.year === y && 
+            (p.type === 'Cuota' || p.type === 'Licencia' || !p.type)
+        );
+
+        if (!hasRecord) {
+            pastDebtAmount += (member.planCost || 2000);
+            pastMonthsPending.push(d.toLocaleString('es-ES', { month: 'long' }));
+        }
+    }
+
+    const totalFiadoDebt = debts.reduce((acc, d) => acc + (d.totalAmount - (d.paidAmount || 0)), 0);
+    const currentMonthPending = (isPaid || isLicensed) ? 0 : (member.planCost || 2000);
+    const totalPendingAmount = currentMonthPending + pastDebtAmount + totalFiadoDebt;
 
     // Combine and sort history
     const history = [
@@ -111,8 +135,18 @@ const PublicMemberProfile = () => {
                             <p className="text-slate-500 font-medium">{member.planType || 'Personalizado'}</p>
                         </div>
 
-                        <div className={`mt-6 p-4 rounded-2xl flex items-center gap-4 ${isPaid && totalDebt <= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                            {isPaid && totalDebt <= 0 ? (
+                        <div className={`mt-6 p-4 rounded-2xl flex items-center gap-4 ${isLicensed ? 'bg-purple-50 text-purple-700 border border-purple-100' : (isPaid && totalPendingAmount <= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}`}>
+                            {isLicensed ? (
+                                <>
+                                    <div className="p-2 bg-purple-200 rounded-full">
+                                        <Plane size={24} />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold">En Licencia</p>
+                                        <p className="text-sm opacity-90">No registra asistencia en {new Date().toLocaleString('es-ES', { month: 'long' })}</p>
+                                    </div>
+                                </>
+                            ) : (isPaid && totalPendingAmount <= 0) ? (
                                 <>
                                     <div className="p-2 bg-green-200 rounded-full">
                                         <CheckCircle2 size={24} />
@@ -127,10 +161,14 @@ const PublicMemberProfile = () => {
                                     <div className="p-2 bg-red-200 rounded-full">
                                         <AlertCircle size={24} />
                                     </div>
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="font-bold">Pendiente de Pago</p>
-                                        <p className="text-sm opacity-90">Total a Pagar: ${totalPendingAmount.toLocaleString()}</p>
-                                        {totalDebt > 0 && <p className="text-[10px] bg-red-200/50 px-1.5 py-0.5 rounded inline-block mt-1">Incluye ${totalDebt} de Fiados</p>}
+                                        <p className="text-sm opacity-90 font-bold">Total: ${totalPendingAmount.toLocaleString()}</p>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {!isPaid && !isLicensed && <span className="text-[9px] bg-red-100 px-1 rounded uppercase font-bold text-red-600">Mes Actual</span>}
+                                            {pastMonthsPending.length > 0 && <span className="text-[9px] bg-amber-100 px-1 rounded uppercase font-bold text-amber-700">Debe mes anterior</span>}
+                                            {totalFiadoDebt > 0 && <span className="text-[9px] bg-blue-100 px-1 rounded uppercase font-bold text-blue-700">Fiados: ${totalFiadoDebt}</span>}
+                                        </div>
                                     </div>
                                 </>
                             )}
