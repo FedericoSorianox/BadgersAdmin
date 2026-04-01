@@ -89,12 +89,55 @@ const PublicMemberProfile = () => {
     }
 
     const totalFiadoDebt = debts.reduce((acc, d) => acc + (d.totalAmount - (d.paidAmount || 0)), 0);
-    const currentMonthPending = (isPaid || isLicensed) ? 0 : (member.planCost || 2000);
+    const memberPrice = member.planCost || 2000;
+    const currentMonthPending = (isPaid || isLicensed) ? 0 : memberPrice;
     const totalPendingAmount = currentMonthPending + pastDebtAmount + totalFiadoDebt;
+
+    // Create Virtual History for missing months
+    const virtualDebts = [];
+    if (!isPaid && !isLicensed) {
+        virtualDebts.push({
+            _id: `v-current`,
+            month: currentMonth,
+            year: currentYear,
+            amount: memberPrice,
+            type: 'Cuota',
+            isDebt: true,
+            isVirtual: true,
+            date: new Date()
+        });
+    }
+
+    // Add virtual records for past unpaid months
+    for (let i = 1; i <= 3; i++) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const m = d.getMonth() + 1;
+        const y = d.getFullYear();
+
+        const hasRecord = payments.some(p => 
+            p.month === m && p.year === y && 
+            (p.type === 'Cuota' || p.type === 'Licencia' || !p.type)
+        );
+
+        if (!hasRecord) {
+            virtualDebts.push({
+                _id: `v-past-${i}`,
+                month: m,
+                year: y,
+                amount: memberPrice,
+                type: 'Cuota',
+                isDebt: true,
+                isVirtual: true,
+                date: d
+            });
+        }
+    }
 
     // Combine and sort history
     const history = [
         ...payments.map(p => ({ ...p, isDebt: false })),
+        ...virtualDebts,
         ...debts.map(d => ({ 
             ...d, 
             isDebt: true, 
@@ -135,7 +178,7 @@ const PublicMemberProfile = () => {
                             <p className="text-slate-500 font-medium">{member.planType || 'Personalizado'}</p>
                         </div>
 
-                        <div className={`mt-6 p-4 rounded-2xl flex items-center gap-4 ${isLicensed ? 'bg-purple-50 text-purple-700 border border-purple-100' : (isPaid && totalPendingAmount <= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}`}>
+                        <div className={`mt-6 p-4 rounded-2xl flex items-center gap-4 ${isLicensed ? 'bg-purple-50 text-purple-700 border border-purple-100' : (totalPendingAmount <= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}`}>
                             {isLicensed ? (
                                 <>
                                     <div className="p-2 bg-purple-200 rounded-full">
@@ -146,7 +189,7 @@ const PublicMemberProfile = () => {
                                         <p className="text-sm opacity-90">No registra asistencia en {new Date().toLocaleString('es-ES', { month: 'long' })}</p>
                                     </div>
                                 </>
-                            ) : (isPaid && totalPendingAmount <= 0) ? (
+                            ) : (totalPendingAmount <= 0) ? (
                                 <>
                                     <div className="p-2 bg-green-200 rounded-full">
                                         <CheckCircle2 size={24} />
@@ -211,18 +254,19 @@ const PublicMemberProfile = () => {
                                     <div key={item._id || idx} className={`p-4 flex items-center justify-between hover:bg-slate-50 transition-colors ${item.isDebt ? 'bg-red-50/30' : ''}`}>
                                         <div>
                                             <p className={`font-bold text-sm ${item.isDebt ? 'text-red-700' : 'text-slate-700'}`}>
-                                                {item.isDebt ? 'Fiado Pendiente' : (
+                                                {item.type === 'Licencia' ? 'Licencia' : (
                                                     item.month && item.year ? 
                                                     new Date(item.year, item.month - 1).toLocaleString('es-ES', { month: 'long' }) : 
                                                     'Pago Extra'
                                                 )}
                                             </p>
-                                            <p className="text-[10px] text-slate-400 uppercase">{item.isDebt ? item.productName : (item.type || 'Cuota')}</p>
+                                            <p className="text-[10px] text-slate-400 uppercase">
+                                                {item.isVirtual ? 'Pendiente' : (item.isDebt ? item.productName : (item.type || 'Cuota'))}
+                                            </p>
                                         </div>
                                         <div className="text-right">
-                                            <p className={`text-sm font-bold ${item.isDebt ? 'text-red-600' : 'text-slate-800'}`}>
-                                                ${item.amount.toLocaleString()}
-                                                {item.isDebt && <span className="block text-[8px] uppercase tracking-tighter">Deuda</span>}
+                                            <p className={`text-sm font-bold ${item.isDebt ? 'text-red-600' : (item.type === 'Licencia' ? 'text-purple-600' : 'text-slate-800')}`}>
+                                                {item.type === 'Licencia' ? '$0' : `$${item.amount.toLocaleString()}`}
                                             </p>
                                             <p className="text-[10px] text-slate-400 font-medium">
                                                 {new Date(item.date || item.createdAt).toLocaleDateString('es-ES')}
