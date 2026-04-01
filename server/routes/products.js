@@ -22,7 +22,8 @@ router.post('/', upload.single('image'), async (req, res) => {
             costPrice: Number(req.body.costPrice),
             salePrice: Number(req.body.salePrice),
             stock: Number(req.body.stock),
-            category: req.body.category
+            category: req.body.category,
+            isQuickAccess: req.body.isQuickAccess === 'true' || req.body.isQuickAccess === true
         };
 
         // If an image was uploaded, save its path
@@ -50,7 +51,8 @@ router.put('/:id', upload.single('image'), async (req, res) => {
             costPrice: Number(req.body.costPrice),
             salePrice: Number(req.body.salePrice),
             stock: Number(req.body.stock),
-            category: req.body.category
+            category: req.body.category,
+            isQuickAccess: req.body.isQuickAccess === 'true' || req.body.isQuickAccess === true
         };
 
         // If a new image was uploaded, update the path

@@ -23,6 +23,7 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+import PublicMemberProfile from './pages/PublicMemberProfile';
 import { TenantProvider } from './context/TenantContext';
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/public/profile/:id" element={<PublicMemberProfile />} />
 
           <Route path="/superadmin" element={
             <ProtectedRoute>

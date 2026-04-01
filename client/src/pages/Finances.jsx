@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2, Filter, Plus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import axios from 'axios';
@@ -53,7 +53,7 @@ const Finances = () => {
         concept: ''
     });
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = useCallback(async () => {
         setLoading(true);
         try {
             const [paymentsRes, expensesRes, productsRes] = await Promise.all([
@@ -85,11 +85,11 @@ const Finances = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedMonth, selectedYear]);
 
     useEffect(() => {
         fetchTransactions();
-    }, [selectedMonth, selectedYear]);
+    }, [fetchTransactions]);
 
     const handleDelete = async (transaction) => {
         if (!confirm('¿Estás seguro de eliminar esta transacción?')) return;

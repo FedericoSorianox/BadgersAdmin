@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, CheckCircle, XCircle, Calendar, Loader2, DollarSign, BarChart2, AlertCircle, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -23,11 +23,7 @@ const Payments = () => {
     // Derived State for Recurring Debt Analysis
     const [debtAnalysis, setDebtAnalysis] = useState({}); // memberId -> [months owed]
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const [membersRes, paymentsRes] = await Promise.all([
@@ -41,7 +37,11 @@ const Payments = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     // --- Dynamic Year Options ---
     const yearOptions = useMemo(() => {
@@ -122,8 +122,7 @@ const Payments = () => {
     const processedCount = memberStatusList.filter(m => m.paid).length;
     const completionRate = stats.total > 0 ? ((processedCount / stats.total) * 100).toFixed(0) : 0;
 
-    // --- Analytics Logic ---
-    const fetchAnalytics = () => {
+    const fetchAnalytics = useCallback(() => {
         // Compute from existing 'payments' state instead of refetching
         const allPayments = payments.filter(p => (p.type === 'Cuota' || !p.type) && p.type !== 'Condonado'); // Exclude forgiven from revenue
         const monthlyData = Array(12).fill(0).map((_, i) => ({
@@ -146,7 +145,7 @@ const Payments = () => {
 
         setAnalyticsData(monthlyData);
         setAnalyticsModalOpen(true);
-    };
+    }, [analyticsYear, payments]);
 
     const handleDismissDebt = async (member, monthToDismiss = null) => {
         const targetMonth = monthToDismiss || selectedMonth;
@@ -177,7 +176,7 @@ const Payments = () => {
     // Update analytics when year changes inside modal
     useEffect(() => {
         if (analyticsModalOpen) fetchAnalytics();
-    }, [analyticsYear, analyticsModalOpen]);
+    }, [analyticsYear, analyticsModalOpen, fetchAnalytics]);
 
 
     const handleQuickPayment = async (member) => {

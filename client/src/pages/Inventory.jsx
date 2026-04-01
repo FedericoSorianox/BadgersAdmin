@@ -16,7 +16,8 @@ const Inventory = () => {
         costPrice: 0,
         salePrice: 0,
         stock: 0,
-        imageUrl: ''
+        imageUrl: '',
+        isQuickAccess: false
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -48,7 +49,8 @@ const Inventory = () => {
                 costPrice: product.costPrice,
                 salePrice: product.salePrice,
                 stock: product.stock,
-                imageUrl: product.imageUrl || ''
+                imageUrl: product.imageUrl || '',
+                isQuickAccess: product.isQuickAccess || false
             });
             setImagePreview(product.imageUrl ? `${API_URL}${product.imageUrl}` : null);
         } else {
@@ -59,7 +61,8 @@ const Inventory = () => {
                 costPrice: 0,
                 salePrice: 0,
                 stock: 0,
-                imageUrl: ''
+                imageUrl: '',
+                isQuickAccess: false
             });
             setImagePreview(null);
         }
@@ -76,6 +79,7 @@ const Inventory = () => {
             formDataToSend.append('costPrice', formData.costPrice);
             formDataToSend.append('salePrice', formData.salePrice);
             formDataToSend.append('stock', formData.stock);
+            formDataToSend.append('isQuickAccess', String(formData.isQuickAccess));
 
             if (imageFile) {
                 formDataToSend.append('image', imageFile);
@@ -214,8 +218,9 @@ const Inventory = () => {
                                         const profit = (product.salePrice || 0) - (product.costPrice || 0);
                                         return (
                                             <tr key={product._id} className="hover:bg-slate-50/80 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-slate-700">
+                                                <td className="px-6 py-4 font-medium text-slate-700 flex items-center gap-2">
                                                     {product.name}
+                                                    {product.isQuickAccess && <span className="text-amber-500" title="Acceso Rápido">⭐</span>}
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-500">
                                                     {product.category || 'General'}
@@ -366,6 +371,19 @@ const Inventory = () => {
                                     </div>
                                 </div>
                             )}
+
+                            <div className="flex items-center gap-2 py-2">
+                                <input
+                                    type="checkbox"
+                                    id="isQuickAccess"
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    checked={formData.isQuickAccess}
+                                    onChange={(e) => setFormData({ ...formData, isQuickAccess: e.target.checked })}
+                                />
+                                <label htmlFor="isQuickAccess" className="text-sm font-medium text-slate-700 cursor-pointer">
+                                    Mostrar en Acceso Rápido (Dashboard)
+                                </label>
+                            </div>
 
                             <div className="flex gap-3 mt-6">
                                 <button

@@ -7,6 +7,7 @@ const ProductSchema = new mongoose.Schema({
     stock: { type: Number, default: 0 },
     imageUrl: { type: String },
     category: { type: String },
+    isQuickAccess: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 

@@ -4,6 +4,7 @@ import API_URL from '../config';
 
 const TenantContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTenant = () => useContext(TenantContext);
 
 export const TenantProvider = ({ children }) => {
@@ -33,15 +34,17 @@ export const TenantProvider = ({ children }) => {
 
         // 1. Skip branding if on superadmin route
         if (pathname.startsWith('/superadmin')) {
-            setBranding({
-                name: 'GymWorksPro Panel',
-                primaryColor: '#000000',
-                secondaryColor: '#1a1a1a',
-                sidebarText: 'GymWorksPro SuperAdmin',
-                textColor: '#ffffff',
-                logoUrl: '/badgers-logo.jpg'
+            queueMicrotask(() => {
+                setBranding({
+                    name: 'GymWorksPro Panel',
+                    primaryColor: '#000000',
+                    secondaryColor: '#1a1a1a',
+                    sidebarText: 'GymWorksPro SuperAdmin',
+                    textColor: '#ffffff',
+                    logoUrl: '/badgers-logo.jpg'
+                });
+                setLoading(false);
             });
-            setLoading(false);
             return;
         }
 

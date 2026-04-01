@@ -16,24 +16,7 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
     const [selectedHistoryMonth, setSelectedHistoryMonth] = useState(null);
     const [members, setMembers] = useState([]); // Needed for detail resolution
 
-    useEffect(() => {
-        // Fetch members for detail lookup if needed
-        const fetchMembersForContext = async () => {
-            try {
-                const response = await axios.get(`${API_URL}/api/members`);
-                setMembers(response.data);
-            } catch (error) {
-                console.error("Error fetching members for analytics context", error);
-            }
-        };
-
-        if (isOpen) {
-            fetchMembersForContext();
-            fetchAnalytics();
-        }
-    }, [isOpen, selectedYear]);
-
-    const fetchAnalytics = async () => {
+    const fetchAnalytics = React.useCallback(async () => {
         try {
             const response = await axios.get(`${API_URL}/api/finance/analytics/annual`, {
                 params: { year: selectedYear }
@@ -55,7 +38,24 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
         } catch (error) {
             console.error("Error fetching analytics", error);
         }
-    };
+    }, [selectedYear]);
+
+    useEffect(() => {
+        // Fetch members for detail lookup if needed
+        const fetchMembersForContext = async () => {
+            try {
+                const response = await axios.get(`${API_URL}/api/members`);
+                setMembers(response.data);
+            } catch (error) {
+                console.error("Error fetching members for analytics context", error);
+            }
+        };
+
+        if (isOpen) {
+            fetchMembersForContext();
+            fetchAnalytics();
+        }
+    }, [isOpen, fetchAnalytics]);
 
     const fetchMonthDetails = async (month) => {
         setLoadingDetails(true);

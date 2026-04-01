@@ -23,42 +23,44 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
 
     useEffect(() => {
         if (isOpen) {
-            if (initialData) {
-                setFormData({
-                    fullName: initialData.fullName || '',
-                    ci: initialData.ci || '',
-                    phone: initialData.phone || '',
-                    planType: initialData.planType || '',
-                    planCost: initialData.planCost || 0,
-                    birthDate: initialData.birthDate ? new Date(initialData.birthDate).toISOString().split('T')[0] : '',
-                    comments: initialData.comments || '',
-                    active: initialData.active !== undefined ? initialData.active : true,
-                    isInWhatsappGroup: initialData.isInWhatsappGroup || false,
-                    photoUrl: initialData.photoUrl || '',
-                    isExempt: initialData.isExempt || false,
-                    familyId: initialData.familyId || '',
-                    isFamilyHead: initialData.isFamilyHead || false
-                });
-                setImagePreview(initialData.photoUrl ? (initialData.photoUrl.startsWith('http') ? initialData.photoUrl : `${API_URL}${initialData.photoUrl}`) : null);
-            } else {
-                setFormData({
-                    fullName: '',
-                    ci: '',
-                    phone: '',
-                    planType: plans.length > 0 ? plans[0].name : '',
-                    planCost: plans.length > 0 ? plans[0].cost : 0,
-                    birthDate: '',
-                    comments: '',
-                    active: true,
-                    isInWhatsappGroup: false,
-                    photoUrl: '',
-                    isExempt: false,
-                    familyId: '',
-                    isFamilyHead: false
-                });
-                setImagePreview(null);
-            }
-            setImageFile(null);
+            queueMicrotask(() => {
+                if (initialData) {
+                    setFormData({
+                        fullName: initialData.fullName || '',
+                        ci: initialData.ci || '',
+                        phone: initialData.phone || '',
+                        planType: initialData.planType || '',
+                        planCost: initialData.planCost || 0,
+                        birthDate: initialData.birthDate ? new Date(initialData.birthDate).toISOString().split('T')[0] : '',
+                        comments: initialData.comments || '',
+                        active: initialData.active !== undefined ? initialData.active : true,
+                        isInWhatsappGroup: initialData.isInWhatsappGroup || false,
+                        photoUrl: initialData.photoUrl || '',
+                        isExempt: initialData.isExempt || false,
+                        familyId: initialData.familyId || '',
+                        isFamilyHead: initialData.isFamilyHead || false
+                    });
+                    setImagePreview(initialData.photoUrl ? (initialData.photoUrl.startsWith('http') ? initialData.photoUrl : `${API_URL}${initialData.photoUrl}`) : null);
+                } else {
+                    setFormData({
+                        fullName: '',
+                        ci: '',
+                        phone: '',
+                        planType: plans.length > 0 ? plans[0].name : '',
+                        planCost: plans.length > 0 ? plans[0].cost : 0,
+                        birthDate: '',
+                        comments: '',
+                        active: true,
+                        isInWhatsappGroup: false,
+                        photoUrl: '',
+                        isExempt: false,
+                        familyId: '',
+                        isFamilyHead: false
+                    });
+                    setImagePreview(null);
+                }
+                setImageFile(null);
+            });
         }
     }, [isOpen, initialData, plans]);
 

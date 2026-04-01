@@ -1,6 +1,6 @@
 import React from 'react';
 import Modal from '../Modal';
-import { Edit2 } from 'lucide-react';
+import { Edit2, Share2 } from 'lucide-react';
 import { API_URL } from '../../config';
 
 const MemberDetailModal = ({ isOpen, onClose, member, onEdit }) => {
@@ -68,6 +68,31 @@ const MemberDetailModal = ({ isOpen, onClose, member, onEdit }) => {
                         <div>
                             <p className="text-xs font-bold text-slate-400 uppercase mb-1">Comentarios</p>
                             <p className="text-slate-700 font-medium whitespace-pre-wrap">{member.comments || '-'}</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col gap-2">
+                        <div className="flex items-center gap-2 text-blue-800">
+                            <Share2 size={18} />
+                            <p className="text-sm font-bold uppercase tracking-wider italic">Link de Ficha Pública</p>
+                        </div>
+                        <p className="text-xs text-blue-600">Comparte este link con el socio para que vea su estado de cuenta.</p>
+                        <div className="flex gap-2">
+                            <input 
+                                readOnly
+                                type="text" 
+                                className="flex-1 text-[10px] px-2 py-1.5 bg-white border border-blue-200 rounded text-blue-800 font-mono"
+                                value={`${window.location.origin}/public/profile/${member._id}`}
+                            />
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/public/profile/${member._id}`);
+                                    alert('Link copiado al portapapeles');
+                                }}
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700 transition-colors"
+                            >
+                                Copiar Link
+                            </button>
                         </div>
                     </div>
 

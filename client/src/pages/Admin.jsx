@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Save, Calculator } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
@@ -87,9 +87,9 @@ const Admin = () => {
         };
 
         fetchInitialData();
-    }, []);
+    }, [currentMonth, currentYear]);
 
-    const handleCalculate = () => {
+    const handleCalculate = useCallback(() => {
         const workingDays = 26;
         const hourlyRate = 1000;
 
@@ -152,12 +152,12 @@ const Admin = () => {
             utilityGonza: utilityPerPartner,
             gonzaAmount
         });
-    };
+    }, [config]);
 
     // Calculate automatically when inputs change
     useEffect(() => {
         handleCalculate();
-    }, [config]);
+    }, [handleCalculate]);
 
     const handleSave = async () => {
         try {

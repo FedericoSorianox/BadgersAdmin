@@ -795,34 +795,77 @@ const Dashboard = () => {
                 </div>
             )}
 
-            {/* Header w/ Quick Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            {/* Header */}
+            <div className="mb-2">
                 <h1 className="text-4xl font-bold text-slate-900" style={{ color: 'var(--dashboard-title, #0f172a)' }}>Dashboard</h1>
-                <div className="flex gap-2">
+                <p className="text-slate-500 mt-1">Gestión administrativa de The Badgers</p>
+            </div>
+
+            {/* Quick Actions Grid */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <TrendingUp className="text-blue-600" />
+                        Acceso Rápido
+                    </h3>
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {/* Primary Actions */}
                     <button
                         onClick={() => setNewSaleModalOpen(true)}
-                        style={{ backgroundColor: 'var(--btn-new-sale, #9333ea)' }}
-                        className="hover:brightness-90 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm"
+                        className="flex flex-col items-center justify-center p-4 rounded-2xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors border border-purple-100 group"
                     >
-                        <DollarSign size={20} />
-                        Nueva Venta
+                        <div className="p-3 bg-white rounded-xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
+                            <DollarSign size={24} />
+                        </div>
+                        <span className="text-xs font-bold uppercase tracking-wider">Nueva Venta</span>
                     </button>
-                    {/* <button
-                        onClick={() => setNewExpenseModalOpen(true)}
-                        style={{ backgroundColor: 'var(--btn-new-expense, #dc2626)' }}
-                        className="hover:brightness-90 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm"
-                    >
-                        <TrendingDown size={20} />
-                        Nuevo Gasto
-                    </button> */}
+
                     <button
                         onClick={() => setNewFiadoModalOpen(true)}
-                        style={{ backgroundColor: 'var(--btn-new-fiado, #f59e0b)' }}
-                        className="hover:brightness-90 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm"
+                        className="flex flex-col items-center justify-center p-4 rounded-2xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors border border-amber-100 group"
                     >
-                        <Clock size={20} />
-                        Nuevo Fiado
+                        <div className="p-3 bg-white rounded-xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
+                            <Clock size={24} />
+                        </div>
+                        <span className="text-xs font-bold uppercase tracking-wider">Nuevo Fiado</span>
                     </button>
+
+                    {/* Quick Sale Favorites (User selected isQuickAccess) */}
+                    {stats.products.filter(p => p.isQuickAccess && Number(p.stock) > 0).map(product => (
+                        <button
+                            key={product._id}
+                            onClick={() => {
+                                if (confirm(`¿Vender 1x ${product.name} por $${product.salePrice}?`)) {
+                                    const currentMonth = new Date().getMonth() + 1;
+                                    const currentYear = new Date().getFullYear();
+                                    axios.post(`${API_URL}/api/finance`, {
+                                        productName: product.name,
+                                        productId: product._id,
+                                        quantity: 1,
+                                        amount: product.salePrice,
+                                        type: 'Producto',
+                                        month: currentMonth,
+                                        year: currentYear,
+                                        date: new Date()
+                                    }).then(() => fetchData());
+                                }
+                            }}
+                            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors border border-slate-100 group relative overflow-hidden"
+                        >
+                            <div className="p-3 bg-white rounded-xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
+                                <Package size={24} className="text-emerald-500" />
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider truncate w-full text-center px-1" title={product.name}>{product.name}</span>
+                            <span className="text-xs font-black text-slate-900 mt-1">${product.salePrice}</span>
+                            
+                            {/* Stock badge */}
+                            <div className="absolute top-2 right-2 text-[8px] font-black bg-white px-1.5 py-0.5 rounded border border-slate-100 text-slate-400">
+                                {product.stock}
+                            </div>
+                        </button>
+                    ))}
                 </div>
             </div>
 
