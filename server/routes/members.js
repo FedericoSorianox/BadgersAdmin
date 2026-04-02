@@ -182,9 +182,39 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 // Get public member info
 router.get("/public/:id", async (req, res) => {
     try {
-        const member = await Member.findById(req.params.id).select("fullName photoUrl planType planCost active ci phone createdAt");
+        const member = await Member.findById(req.params.id).select("fullName photoUrl planType planCost active ci phone birthDate comments createdAt");
         if (!member) return res.status(404).json({ message: "Socio no encontrado" });
         res.json(member);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Update specific member fields from public profile
+router.put("/public/:id", async (req, res) => {
+    try {
+        const { ci, phone, birthDate, comments } = req.body;
+        
+        // Prevent empty CI or other critical fields
+        if (!ci) return res.status(400).json({ message: "La cédula es obligatoria" });
+
+        // Security check: ensure CI is unique if changed
+        const existingWithCI = await Member.findOne({ ci, _id: { $ne: req.params.id } });
+        if (existingWithCI) {
+            return res.status(400).json({ message: "La cédula ya está registrada por otro socio" });
+        }
+
+        const updatedMember = await Member.findByIdAndUpdate(
+            req.params.id, 
+            { ci, phone, birthDate, comments }, 
+            { new: true }
+        ).select("ci phone birthDate comments");
+
+        if (!updatedMember) {
+            return res.status(404).json({ message: "Socio no encontrado" });
+        }
+
+        res.json(updatedMember);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

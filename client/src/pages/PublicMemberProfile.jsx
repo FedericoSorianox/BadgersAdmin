@@ -12,6 +12,8 @@ const PublicMemberProfile = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState({ ci: '', phone: '', birthDate: '', comments: '' });
     const fileInputRef = useRef(null);
 
     const fetchPublicData = useCallback(async () => {
@@ -22,8 +24,13 @@ const PublicMemberProfile = () => {
                 axios.get(`${API_URL}/api/finance/member/${id}`),
                 axios.get(`${API_URL}/api/debts/public/member/${id}`)
             ]);
-            
             setMember(memberRes.data);
+            setEditData({
+                ci: memberRes.data.ci || '',
+                phone: memberRes.data.phone || '',
+                birthDate: memberRes.data.birthDate ? new Date(memberRes.data.birthDate).toISOString().split('T')[0] : '',
+                comments: memberRes.data.comments || ''
+            });
             setPayments(financeRes.data || []);
             setDebts(debtsRes.data || []);
         } catch (err) {
@@ -53,6 +60,18 @@ const PublicMemberProfile = () => {
             alert('Error al subir la foto');
         } finally {
             setIsUploading(false);
+        }
+    };
+
+    const handleSaveProfile = async () => {
+        try {
+            const res = await axios.put(`${API_URL}/api/members/public/${id}`, editData);
+            setMember(prev => ({ ...prev, ...res.data }));
+            setIsEditing(false);
+            alert('¡Perfil actualizado!');
+        } catch (err) {
+            console.error('Error updating profile:', err);
+            alert(err.response?.data?.message || 'Error al actualizar el perfil');
         }
     };
 
@@ -223,6 +242,12 @@ const PublicMemberProfile = () => {
                         <div className="text-center">
                             <h2 className="text-2xl font-bold text-slate-800">{member.fullName}</h2>
                             <p className="text-slate-500 font-medium">{member.planType || 'Personalizado'}</p>
+                            <button 
+                                onClick={() => setIsEditing(!isEditing)}
+                                className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-full"
+                            >
+                                {isEditing ? 'Cancelar' : 'Editar Perfil'}
+                            </button>
                         </div>
 
                         <div className={`mt-6 p-4 rounded-2xl flex items-center gap-4 ${isLicensed ? 'bg-purple-50 text-purple-700 border border-purple-100' : (totalPendingAmount <= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}`}>
@@ -268,21 +293,101 @@ const PublicMemberProfile = () => {
 
                 {/* Details Section */}
                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Teléfono</span>
-                            <div className="flex items-center gap-2 text-slate-700">
-                                <Phone size={14} />
-                                <span className="font-medium">{member.phone || 'No registrado'}</span>
+                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+                        <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+                            <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Cédula</span>
+                                {isEditing ? (
+                                    <input 
+                                        type="text"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={editData.ci}
+                                        onChange={(e) => setEditData({...editData, ci: e.target.value})}
+                                    />
+                                ) : (
+                                    <div className="flex items-center gap-2 text-slate-700">
+                                        <CreditCard size={14} className="text-slate-400" />
+                                        <span className="font-medium">{member.ci}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Teléfono</span>
+                                {isEditing ? (
+                                    <input 
+                                        type="text"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={editData.phone}
+                                        onChange={(e) => setEditData({...editData, phone: e.target.value})}
+                                    />
+                                ) : (
+                                    <div className="flex items-center gap-2 text-slate-700">
+                                        <Phone size={14} className="text-slate-400" />
+                                        <span className="font-medium">{member.phone || '—'}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Plan</span>
+                                <div className="flex items-center gap-2 text-slate-700">
+                                    <User size={14} className="text-slate-400" />
+                                    <span className="font-medium">{member.planType || 'Personalizado'}</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Costo</span>
+                                <div className="flex items-center gap-2 text-green-600">
+                                    <span className="font-bold text-lg">${(member.planCost || 0).toLocaleString()}</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Socio desde</span>
-                            <div className="flex items-center gap-2 text-slate-700">
-                                <Calendar size={14} />
-                                <span className="font-medium">{new Date(member.createdAt).getFullYear()}</span>
+
+                        <div className="mt-8 grid grid-cols-1 gap-6 border-t border-slate-50 pt-6">
+                            <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Fecha de Nacimiento</span>
+                                {isEditing ? (
+                                    <input 
+                                        type="date"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={editData.birthDate}
+                                        onChange={(e) => setEditData({...editData, birthDate: e.target.value})}
+                                    />
+                                ) : (
+                                    <p className="text-slate-700 font-medium">
+                                        {member.birthDate ? new Date(member.birthDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Comentarios</span>
+                                {isEditing ? (
+                                    <textarea 
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 min-h-[60px]"
+                                        value={editData.comments}
+                                        onChange={(e) => setEditData({...editData, comments: e.target.value})}
+                                        placeholder="Agrega información adicional..."
+                                    />
+                                ) : (
+                                    <p className="text-slate-500 text-sm italic">
+                                        {member.comments || '—'}
+                                    </p>
+                                )}
                             </div>
                         </div>
+
+                        {isEditing && (
+                            <button 
+                                onClick={handleSaveProfile}
+                                className="w-full mt-6 bg-blue-600 text-white font-bold py-3 rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                            >
+                                <CheckCircle2 size={18} />
+                                Guardar Cambios
+                            </button>
+                        )}
                     </div>
 
                     {/* History Section */}

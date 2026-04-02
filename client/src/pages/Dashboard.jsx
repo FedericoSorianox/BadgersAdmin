@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane } from 'lucide-react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane, ExternalLink } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
@@ -540,9 +540,18 @@ const Dashboard = () => {
                     <p className="text-sm text-slate-500">Total: {list.length} socios activos</p>
                     <div className="divide-y divide-slate-100">
                         {list.map(m => (
-                            <div key={m._id} className="py-3 flex justify-between items-center">
+                            <div key={m._id} className="py-3 flex justify-between items-center group">
                                 <div>
-                                    <p className="font-bold text-slate-700">{m.fullName}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-bold text-slate-700">{m.fullName}</p>
+                                        <button 
+                                            onClick={() => window.open(`/public/profile/${m._id}`, '_blank')}
+                                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                                            title="Ver Ficha Pública"
+                                        >
+                                            <ExternalLink size={14} />
+                                        </button>
+                                    </div>
                                     <p className="text-xs text-slate-400">CI: {m.ci}</p>
                                 </div>
                                 <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Activo</span>
@@ -560,9 +569,18 @@ const Dashboard = () => {
                     <p className="text-sm text-slate-500">Total: {list.length} socios inactivos</p>
                     <div className="divide-y divide-slate-100">
                         {list.map(m => (
-                            <div key={m._id} className="py-3 flex justify-between items-center">
+                            <div key={m._id} className="py-3 flex justify-between items-center group">
                                 <div>
-                                    <p className="font-bold text-slate-700">{m.fullName}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-bold text-slate-700">{m.fullName}</p>
+                                        <button 
+                                            onClick={() => window.open(`/public/profile/${m._id}`, '_blank')}
+                                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                                            title="Ver Ficha Pública"
+                                        >
+                                            <ExternalLink size={14} />
+                                        </button>
+                                    </div>
                                     <p className="text-xs text-slate-400">CI: {m.ci}</p>
                                 </div>
                                 <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">Inactivo</span>
