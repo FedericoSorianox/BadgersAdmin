@@ -182,10 +182,32 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 // Get public member info
 router.get("/public/:id", async (req, res) => {
     try {
-        const Member = require("../models/Member");
-        const member = await Member.findById(req.params.id).select("fullName photoUrl planType planCost active ci createdAt");
+        const member = await Member.findById(req.params.id).select("fullName photoUrl planType planCost active ci phone createdAt");
         if (!member) return res.status(404).json({ message: "Socio no encontrado" });
         res.json(member);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Update member photo from public profile
+router.post("/public/:id/photo", upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: "No se subió ninguna imagen" });
+        }
+
+        const updatedMember = await Member.findByIdAndUpdate(
+            req.params.id, 
+            { photoUrl: req.file.path }, 
+            { new: true }
+        ).select("photoUrl");
+
+        if (!updatedMember) {
+            return res.status(404).json({ message: "Socio no encontrado" });
+        }
+
+        res.json({ photoUrl: updatedMember.photoUrl });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

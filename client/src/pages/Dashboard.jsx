@@ -115,13 +115,13 @@ const Dashboard = () => {
             const activeMembersCount = activeMembers.length;
             const inactiveMembersCount = members.length - activeMembersCount;
 
-            // Paid members for current month
+            // Paid members for current month (Includes Condoned & Licensed)
             const paidThisMonthIds = new Set(
                 payments
                     .filter(p =>
                         Number(p.month) === currentMonth &&
                         Number(p.year) === currentYear &&
-                        (p.type === 'Cuota' || !p.type)
+                        (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
                     )
                     .map(p => String(p.memberId))
             );
@@ -622,7 +622,7 @@ const Dashboard = () => {
                     .filter(p =>
                         Number(p.month) === currentMonth &&
                         Number(p.year) === currentYear &&
-                        (p.type === 'Cuota' || !p.type)
+                        (p.type === 'Cuota' || p.type === 'Condonado' || !p.type)
                     )
                     .map(p => String(p.memberId))
             );
@@ -650,7 +650,7 @@ const Dashboard = () => {
                     const hasPayment = stats.paymentsList.some(p => 
                         String(p.memberId) === String(memberId) && 
                         p.month === m && p.year === y && 
-                        (p.type === 'Cuota' || p.type === 'Licencia' || !p.type)
+                        (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
                     );
 
                     if (!hasPayment) {
@@ -685,6 +685,21 @@ const Dashboard = () => {
                     fetchData();
                 } catch (e) {
                     alert('Error al registrar licencia');
+                }
+            };
+
+            const handleCondoneDebt = async (member) => {
+                if (!confirm(`¿Condonar (perdonar) deuda de ${new Date().toLocaleString('es-ES', { month: 'long' })} para ${member.fullName}?`)) return;
+                try {
+                    await axios.post(`${API_URL}/api/finance/condone`, {
+                        memberId: member._id,
+                        memberName: member.fullName,
+                        month: currentMonth,
+                        year: currentYear
+                    });
+                    fetchData();
+                } catch (e) {
+                    alert('Error al condonar deuda');
                 }
             };
 
@@ -773,6 +788,13 @@ const Dashboard = () => {
                                                 title="Marcar como Licencia (No asiste este mes)"
                                             >
                                                 <Plane size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleCondoneDebt(m)}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                title="Condonar Deuda (Perdonar este mes)"
+                                            >
+                                                <XCircle size={16} />
                                             </button>
                                             <button
                                                 onClick={() => handleQuickPayment(m)}

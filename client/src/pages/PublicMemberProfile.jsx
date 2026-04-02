@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config';
-import { Loader2, CheckCircle2, XCircle, Calendar, User, Phone, CreditCard, AlertCircle, Plane } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Calendar, User, Phone, CreditCard, AlertCircle, Plane, Camera } from 'lucide-react';
 
 const PublicMemberProfile = () => {
     const { id } = useParams();
@@ -11,6 +11,8 @@ const PublicMemberProfile = () => {
     const [debts, setDebts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef(null);
 
     const fetchPublicData = useCallback(async () => {
         setLoading(true);
@@ -31,6 +33,28 @@ const PublicMemberProfile = () => {
             setLoading(false);
         }
     }, [id]);
+
+    const handlePhotoChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        setIsUploading(true);
+        try {
+            const res = await axios.post(`${API_URL}/api/members/public/${id}/photo`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setMember(prev => ({ ...prev, photoUrl: res.data.photoUrl }));
+            alert('¡Foto actualizada correctamente!');
+        } catch (err) {
+            console.error('Error uploading photo:', err);
+            alert('Error al subir la foto');
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     useEffect(() => {
         fetchPublicData();
@@ -62,11 +86,12 @@ const PublicMemberProfile = () => {
     const currentPayment = payments.find(p => 
         Number(p.month) === currentMonth && 
         Number(p.year) === currentYear && 
-        (p.type === 'Cuota' || p.type === 'Licencia' || !p.type)
+        (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
     );
 
     const isPaid = currentPayment && (currentPayment.type === 'Cuota' || !currentPayment.type);
     const isLicensed = currentPayment && currentPayment.type === 'Licencia';
+    const isCondoned = currentPayment && currentPayment.type === 'Condonado';
 
     // Calculate Past Debt (last 3 months)
     let pastDebtAmount = 0;
@@ -79,7 +104,7 @@ const PublicMemberProfile = () => {
 
         const hasRecord = payments.some(p => 
             p.month === m && p.year === y && 
-            (p.type === 'Cuota' || p.type === 'Licencia' || !p.type)
+            (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
         );
 
         if (!hasRecord) {
@@ -90,12 +115,12 @@ const PublicMemberProfile = () => {
 
     const totalFiadoDebt = debts.reduce((acc, d) => acc + (d.totalAmount - (d.paidAmount || 0)), 0);
     const memberPrice = member.planCost || 2000;
-    const currentMonthPending = (isPaid || isLicensed) ? 0 : memberPrice;
+    const currentMonthPending = (isPaid || isLicensed || isCondoned) ? 0 : memberPrice;
     const totalPendingAmount = currentMonthPending + pastDebtAmount + totalFiadoDebt;
 
     // Create Virtual History for missing months
     const virtualDebts = [];
-    if (!isPaid && !isLicensed) {
+    if (!isPaid && !isLicensed && !isCondoned) {
         virtualDebts.push({
             _id: `v-current`,
             month: currentMonth,
@@ -117,7 +142,7 @@ const PublicMemberProfile = () => {
 
         const hasRecord = payments.some(p => 
             p.month === m && p.year === y && 
-            (p.type === 'Cuota' || p.type === 'Licencia' || !p.type)
+            (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
         );
 
         if (!hasRecord) {
@@ -160,17 +185,39 @@ const PublicMemberProfile = () => {
                     <div className="bg-gradient-to-br from-blue-600 to-indigo-700 h-24"></div>
                     <div className="px-6 pb-6 relative">
                         <div className="flex justify-center -mt-12 mb-4">
-                            {member.photoUrl ? (
-                                <img 
-                                    src={member.photoUrl.startsWith('http') ? member.photoUrl : `${API_URL}${member.photoUrl}`} 
-                                    className="w-24 h-24 rounded-full border-4 border-white shadow-lg object-cover bg-slate-100"
-                                    alt={member.fullName}
-                                />
-                            ) : (
-                                <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                                    <User size={40} />
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={handlePhotoChange}
+                            />
+                            <div 
+                                className="relative group cursor-pointer"
+                                onClick={() => !isUploading && fileInputRef.current.click()}
+                            >
+                                {member.photoUrl ? (
+                                    <img 
+                                        src={member.photoUrl.startsWith('http') ? member.photoUrl : `${API_URL}${member.photoUrl}`} 
+                                        className={`w-24 h-24 rounded-full border-4 border-white shadow-lg object-cover bg-slate-100 transition-opacity ${isUploading ? 'opacity-50' : 'group-hover:opacity-90'}`}
+                                        alt={member.fullName}
+                                    />
+                                ) : (
+                                    <div className={`w-24 h-24 rounded-full border-4 border-white shadow-lg bg-slate-100 flex items-center justify-center text-slate-400 transition-opacity ${isUploading ? 'opacity-50' : 'group-hover:opacity-90'}`}>
+                                        <User size={40} />
+                                    </div>
+                                )}
+                                <div className="absolute inset-0 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="bg-black/40 p-2 rounded-full text-white">
+                                        {isUploading ? <Loader2 className="animate-spin" size={20} /> : <Camera size={20} />}
+                                    </div>
                                 </div>
-                            )}
+                                {isUploading && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <Loader2 className="animate-spin text-blue-600" size={32} />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         
                         <div className="text-center">
@@ -222,11 +269,11 @@ const PublicMemberProfile = () => {
                 {/* Details Section */}
                 <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 italic">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Cédula</span>
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Teléfono</span>
                             <div className="flex items-center gap-2 text-slate-700">
-                                <CreditCard size={14} />
-                                <span className="font-medium">{member.ci}</span>
+                                <Phone size={14} />
+                                <span className="font-medium">{member.phone || 'No registrado'}</span>
                             </div>
                         </div>
                         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
@@ -257,7 +304,7 @@ const PublicMemberProfile = () => {
                                                 {item.type === 'Licencia' ? 'Licencia' : (
                                                     item.month && item.year ? 
                                                     new Date(item.year, item.month - 1).toLocaleString('es-ES', { month: 'long' }) : 
-                                                    'Pago Extra'
+                                                    (item.type === 'Condonado' ? 'Deuda Condonada' : 'Pago Extra')
                                                 )}
                                             </p>
                                             <p className="text-[10px] text-slate-400 uppercase">

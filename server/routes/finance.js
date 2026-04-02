@@ -166,6 +166,35 @@ router.post('/license', async (req, res) => {
     }
 });
 
+router.post('/condone', async (req, res) => {
+    try {
+        const { memberId, memberName, month, year } = req.body;
+        const tenantId = req.tenantId || null;
+
+        // Check if already has a condoned status for this period
+        let existing = await Payment.findOne({ memberId, month, year, type: 'Condonado', tenantId });
+        if (existing) return res.json(existing);
+
+        // Delete any existing "Cuota" payment if any (reverting it)
+        await Payment.deleteMany({ memberId, month, year, type: 'Cuota', tenantId });
+
+        const condoned = new Payment({
+            memberId,
+            memberName,
+            month,
+            year,
+            amount: 0,
+            type: 'Condonado',
+            tenantId
+        });
+
+        const saved = await condoned.save();
+        res.status(201).json(saved);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 router.post('/note', async (req, res) => {
     try {
         const { memberId, memberName, month, year, comments } = req.body;
