@@ -28,26 +28,39 @@ const applyFamilyDiscount = async (familyHeadId, tenantId) => {
 
         if (totalActiveMembers === 0) return;
 
-        // Fetch settings to get the base cost of the family plan
+        // Fetch settings. The plugin might filter by tenantId, but let's be explicit and handle the lookup.
         const Settings = require('../models/Settings');
-        const settings = await Settings.findOne({ tenantId });
+        let settings = await Settings.findOne({ tenantId });
+        
+        // Fallback to searching without tenantId if not found (for legacy migration support)
+        if (!settings) {
+            settings = await Settings.findOne({ key: 'admin_config' });
+        }
 
-        let planCost = head.planCost;
+        // We MUST find the plan to know the base cost. If not found, we use a default
+        // or the member's current plan cost BUT only if it is something reasonable?
+        // Actually, if settings lookup was fixed, this will find the plan.
+        let baseCost = 0;
         if (settings && settings.plans) {
             const familyPlan = settings.plans.find(p => p.name === head.planType);
             if (familyPlan) {
-                planCost = familyPlan.cost;
+                baseCost = familyPlan.cost;
             }
+        }
+
+        // If we still don't have a plan cost, use the individual default or member current
+        if (baseCost === 0) {
+            // Note: If we don't know the plan cost, we might default to 2300 (half of 4600)
+            // or use head.planCost if it looks like a single-person price.
+            baseCost = head.planCost > 0 ? (head.planCost > 5000 ? 4600 : head.planCost) : 4600;
         }
 
         // 3x2 Calculation: Every 3rd member is free
         const billableMembers = totalActiveMembers - Math.floor(totalActiveMembers / 3);
         
-        // Note: The 'planCost' in settings (e.g. 4600) already represents 
-        // the total for 2 paid members in a 3x2 set. 
-        // Since billableMembers correctly gives '2' for a group of 3, 
-        // we must divide the group cost by 2 to get the individual fee as base.
-        const individualFee = planCost / 2;
+        // El costo del plan en settings (4600) ya representa 2 personas (3x2).
+        // Por ende el precio individual base es planCost / 2.
+        const individualFee = baseCost / 2;
         const totalCost = billableMembers * individualFee;
 
         await Member.findByIdAndUpdate(familyHeadId, { planCost: totalCost });

@@ -17,4 +17,6 @@ const settingsSchema = new mongoose.Schema({
     }]
 }, { timestamps: true });
 
+settingsSchema.plugin(require('../plugins/tenantPlugin'));
+
 module.exports = mongoose.model('Settings', settingsSchema);
