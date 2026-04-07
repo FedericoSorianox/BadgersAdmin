@@ -42,7 +42,13 @@ const applyFamilyDiscount = async (familyHeadId, tenantId) => {
 
         // 3x2 Calculation: Every 3rd member is free
         const billableMembers = totalActiveMembers - Math.floor(totalActiveMembers / 3);
-        const totalCost = billableMembers * planCost;
+        
+        // Note: The 'planCost' in settings (e.g. 4600) already represents 
+        // the total for 2 paid members in a 3x2 set. 
+        // Since billableMembers correctly gives '2' for a group of 3, 
+        // we must divide the group cost by 2 to get the individual fee as base.
+        const individualFee = planCost / 2;
+        const totalCost = billableMembers * individualFee;
 
         await Member.findByIdAndUpdate(familyHeadId, { planCost: totalCost });
     } catch (err) {

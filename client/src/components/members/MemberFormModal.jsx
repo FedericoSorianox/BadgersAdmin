@@ -79,7 +79,11 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
                 const totalActive = dependentCount + (formData.active ? 1 : 0);
                 if (totalActive > 0) {
                     const billable = totalActive - Math.floor(totalActive / 3);
-                    finalCost = billable * selectedPlan.cost;
+                    // El costo del plan seleccionado (ej: 4600) ya representa 2 cuotas (3x2).
+                    // La lógica de billable ya nos da '2' para un grupo de 3.
+                    // Si multiplicamos 2 * 4600 nos da 9200 (4 cuotas).
+                    // Dividimos por 2 para usar la cuota individual como base.
+                    finalCost = billable * (selectedPlan.cost / 2);
                 }
             }
 
@@ -101,14 +105,14 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
             const selectedPlan = plans.find(p => p.name === formData.planType);
             let finalCost = selectedPlan ? selectedPlan.cost : formData.planCost;
 
-            if (selectedPlan) {
+            if (selectedPlan && selectedPlan.type === 'Familiar') {
                 const dependentCount = initialData && initialData._id
                     ? members.filter(m => m.familyId === initialData._id && m.active).length
                     : 0;
                 const totalActive = dependentCount + (formData.active ? 1 : 0);
                 if (totalActive > 0) {
                     const billable = totalActive - Math.floor(totalActive / 3);
-                    finalCost = billable * selectedPlan.cost;
+                    finalCost = billable * (selectedPlan.cost / 2);
                 }
             }
 
