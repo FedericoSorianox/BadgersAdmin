@@ -357,7 +357,7 @@ const PublicMemberProfile = () => {
                                     />
                                 ) : (
                                     <p className="text-slate-700 font-medium">
-                                        {member.birthDate ? new Date(member.birthDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                                        {member.birthDate ? new Date(member.birthDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }) : '—'}
                                     </p>
                                 )}
                             </div>

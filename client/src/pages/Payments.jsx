@@ -180,7 +180,7 @@ const Payments = () => {
 
 
     const handleQuickPayment = async (member) => {
-        const confirmPayment = window.confirm(`¿Confirmar pago de $${member.planCost || 2000} para ${member.fullName}?`);
+        const confirmPayment = window.confirm(`¿Confirmar pago para ${member.fullName}?`);
         if (!confirmPayment) return;
 
         try {

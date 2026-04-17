@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane, ExternalLink, XCircle } from 'lucide-react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane, ExternalLink, XCircle, Copy } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
@@ -364,7 +364,7 @@ const Dashboard = () => {
     };
 
     const handleQuickPayment = async (member) => {
-        const confirmPayment = window.confirm(`¿Confirmar pago de $2000 para ${member.fullName}?`);
+        const confirmPayment = window.confirm(`¿Confirmar pago para ${member.fullName}?`);
         if (!confirmPayment) return;
 
         try {
@@ -398,7 +398,7 @@ const Dashboard = () => {
         const currentYear = new Date().getFullYear();
         const amount = instructor.hours * 500;
 
-        if (!window.confirm(`¿Confirmar pago de $${amount} a ${instructor.name} correspondiente a este mes?`)) return;
+        if (!window.confirm(`¿Confirmar pago a ${instructor.name} correspondiente a este mes?`)) return;
 
         setLoading(true);
         try {
@@ -791,6 +791,16 @@ const Dashboard = () => {
                                             <span className="text-xs text-slate-500 font-medium">CI: {m.ci || 'N/A'} • ${m.planCost?.toLocaleString() || '2.000'}</span>
                                         </div>
                                         <div className="flex gap-2 lg:gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    const link = `${window.location.origin}/public/profile/${m._id}`;
+                                                    navigator.clipboard.writeText(link);
+                                                }}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                                title="Copiar Link de Ficha"
+                                            >
+                                                <Copy size={16} />
+                                            </button>
                                             <button
                                                 onClick={() => handleAddNote(m)}
                                                 className={`p-1.5 rounded-lg transition-colors
@@ -1196,7 +1206,7 @@ const Dashboard = () => {
                                                 </button>
                                                 <button
                                                     onClick={async () => {
-                                                        if (confirm(`¿Confirmar pago TOTAL de $${group.totalDebt} para ${group.name}?`)) {
+                                                        if (confirm(`¿Confirmar pago TOTAL para ${group.name}?`)) {
                                                             try {
                                                                 await axios.post(`${API_URL}/api/debts/pay-partial`, {
                                                                     memberId: group.id,

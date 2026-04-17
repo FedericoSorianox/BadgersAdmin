@@ -60,7 +60,7 @@ const MemberDetailModal = ({ isOpen, onClose, member, onEdit }) => {
                             <p className="text-xs font-bold text-slate-400 uppercase mb-1">Fecha de Nacimiento</p>
                             <p className="text-slate-700 font-medium">
                                 {member.birthDate
-                                    ? new Date(member.birthDate).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
+                                    ? new Date(member.birthDate).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
                                     : '-'
                                 }
                             </p>
