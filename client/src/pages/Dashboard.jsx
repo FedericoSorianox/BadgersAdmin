@@ -58,6 +58,8 @@ const Dashboard = () => {
     const [currentFiadoProduct, setCurrentFiadoProduct] = useState({ productId: '', quantity: 1 });
     const [fiadoProductSearchTerm, setFiadoProductSearchTerm] = useState('');
     const [showFiadoProductDropdown, setShowFiadoProductDropdown] = useState(false);
+    const [fiadoMemberSearchTerm, setFiadoMemberSearchTerm] = useState('');
+    const [showFiadoMemberDropdown, setShowFiadoMemberDropdown] = useState(false);
 
     const [partialPayModalOpen, setPartialPayModalOpen] = useState(false);
     const [partialPayForm, setPartialPayForm] = useState({ 
@@ -299,6 +301,7 @@ const Dashboard = () => {
             await axios.post(`${API_URL}/api/debts`, fiadoData);
             setNewFiadoModalOpen(false);
             setNewFiadoForm({ memberId: '', products: [] });
+            setFiadoMemberSearchTerm('');
             fetchData();
         } catch (error) {
             console.error('Error creating fiado:', error);
@@ -969,7 +972,12 @@ const Dashboard = () => {
                     </button>
 
                     <button
-                        onClick={() => setNewFiadoModalOpen(true)}
+                        onClick={() => {
+                            setNewFiadoForm({ memberId: '', products: [] });
+                            setFiadoMemberSearchTerm('');
+                            setFiadoProductSearchTerm('');
+                            setNewFiadoModalOpen(true);
+                        }}
                         className="flex flex-col items-center justify-center p-4 rounded-2xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors border border-amber-100 group"
                     >
                         <div className="p-3 bg-white rounded-xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
@@ -1417,18 +1425,59 @@ const Dashboard = () => {
 
                         <div className="space-y-4">
                             {/* Member Select */}
-                            <div>
+                            <div className="relative">
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Socio</label>
-                                <select
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    value={newFiadoForm.memberId}
-                                    onChange={(e) => setNewFiadoForm({ ...newFiadoForm, memberId: e.target.value })}
-                                >
-                                    <option value="">Seleccionar socio...</option>
-                                    {stats.membersList.filter(m => m.active).map(m => (
-                                        <option key={m._id} value={m._id}>{m.fullName}</option>
-                                    ))}
-                                </select>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <input
+                                        type="text"
+                                        className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        placeholder="Buscar socio por nombre o CI..."
+                                        value={fiadoMemberSearchTerm}
+                                        onChange={(e) => {
+                                            setFiadoMemberSearchTerm(e.target.value);
+                                            setShowFiadoMemberDropdown(true);
+                                            if (newFiadoForm.memberId && e.target.value !== stats.membersList.find(m => m._id === newFiadoForm.memberId)?.fullName) {
+                                                setNewFiadoForm(prev => ({ ...prev, memberId: '' }));
+                                            }
+                                        }}
+                                        onFocus={() => setShowFiadoMemberDropdown(true)}
+                                    />
+                                </div>
+                                {showFiadoMemberDropdown && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowFiadoMemberDropdown(false)} />
+                                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                            {stats.membersList
+                                                .filter(m => m.active && (
+                                                    m.fullName.toLowerCase().includes(fiadoMemberSearchTerm.toLowerCase()) ||
+                                                    (m.ci && m.ci.includes(fiadoMemberSearchTerm))
+                                                ))
+                                                .map(member => (
+                                                    <div
+                                                        key={member._id}
+                                                        className="px-4 py-3 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-none"
+                                                        onClick={() => {
+                                                            setNewFiadoForm({ ...newFiadoForm, memberId: member._id });
+                                                            setFiadoMemberSearchTerm(member.fullName);
+                                                            setShowFiadoMemberDropdown(false);
+                                                        }}
+                                                    >
+                                                        <div>
+                                                            <span className="font-bold text-slate-700 block text-sm">{member.fullName}</span>
+                                                            <span className="text-[10px] text-slate-400 uppercase font-medium">CI: {member.ci || 'N/A'}</span>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Activo</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            {stats.membersList.filter(m => m.active && (m.fullName.toLowerCase().includes(fiadoMemberSearchTerm.toLowerCase()) || (m.ci && m.ci.includes(fiadoMemberSearchTerm)))).length === 0 && (
+                                                <div className="px-4 py-4 text-slate-400 text-sm text-center">No se encontraron socios activos</div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             {/* Add Product Section */}
