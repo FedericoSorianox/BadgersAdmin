@@ -103,6 +103,13 @@ router.post('/', upload.single('image'), async (req, res) => {
             memberData.tenantId = req.tenantId;
         }
 
+        if (req.body.ci) {
+            const existingMember = await Member.findOne({ ci: req.body.ci, tenantId: req.tenantId || null });
+            if (existingMember) {
+                return res.status(400).json({ message: "La cédula ya está registrada por otro socio" });
+            }
+        }
+
         const member = new Member(memberData);
         const newMember = await member.save();
 
@@ -165,6 +172,14 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 
         if (req.file) {
             memberData.photoUrl = req.file.path;
+        }
+
+        if (req.body.ci) {
+            const existingMember = await Member.findOne({ ci: req.body.ci, tenantId: req.tenantId || null, _id: { $ne: req.params.id } });
+            if (existingMember) {
+                return res.status(400).json({ message: "La cédula ya está registrada por otro socio" });
+            }
+            memberData.ci = req.body.ci; // Ensure CI is updated
         }
 
         const updatedMember = await Member.findByIdAndUpdate(req.params.id, memberData, { new: true });
@@ -259,6 +274,27 @@ router.post("/public/:id/photo", upload.single('image'), async (req, res) => {
         }
 
         res.json({ photoUrl: updatedMember.photoUrl });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Toggle member status (active/inactive)
+router.put('/:id/toggle-status', async (req, res) => {
+    try {
+        const member = await Member.findById(req.params.id);
+        if (!member) {
+            return res.status(404).json({ message: 'Socio no encontrado' });
+        }
+        member.active = !member.active;
+        await member.save();
+        
+        // If status changed and they are part of a family plan, recalculate
+        if (member.isFamilyHead || member.familyId) {
+            await applyFamilyDiscount(member.isFamilyHead ? member._id : member.familyId, req.tenantId);
+        }
+        
+        res.json(member);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

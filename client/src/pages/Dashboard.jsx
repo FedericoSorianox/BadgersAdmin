@@ -533,6 +533,19 @@ const Dashboard = () => {
         }
     };
 
+    const handleToggleMemberStatus = async (member) => {
+        const action = member.active ? 'inactivar' : 'activar';
+        if (!window.confirm(`¿Estás seguro de que deseas ${action} al socio ${member.fullName}?`)) return;
+
+        try {
+            await axios.put(`${API_URL}/api/members/${member._id}/toggle-status`);
+            fetchData();
+        } catch (error) {
+            console.error(`Error al ${action} el socio:`, error);
+            alert(`Error al ${action} el socio`);
+        }
+    };
+
     const renderModalContent = () => {
         if (!modalType) return null;
 
@@ -557,7 +570,16 @@ const Dashboard = () => {
                                     </div>
                                     <p className="text-xs text-slate-400">CI: {m.ci}</p>
                                 </div>
-                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Activo</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Activo</span>
+                                    <button 
+                                        onClick={() => handleToggleMemberStatus(m)}
+                                        className="p-1 text-slate-400 hover:text-red-600 transition-colors bg-slate-50 hover:bg-red-50 rounded-full"
+                                        title="Mover a inactivos"
+                                    >
+                                        <UserX size={16} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -586,7 +608,16 @@ const Dashboard = () => {
                                     </div>
                                     <p className="text-xs text-slate-400">CI: {m.ci}</p>
                                 </div>
-                                <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">Inactivo</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">Inactivo</span>
+                                    <button 
+                                        onClick={() => handleToggleMemberStatus(m)}
+                                        className="p-1 text-slate-400 hover:text-green-600 transition-colors bg-slate-50 hover:bg-green-50 rounded-full"
+                                        title="Mover a activos"
+                                    >
+                                        <UserCheck size={16} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
