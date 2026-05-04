@@ -1533,11 +1533,12 @@ const Dashboard = () => {
                                     {showFiadoProductDropdown && (
                                         <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                             {stats.products
-                                                .filter(p => p.name.toLowerCase().includes(fiadoProductSearchTerm.toLowerCase()))
+                                                .filter(p => p.name.toLowerCase().includes(fiadoProductSearchTerm.toLowerCase()) && p.stock > 0)
+                                                .sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0))
                                                 .map(p => (
                                                     <div
                                                         key={p._id}
-                                                        className={`px-4 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center ${p.stock <= 0 ? 'opacity-50' : ''}`}
+                                                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center"
                                                         onClick={() => {
                                                             if (p.stock > 0) {
                                                                 setCurrentFiadoProduct({ ...currentFiadoProduct, productId: p._id });
@@ -1549,12 +1550,13 @@ const Dashboard = () => {
                                                         <span className="font-medium text-slate-700 text-xs">{p.name}</span>
                                                         <div className="text-right">
                                                             <span className="block text-[10px] text-slate-500">Stock: {p.stock}</span>
+                                                            <span className="block text-[10px] text-blue-500 font-medium">Vendidos: {p.salesCount || 0}</span>
                                                             <span className="block text-xs font-bold text-green-600">${p.salePrice}</span>
                                                         </div>
                                                     </div>
                                                 ))}
-                                            {stats.products.filter(p => p.name.toLowerCase().includes(fiadoProductSearchTerm.toLowerCase())).length === 0 && (
-                                                <div className="px-4 py-2 text-slate-400 text-xs">No se encontraron productos</div>
+                                            {stats.products.filter(p => p.name.toLowerCase().includes(fiadoProductSearchTerm.toLowerCase()) && p.stock > 0).length === 0 && (
+                                                <div className="px-4 py-2 text-slate-400 text-xs">No se encontraron productos con stock</div>
                                             )}
                                         </div>
                                     )}

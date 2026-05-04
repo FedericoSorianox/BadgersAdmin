@@ -22,7 +22,7 @@ router.post('/', async (req, res) => {
     try {
         const { memberId, memberName, products, totalAmount } = req.body;
 
-        // Verify and deduct stock for each product
+        // Verify and deduct stock and increment salesCount for each product
         for (const item of products) {
             const product = await Product.findById(item.productId);
             if (!product) {
@@ -32,6 +32,7 @@ router.post('/', async (req, res) => {
                 return res.status(400).json({ message: `Stock insuficiente para ${product.name}. Stock actual: ${product.stock}` });
             }
             product.stock -= item.quantity;
+            product.salesCount = (product.salesCount || 0) + item.quantity;
             await product.save();
         }
 

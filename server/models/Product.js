@@ -5,6 +5,7 @@ const ProductSchema = new mongoose.Schema({
     costPrice: { type: Number, required: true },
     salePrice: { type: Number, required: true },
     stock: { type: Number, default: 0 },
+    salesCount: { type: Number, default: 0 },
     imageUrl: { type: String },
     category: { type: String },
     isQuickAccess: { type: Boolean, default: false },

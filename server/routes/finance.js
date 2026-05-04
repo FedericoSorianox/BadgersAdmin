@@ -115,7 +115,7 @@ router.post('/', async (req, res) => {
     if (req.tenantId) paymentData.tenantId = req.tenantId;
     const payment = new Payment(paymentData);
     try {
-        // If it's a product sale, deduct stock
+        // If it's a product sale, deduct stock and increment salesCount
         if (req.body.type === 'Producto' && req.body.productId) {
             const product = await Product.findById(req.body.productId);
             if (!product) {
@@ -125,6 +125,7 @@ router.post('/', async (req, res) => {
                 return res.status(400).json({ message: `Stock insuficiente. Stock actual: ${product.stock}` });
             }
             product.stock -= (req.body.quantity || 1);
+            product.salesCount = (product.salesCount || 0) + (req.body.quantity || 1);
             await product.save();
         }
 
