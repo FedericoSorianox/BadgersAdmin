@@ -4,6 +4,25 @@ import { Edit2, Share2 } from 'lucide-react';
 import { API_URL } from '../../config';
 
 const MemberDetailModal = ({ isOpen, onClose, member, onEdit }) => {
+    const calculateTrainingTime = (dateString) => {
+        if (!dateString) return 'Desconocido';
+        const start = new Date(dateString);
+        const now = new Date();
+        
+        let years = now.getFullYear() - start.getFullYear();
+        let months = now.getMonth() - start.getMonth();
+        
+        if (months < 0) {
+            years--;
+            months += 12;
+        }
+        
+        if (years === 0 && months === 0) return 'Menos de 1 mes';
+        if (years === 0) return `${months} ${months === 1 ? 'mes' : 'meses'}`;
+        if (months === 0) return `${years} ${years === 1 ? 'año' : 'años'}`;
+        
+        return `${years} ${years === 1 ? 'año' : 'años'} y ${months} ${months === 1 ? 'mes' : 'meses'}`;
+    };
     return (
         <Modal
             isOpen={isOpen}
@@ -63,6 +82,12 @@ const MemberDetailModal = ({ isOpen, onClose, member, onEdit }) => {
                                     ? new Date(member.birthDate).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
                                     : '-'
                                 }
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase mb-1">Tiempo Entrenando</p>
+                            <p className="text-slate-700 font-medium">
+                                {calculateTrainingTime(member.joinDate || member.createdAt)}
                             </p>
                         </div>
                         <div>

@@ -91,6 +91,7 @@ router.post('/', upload.single('image'), async (req, res) => {
             active: req.body.active === 'true' || req.body.active === true,
             isExempt: req.body.isExempt === 'true' || req.body.isExempt === true,
             isInWhatsappGroup: req.body.isInWhatsappGroup === 'true' || req.body.isInWhatsappGroup === true,
+            joinDate: req.body.joinDate || Date.now(),
             ...familyFields
         };
 
@@ -158,6 +159,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
             active: req.body.active === 'true' || req.body.active === true,
             isExempt: req.body.isExempt === 'true' || req.body.isExempt === true,
             isInWhatsappGroup: req.body.isInWhatsappGroup === 'true' || req.body.isInWhatsappGroup === true,
+            ...(req.body.joinDate ? { joinDate: req.body.joinDate } : {}),
             ...familyFields
         };
 
@@ -201,7 +203,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 // Get public member info
 router.get("/public/:id", async (req, res) => {
     try {
-        const member = await Member.findById(req.params.id).select("fullName photoUrl planType planCost active ci phone birthDate comments createdAt");
+        const member = await Member.findById(req.params.id).select("fullName photoUrl planType planCost active ci phone birthDate joinDate comments createdAt");
         if (!member) return res.status(404).json({ message: "Socio no encontrado" });
         res.json(member);
     } catch (err) {

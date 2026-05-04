@@ -190,6 +190,26 @@ const PublicMemberProfile = () => {
         }))
     ].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
 
+    const calculateTrainingTime = (dateString) => {
+        if (!dateString) return 'Desconocido';
+        const start = new Date(dateString);
+        const now = new Date();
+        
+        let years = now.getFullYear() - start.getFullYear();
+        let months = now.getMonth() - start.getMonth();
+        
+        if (months < 0) {
+            years--;
+            months += 12;
+        }
+        
+        if (years === 0 && months === 0) return 'Menos de 1 mes';
+        if (years === 0) return `${months} ${months === 1 ? 'mes' : 'meses'}`;
+        if (months === 0) return `${years} ${years === 1 ? 'año' : 'años'}`;
+        
+        return `${years} ${years === 1 ? 'año' : 'años'} y ${months} ${months === 1 ? 'mes' : 'meses'}`;
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 pb-12">
             {/* Header Branding */}
@@ -360,6 +380,13 @@ const PublicMemberProfile = () => {
                                         {member.birthDate ? new Date(member.birthDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }) : '—'}
                                     </p>
                                 )}
+                            </div>
+
+                            <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Tiempo Entrenando</span>
+                                <p className="text-slate-700 font-medium">
+                                    {calculateTrainingTime(member.joinDate || member.createdAt)}
+                                </p>
                             </div>
 
                             <div>

@@ -16,7 +16,8 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
         photoUrl: '',
         isExempt: false,
         familyId: '',
-        isFamilyHead: false
+        isFamilyHead: false,
+        joinDate: ''
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -38,7 +39,8 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
                         photoUrl: initialData.photoUrl || '',
                         isExempt: initialData.isExempt || false,
                         familyId: initialData.familyId || '',
-                        isFamilyHead: initialData.isFamilyHead || false
+                        isFamilyHead: initialData.isFamilyHead || false,
+                        joinDate: initialData.joinDate ? new Date(initialData.joinDate).toISOString().split('T')[0] : (initialData.createdAt ? new Date(initialData.createdAt).toISOString().split('T')[0] : '')
                     });
                     setImagePreview(initialData.photoUrl ? (initialData.photoUrl.startsWith('http') ? initialData.photoUrl : `${API_URL}${initialData.photoUrl}`) : null);
                 } else {
@@ -55,7 +57,8 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
                         photoUrl: '',
                         isExempt: false,
                         familyId: '',
-                        isFamilyHead: false
+                        isFamilyHead: false,
+                        joinDate: new Date().toISOString().split('T')[0]
                     });
                     setImagePreview(null);
                 }
@@ -148,6 +151,9 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
         formDataToSend.append('isExempt', formData.isExempt);
         formDataToSend.append('familyId', formData.familyId);
         formDataToSend.append('isFamilyHead', formData.isFamilyHead);
+        if (formData.joinDate) {
+            formDataToSend.append('joinDate', formData.joinDate);
+        }
 
         if (imageFile) {
             formDataToSend.append('image', imageFile);
@@ -249,7 +255,7 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
                     />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Nacimiento</label>
                         <input
@@ -257,6 +263,15 @@ const MemberFormModal = ({ isOpen, onClose, onSubmit, initialData, plans = [], m
                             className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             value={formData.birthDate}
                             onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Ingreso</label>
+                        <input
+                            type="date"
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={formData.joinDate}
+                            onChange={(e) => setFormData({ ...formData, joinDate: e.target.value })}
                         />
                     </div>
                 </div>
