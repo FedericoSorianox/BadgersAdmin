@@ -12,6 +12,7 @@ const paymentSchema = new mongoose.Schema({
     comments: { type: String }, // For status notes (e.g., "Viaje", "Licencia")
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     quantity: { type: Number, default: 1 },
+    paymentMethod: { type: String, enum: ['Efectivo', 'Digital'], default: 'Efectivo' },
     date: { type: Date, default: Date.now }
 }, { timestamps: true });
 

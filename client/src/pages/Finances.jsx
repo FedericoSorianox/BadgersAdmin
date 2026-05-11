@@ -50,7 +50,7 @@ const Finances = () => {
     const [newExpenseForm, setNewExpenseForm] = useState({
         description: '',
         amount: 0,
-        concept: ''
+        concept: 'Gasto'
     });
 
     const fetchTransactions = useCallback(async () => {
@@ -183,7 +183,7 @@ const Finances = () => {
 
             await axios.post(`${API_URL}/api/finance/expenses`, expenseData);
             setNewExpenseModalOpen(false);
-            setNewExpenseForm({ description: '', amount: 0, concept: '' });
+            setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto' });
             fetchTransactions();
         } catch (error) {
             console.error('Error registering expense:', error);
@@ -454,10 +454,10 @@ const Finances = () => {
                                             {new Date(transaction.date).toLocaleDateString('es-UY')}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-800">
-                                            {transaction.productName || transaction.memberName || 'N/A'}
+                                            {transaction.category === 'Gasto' ? transaction.description : (transaction.productName || transaction.memberName || 'N/A')}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                                            {transaction.description || transaction.concept || '-'}
+                                            {transaction.category === 'Gasto' ? (transaction.concept || '-') : (transaction.description || transaction.concept || '-')}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryBadge(transaction.category)}`}>
@@ -584,16 +584,7 @@ const Finances = () => {
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Concepto (Opcional)</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    value={newExpenseForm.concept}
-                                    onChange={(e) => setNewExpenseForm({ ...newExpenseForm, concept: e.target.value })}
-                                    placeholder="Detalles adicionales"
-                                />
-                            </div>
+
 
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Monto</label>
@@ -621,7 +612,7 @@ const Finances = () => {
                             <button
                                 onClick={() => {
                                     setNewExpenseModalOpen(false);
-                                    setNewExpenseForm({ description: '', amount: 0, concept: '' });
+                                    setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto' });
                                 }}
                                 className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
                             >

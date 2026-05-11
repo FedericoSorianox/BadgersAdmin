@@ -4,6 +4,7 @@ const Payment = require('../models/Payment');
 const Expense = require('../models/Expense');
 const Member = require('../models/Member');
 const Product = require('../models/Product');
+const CashRegister = require('../models/CashRegister');
 
 // Get payments (optionally filter by month/year)
 router.get('/', async (req, res) => {
@@ -304,6 +305,57 @@ router.delete('/:id', async (req, res) => {
     try {
         await Payment.findByIdAndDelete(req.params.id);
         res.json({ message: 'Payment deleted' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Get cash registers
+router.get('/cash-register', async (req, res) => {
+    try {
+        const query = { tenantId: req.tenantId || null };
+        const registers = await CashRegister.find(query).sort({ date: -1 }).limit(30);
+        res.json(registers);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Register cash register close
+router.post('/cash-register', async (req, res) => {
+    const data = req.body;
+    if (req.tenantId) data.tenantId = req.tenantId;
+    const register = new CashRegister(data);
+    try {
+        const saved = await register.save();
+        res.status(201).json(saved);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Get cash summary for current day
+router.get('/cash-summary', async (req, res) => {
+    try {
+        const tenantId = req.tenantId || null;
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const query = {
+            tenantId,
+            paymentMethod: 'Efectivo',
+            date: { $gte: startOfDay, $lte: endOfDay }
+        };
+
+        const payments = await Payment.find(query);
+        const cashIn = payments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+        const expenses = await Expense.find(query);
+        const cashOut = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+        res.json({ cashIn, cashOut });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

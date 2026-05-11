@@ -78,6 +78,7 @@ router.put('/:id/pay', async (req, res) => {
             year: currentYear,
             amount: debt.totalAmount,
             type: 'Producto', // Classify as sale
+            paymentMethod: req.body.paymentMethod || 'Efectivo',
             date: new Date()
         });
 
@@ -180,6 +181,7 @@ router.post('/pay-partial', async (req, res) => {
                 year: currentYear,
                 amount: effectivePaid,
                 type: 'Producto',
+                paymentMethod: req.body.paymentMethod || 'Efectivo',
                 date: new Date()
             });
 

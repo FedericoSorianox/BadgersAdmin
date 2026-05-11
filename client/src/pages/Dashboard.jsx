@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane, ExternalLink, XCircle, Copy } from 'lucide-react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane, ExternalLink, XCircle, Copy, Calculator, History } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
@@ -15,6 +15,27 @@ const StatCard = ({ title, value, subtext, icon: Icon, colorClass, iconClass, on
         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">{title}</h3>
         <p className="text-5xl font-bold text-slate-800 mb-2">{value}</p>
         <p className="text-sm text-slate-400">{subtext}</p>
+    </div>
+);
+
+const PaymentMethodToggle = ({ value, onChange }) => (
+    <div className="flex bg-slate-100 p-1 rounded-xl">
+        <button
+            type="button"
+            onClick={() => onChange('Efectivo')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-bold transition-all ${value === 'Efectivo' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            <DollarSign size={16} className={value === 'Efectivo' ? 'text-green-600' : ''} />
+            Efectivo
+        </button>
+        <button
+            type="button"
+            onClick={() => onChange('Digital')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-bold transition-all ${value === 'Digital' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            <CreditCard size={16} className={value === 'Digital' ? 'text-blue-600' : ''} />
+            Digital
+        </button>
     </div>
 );
 
@@ -45,12 +66,27 @@ const Dashboard = () => {
 
     // Quick Actions State
     const [newSaleModalOpen, setNewSaleModalOpen] = useState(false);
-    const [newSaleForm, setNewSaleForm] = useState({ productId: '', productName: '', amount: 0, quantity: 1 });
+    const [newSaleForm, setNewSaleForm] = useState({ productId: '', productName: '', amount: 0, quantity: 1, paymentMethod: 'Efectivo' });
     const [productSearchTerm, setProductSearchTerm] = useState('');
     const [showProductDropdown, setShowProductDropdown] = useState(false);
 
     const [newExpenseModalOpen, setNewExpenseModalOpen] = useState(false);
-    const [newExpenseForm, setNewExpenseForm] = useState({ description: '', amount: 0, concept: '' });
+    const [newExpenseForm, setNewExpenseForm] = useState({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo' });
+
+    const [cashRegisterModalOpen, setCashRegisterModalOpen] = useState(false);
+    const [cashRegisterForm, setCashRegisterForm] = useState({
+        initialBalance: '',
+        cashIn: '',
+        cashOut: '',
+        actualBalance: '',
+        notes: ''
+    });
+
+    const [payMethodModalOpen, setPayMethodModalOpen] = useState(false);
+    const [pendingPayment, setPendingPayment] = useState(null);
+
+    const [cashRegisterHistoryModalOpen, setCashRegisterHistoryModalOpen] = useState(false);
+    const [cashRegisterHistory, setCashRegisterHistory] = useState([]);
 
     const [newFiadoModalOpen, setNewFiadoModalOpen] = useState(false);
     const [newFiadoForm, setNewFiadoForm] = useState({ memberId: '', products: [] });
@@ -68,7 +104,8 @@ const Dashboard = () => {
         memberName: '', 
         maxAmount: 0,
         items: [],
-        adjustments: {} 
+        adjustments: {},
+        paymentMethod: 'Efectivo'
     });
     const [pendingNotes, setPendingNotes] = useState({});
 
@@ -200,6 +237,7 @@ const Dashboard = () => {
                 quantity: newSaleForm.quantity,
                 amount: newSaleForm.amount * newSaleForm.quantity,
                 type: 'Producto',
+                paymentMethod: newSaleForm.paymentMethod,
                 month: currentMonth,
                 year: currentYear,
                 date: new Date()
@@ -207,7 +245,7 @@ const Dashboard = () => {
 
             await axios.post(`${API_URL}/api/finance`, saleData);
             setNewSaleModalOpen(false);
-            setNewSaleForm({ productId: '', productName: '', amount: 0, quantity: 1 });
+            setNewSaleForm({ productId: '', productName: '', amount: 0, quantity: 1, paymentMethod: 'Efectivo' });
             setProductSearchTerm('');
             fetchData();
         } catch (error) {
@@ -226,17 +264,76 @@ const Dashboard = () => {
                 description: newExpenseForm.description,
                 concept: newExpenseForm.concept,
                 amount: newExpenseForm.amount,
+                paymentMethod: newExpenseForm.paymentMethod,
                 date: new Date()
             };
             await axios.post(`${API_URL}/api/finance/expenses`, expenseData);
             setNewExpenseModalOpen(false);
-            setNewExpenseForm({ description: '', amount: 0, concept: '' });
+            setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo' });
             fetchData(); // Refresh to update financials if we were showing them, although mainly updates stats here
         } catch (error) {
             console.error('Error registering expense:', error);
             alert('Error al registrar el gasto');
         }
     };
+
+    const handleCashRegisterSubmit = async () => {
+        try {
+            const expected = Number(cashRegisterForm.initialBalance) + Number(cashRegisterForm.cashIn) - Number(cashRegisterForm.cashOut);
+            const actual = Number(cashRegisterForm.actualBalance);
+            const diff = actual - expected;
+
+            const payload = {
+                initialBalance: Number(cashRegisterForm.initialBalance),
+                cashIn: Number(cashRegisterForm.cashIn),
+                cashOut: Number(cashRegisterForm.cashOut),
+                expectedBalance: expected,
+                actualBalance: actual,
+                difference: diff,
+                notes: cashRegisterForm.notes,
+                date: new Date()
+            };
+
+            await axios.post(`${API_URL}/api/finance/cash-register`, payload);
+            
+            setCashRegisterModalOpen(false);
+            setCashRegisterForm({ initialBalance: '', cashIn: '', cashOut: '', actualBalance: '', notes: '' });
+            alert('Cierre de caja guardado con éxito.');
+        } catch (error) {
+            console.error('Error saving cash register:', error);
+            alert('Error al guardar el cierre de caja.');
+        }
+    };
+
+    const fetchCashRegisterHistory = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/api/finance/cash-register`);
+            setCashRegisterHistory(res.data);
+            setCashRegisterHistoryModalOpen(true);
+        } catch (error) {
+            console.error('Error fetching cash register history:', error);
+            alert('Error al obtener el historial de cierres.');
+        }
+    };
+
+    const fetchCashSummary = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/api/finance/cash-summary`);
+            setCashRegisterForm(prev => ({
+                ...prev,
+                cashIn: res.data.cashIn,
+                cashOut: res.data.cashOut
+            }));
+        } catch (error) {
+            console.error('Error fetching cash summary:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (cashRegisterModalOpen) {
+            fetchCashSummary();
+        }
+    }, [cashRegisterModalOpen]);
 
     // --- Fiados Logic ---
 
@@ -321,10 +418,11 @@ const Dashboard = () => {
             await axios.post(`${API_URL}/api/debts/pay-partial`, {
                 memberId: partialPayForm.memberId,
                 amount: totalToPay,
-                adjustments: partialPayForm.adjustments
+                adjustments: partialPayForm.adjustments,
+                paymentMethod: partialPayForm.paymentMethod
             });
             setPartialPayModalOpen(false);
-            setPartialPayForm({ memberId: '', amount: '', memberName: '', maxAmount: 0, items: [], adjustments: {} });
+            setPartialPayForm({ memberId: '', amount: '', memberName: '', maxAmount: 0, items: [], adjustments: {}, paymentMethod: 'Efectivo' });
             fetchData();
         } catch (error) {
             console.error('Error paying partial:', error);
@@ -366,34 +464,31 @@ const Dashboard = () => {
         setPendingNotes({});
     };
 
-    const handleQuickPayment = async (member) => {
-        const confirmPayment = window.confirm(`¿Confirmar pago para ${member.fullName}?`);
-        if (!confirmPayment) return;
-
-        try {
-            const currentMonth = new Date().getMonth() + 1;
-            const currentYear = new Date().getFullYear();
-
-            const paymentData = {
-                memberId: member._id,
-                memberName: member.fullName,
-                memberCi: member.ci,
-                month: currentMonth,
-                year: currentYear,
-                amount: member.planCost || 2000,
-                type: 'Cuota',
-                date: new Date()
-            };
-
-            await axios.post(`${API_URL}/api/finance`, paymentData);
-            fetchData();
-            // window.location.reload(); // Removed reload, using fetchData
-            setModalOpen(false);
-
-        } catch (error) {
-            console.error("Error registering payment", error);
-            alert('Error al registrar el pago');
-        }
+    const handleQuickPayment = (member) => {
+        const currentMonth = new Date().getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+        
+        setPendingPayment({
+            title: `Cobro de Cuota`,
+            subtitle: member.fullName,
+            amount: member.planCost || 2000,
+            action: async (method) => {
+                await axios.post(`${API_URL}/api/finance`, {
+                    memberId: member._id,
+                    memberName: member.fullName,
+                    memberCi: member.ci,
+                    month: currentMonth,
+                    year: currentYear,
+                    amount: member.planCost || 2000,
+                    type: 'Cuota',
+                    paymentMethod: method,
+                    date: new Date()
+                });
+                fetchData();
+                setModalOpen(false);
+            }
+        });
+        setPayMethodModalOpen(true);
     };
 
     const handlePayInstructor = async (instructor) => {
@@ -409,7 +504,8 @@ const Dashboard = () => {
                 description: `Pago Instructor: ${instructor.name}`,
                 amount: amount,
                 date: new Date(),
-                category: 'Sueldos'
+                category: 'Sueldos',
+                paymentMethod: 'Efectivo'
             });
             alert('Pago registrado correctamente');
             fetchData();
@@ -1101,10 +1197,10 @@ const Dashboard = () => {
                     {/* Primary Actions */}
                     <button
                         onClick={() => setNewSaleModalOpen(true)}
-                        className="flex flex-col items-center justify-center p-4 rounded-2xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors border border-purple-100 group"
+                        className="flex flex-col items-center justify-center p-4 rounded-2xl bg-green-50 text-green-700 hover:bg-green-100 transition-colors border border-green-100 group"
                     >
                         <div className="p-3 bg-white rounded-xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
-                            <DollarSign size={24} />
+                            <DollarSign size={24} className="text-green-600" />
                         </div>
                         <span className="text-xs font-bold uppercase tracking-wider">Nueva Venta</span>
                     </button>
@@ -1124,25 +1220,56 @@ const Dashboard = () => {
                         <span className="text-xs font-bold uppercase tracking-wider">Nuevo Fiado</span>
                     </button>
 
+                    <button
+                        onClick={() => {
+                            setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto' });
+                            setNewExpenseModalOpen(true);
+                        }}
+                        className="flex flex-col items-center justify-center p-4 rounded-2xl bg-red-50 text-red-700 hover:bg-red-100 transition-colors border border-red-100 group"
+                    >
+                        <div className="p-3 bg-white rounded-xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
+                            <TrendingDown size={24} />
+                        </div>
+                        <span className="text-xs font-bold uppercase tracking-wider">Nuevo Gasto</span>
+                    </button>
+
+                    <button
+                        onClick={() => setCashRegisterModalOpen(true)}
+                        className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200 group"
+                    >
+                        <div className="p-3 bg-white rounded-xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
+                            <Calculator size={24} className="text-slate-600" />
+                        </div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-center">Cierre Caja</span>
+                    </button>
+
                     {/* Quick Sale Favorites (User selected isQuickAccess) */}
                     {stats.products.filter(p => p.isQuickAccess && Number(p.stock) > 0).map(product => (
-                        <button
+                            <button
                             key={product._id}
                             onClick={() => {
-                                if (confirm(`¿Vender 1x ${product.name} por $${product.salePrice}?`)) {
-                                    const currentMonth = new Date().getMonth() + 1;
-                                    const currentYear = new Date().getFullYear();
-                                    axios.post(`${API_URL}/api/finance`, {
-                                        productName: product.name,
-                                        productId: product._id,
-                                        quantity: 1,
-                                        amount: product.salePrice,
-                                        type: 'Producto',
-                                        month: currentMonth,
-                                        year: currentYear,
-                                        date: new Date()
-                                    }).then(() => fetchData());
-                                }
+                                setPendingPayment({
+                                    title: 'Venta Rápida',
+                                    subtitle: product.name,
+                                    amount: product.salePrice,
+                                    action: async (method) => {
+                                        const currentMonth = new Date().getMonth() + 1;
+                                        const currentYear = new Date().getFullYear();
+                                        await axios.post(`${API_URL}/api/finance`, {
+                                            productName: product.name,
+                                            productId: product._id,
+                                            quantity: 1,
+                                            amount: product.salePrice,
+                                            type: 'Producto',
+                                            paymentMethod: method,
+                                            month: currentMonth,
+                                            year: currentYear,
+                                            date: new Date()
+                                        });
+                                        fetchData();
+                                    }
+                                });
+                                setPayMethodModalOpen(true);
                             }}
                             className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors border border-slate-100 group relative overflow-hidden"
                         >
@@ -1274,9 +1401,9 @@ const Dashboard = () => {
                         No hay deudas pendientes en este momento.
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-bold text-sm uppercase">
+                    <div className="overflow-x-auto overflow-y-auto max-h-[500px]">
+                        <table className="w-full text-left relative">
+                            <thead className="bg-slate-50 text-slate-500 font-bold text-sm uppercase sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th className="px-6 py-3 rounded-l-lg">Socio</th>
                                     <th className="px-6 py-3">Detalle Deudas</th>
@@ -1359,18 +1486,21 @@ const Dashboard = () => {
                                                     Pago Parcial
                                                 </button>
                                                 <button
-                                                    onClick={async () => {
-                                                        if (confirm(`¿Confirmar pago TOTAL para ${group.name}?`)) {
-                                                            try {
+                                                    onClick={() => {
+                                                        setPendingPayment({
+                                                            title: 'Pago Total de Deuda',
+                                                            subtitle: group.name,
+                                                            amount: group.totalDebt,
+                                                            action: async (method) => {
                                                                 await axios.post(`${API_URL}/api/debts/pay-partial`, {
                                                                     memberId: group.id,
-                                                                    amount: group.totalDebt
+                                                                    amount: group.totalDebt,
+                                                                    paymentMethod: method
                                                                 });
                                                                 fetchData();
-                                                            } catch (e) {
-                                                                alert('Error al procesar pago');
                                                             }
-                                                        }
+                                                        });
+                                                        setPayMethodModalOpen(true);
                                                     }}
                                                     className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
                                                 >
@@ -1493,6 +1623,13 @@ const Dashboard = () => {
                                     onChange={(e) => setNewSaleForm({ ...newSaleForm, quantity: Number(e.target.value) })}
                                 />
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Método de Pago</label>
+                                <PaymentMethodToggle
+                                    value={newSaleForm.paymentMethod}
+                                    onChange={(val) => setNewSaleForm({ ...newSaleForm, paymentMethod: val })}
+                                />
+                            </div>
                             <div className="p-3 bg-slate-50 rounded-lg text-right">
                                 <span className="text-lg font-bold text-green-600">
                                     Total: ${(newSaleForm.amount * newSaleForm.quantity).toLocaleString()}
@@ -1508,7 +1645,7 @@ const Dashboard = () => {
                             </button>
                             <button
                                 onClick={handleNewSale}
-                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold"
+                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold shadow-lg shadow-green-100 transition-all"
                             >
                                 Registrar Venta
                             </button>
@@ -1521,7 +1658,7 @@ const Dashboard = () => {
             {newExpenseModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-                        {/* <h3 className="text-xl font-bold text-slate-800 mb-4">Nuevo Gasto</h3>
+                        <h3 className="text-xl font-bold text-slate-800 mb-4">Nuevo Gasto</h3>
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
@@ -1541,7 +1678,14 @@ const Dashboard = () => {
                                     onChange={(e) => setNewExpenseForm({ ...newExpenseForm, amount: Number(e.target.value) })}
                                 />
                             </div>
-                        </div> */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Método de Pago</label>
+                                <PaymentMethodToggle
+                                    value={newExpenseForm.paymentMethod}
+                                    onChange={(val) => setNewExpenseForm({ ...newExpenseForm, paymentMethod: val })}
+                                />
+                            </div>
+                        </div>
                         <div className="flex gap-3 mt-6">
                             <button
                                 onClick={() => setNewExpenseModalOpen(false)}
@@ -1824,6 +1968,14 @@ const Dashboard = () => {
                                 </button>
                             </div>
 
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Método de Pago</label>
+                                <PaymentMethodToggle
+                                    value={partialPayForm.paymentMethod}
+                                    onChange={(val) => setPartialPayForm({ ...partialPayForm, paymentMethod: val })}
+                                />
+                            </div>
+
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setPartialPayModalOpen(false)}
@@ -1839,6 +1991,261 @@ const Dashboard = () => {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cash Register Modal */}
+            {cashRegisterModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <Calculator className="text-slate-600" />
+                                Cierre de Caja
+                            </div>
+                            <button
+                                onClick={fetchCashRegisterHistory}
+                                className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-lg"
+                            >
+                                <History size={16} /> Historial
+                            </button>
+                        </h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Monto Inicial en Caja ($)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    value={cashRegisterForm.initialBalance}
+                                    onChange={(e) => setCashRegisterForm({ ...cashRegisterForm, initialBalance: e.target.value })}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Ingresos Día ($)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={cashRegisterForm.cashIn}
+                                        onChange={(e) => setCashRegisterForm({ ...cashRegisterForm, cashIn: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Gastos Día ($)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={cashRegisterForm.cashOut}
+                                        onChange={(e) => setCashRegisterForm({ ...cashRegisterForm, cashOut: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm font-medium text-slate-600">Balance Esperado:</span>
+                                    <span className="text-lg font-bold text-blue-700">
+                                        ${ (Number(cashRegisterForm.initialBalance) + Number(cashRegisterForm.cashIn) - Number(cashRegisterForm.cashOut)).toLocaleString() }
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Dinero Físico Real Contado ($)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-bold text-green-700 bg-green-50"
+                                    value={cashRegisterForm.actualBalance}
+                                    onChange={(e) => setCashRegisterForm({ ...cashRegisterForm, actualBalance: e.target.value })}
+                                />
+                            </div>
+
+                            {(() => {
+                                const expected = Number(cashRegisterForm.initialBalance) + Number(cashRegisterForm.cashIn) - Number(cashRegisterForm.cashOut);
+                                const actual = Number(cashRegisterForm.actualBalance);
+                                const diff = actual - expected;
+                                if (cashRegisterForm.actualBalance === '') return null;
+                                return (
+                                    <div className={`p-3 rounded-lg border ${diff === 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium">Diferencia:</span>
+                                            <span className="text-lg font-bold">
+                                                {diff === 0 ? 'Exacto ($0)' : `$${diff.toLocaleString()}`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Notas (Opcional)</label>
+                                <textarea
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    rows="2"
+                                    placeholder="Ej: Faltó billete de 100, se pagó a proveedor..."
+                                    value={cashRegisterForm.notes}
+                                    onChange={(e) => setCashRegisterForm({ ...cashRegisterForm, notes: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setCashRegisterModalOpen(false);
+                                    setCashRegisterForm({ initialBalance: '', cashIn: '', cashOut: '', actualBalance: '', notes: '' });
+                                }}
+                                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCashRegisterSubmit}
+                                className="flex-1 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors font-medium"
+                                disabled={cashRegisterForm.actualBalance === '' || cashRegisterForm.initialBalance === ''}
+                            >
+                                Guardar Cierre
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cash Register History Modal */}
+            {cashRegisterHistoryModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <History className="text-blue-600" />
+                                Historial de Cierres
+                            </h3>
+                            <button
+                                onClick={() => setCashRegisterHistoryModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600"
+                            >
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto pr-2 mini-scrollbar">
+                            {cashRegisterHistory.length === 0 ? (
+                                <div className="text-center py-10 text-slate-500">
+                                    No hay cierres de caja registrados aún.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {cashRegisterHistory.map((register) => (
+                                        <div key={register._id} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <span className="font-bold text-slate-700">
+                                                    {new Date(register.date).toLocaleDateString('es-UY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                                </span>
+                                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${register.difference === 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {register.difference === 0 ? 'Exacto' : `Dif: $${register.difference.toLocaleString()}`}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                                                <div>
+                                                    <p className="text-slate-500 text-xs uppercase">Inicial</p>
+                                                    <p className="font-semibold">${register.initialBalance.toLocaleString()}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-green-600 text-xs uppercase">Ingresos</p>
+                                                    <p className="font-semibold">+${register.cashIn.toLocaleString()}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-red-600 text-xs uppercase">Gastos</p>
+                                                    <p className="font-semibold">-${register.cashOut.toLocaleString()}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-blue-600 text-xs uppercase">Físico</p>
+                                                    <p className="font-bold">${register.actualBalance.toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                            {register.notes && (
+                                                <div className="mt-3 pt-3 border-t border-slate-200 text-sm text-slate-600 bg-white p-2 rounded-lg italic">
+                                                    <StickyNote size={14} className="inline mr-1 text-amber-500" />
+                                                    {register.notes}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Method Selection Modal */}
+            {payMethodModalOpen && pendingPayment && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+                    <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <DollarSign size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800">{pendingPayment.title}</h3>
+                            <p className="text-slate-500">{pendingPayment.subtitle}</p>
+                            <p className="text-2xl font-black text-slate-800 mt-2">${pendingPayment.amount.toLocaleString()}</p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                            <p className="text-center text-sm font-bold text-slate-400 uppercase tracking-wider">Selecciona Método</p>
+                            <div className="grid grid-cols-1 gap-3">
+                                <button
+                                    onClick={async () => {
+                                        await pendingPayment.action('Efectivo');
+                                        setPayMethodModalOpen(false);
+                                        setPendingPayment(null);
+                                    }}
+                                    className="flex items-center justify-between p-4 bg-slate-50 hover:bg-green-50 border border-slate-200 hover:border-green-200 rounded-xl transition-all group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white rounded-lg shadow-sm group-hover:scale-110 transition-transform">
+                                            <DollarSign size={20} className="text-green-600" />
+                                        </div>
+                                        <span className="font-bold text-slate-700">Efectivo</span>
+                                    </div>
+                                    <CheckCircle size={20} className="text-slate-300 group-hover:text-green-500" />
+                                </button>
+                                
+                                <button
+                                    onClick={async () => {
+                                        await pendingPayment.action('Digital');
+                                        setPayMethodModalOpen(false);
+                                        setPendingPayment(null);
+                                    }}
+                                    className="flex items-center justify-between p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white rounded-lg shadow-sm group-hover:scale-110 transition-transform">
+                                            <CreditCard size={20} className="text-blue-600" />
+                                        </div>
+                                        <span className="font-bold text-slate-700">Digital</span>
+                                    </div>
+                                    <CheckCircle size={20} className="text-slate-300 group-hover:text-blue-500" />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button
+                            onClick={() => {
+                                setPayMethodModalOpen(false);
+                                setPendingPayment(null);
+                            }}
+                            className="w-full mt-6 py-3 text-slate-400 hover:text-slate-600 font-medium transition-colors"
+                        >
+                            Cancelar
+                        </button>
                     </div>
                 </div>
             )}
