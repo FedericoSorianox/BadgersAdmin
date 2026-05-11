@@ -5,7 +5,7 @@ const Notification = require('../models/Notification');
 
 // POST /api/notifications/send-reminder
 router.post('/send-reminder', async (req, res) => {
-    const { phone, memberName, memberId, amount, type } = req.body;
+    const { phone, memberName, memberId, amount, type, link } = req.body;
 
     if (!process.env.N8N_WEBHOOK_URL) {
         return res.status(500).json({ message: 'N8N_WEBHOOK_URL not configured' });
@@ -33,7 +33,8 @@ router.post('/send-reminder', async (req, res) => {
             memberName,
             amount,
             type: type || 'payment_reminder',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            link
         });
 
         // Save notification log
@@ -73,6 +74,35 @@ router.get('/reminders', async (req, res) => {
     }
 });
 
+// POST /api/notifications/log-reminder
+router.post('/log-reminder', async (req, res) => {
+    const { memberId } = req.body;
+    try {
+        const currentMonth = new Date().getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+        
+        const existing = await Notification.findOne({
+            memberId,
+            type: 'payment_reminder',
+            month: currentMonth,
+            year: currentYear
+        });
+
+        if (!existing) {
+            const notification = new Notification({
+                memberId,
+                type: 'payment_reminder',
+                month: currentMonth,
+                year: currentYear
+            });
+            await notification.save();
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // POST /api/notifications/send-reminders-bulk
 router.post('/send-reminders-bulk', async (req, res) => {
     const { members } = req.body; // Expects array of { phone, name, id, amount }
@@ -97,7 +127,8 @@ router.post('/send-reminders-bulk', async (req, res) => {
                 memberName: member.name,
                 amount: member.amount,
                 type: 'payment_reminder',
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                link: member.link
             });
 
             // Save notification log

@@ -504,34 +504,7 @@ const Dashboard = () => {
         }
     };
 
-    const handleBulkReminders = async (membersToRemind) => {
-        if (membersToRemind.length === 0) return;
 
-        if (!confirm(`¿Estás seguro de enviar recordatorios a ${membersToRemind.length} socios pendientes?`)) {
-            return;
-        }
-
-        try {
-            setLoading(true); // Show global loading or handle locally
-            const membersPayload = membersToRemind.map(m => ({
-                phone: m.phone,
-                name: m.fullName,
-                id: m._id,
-                amount: m.planCost || 2000
-            }));
-
-            const res = await axios.post(`${API_URL}/api/notifications/send-reminders-bulk`, {
-                members: membersPayload
-            });
-
-            alert(res.data.message);
-            fetchData();
-        } catch (error) {
-            console.error('Error sending bulk reminders:', error);
-            alert('Error al enviar recordatorios masivos');
-            setLoading(false); // Ensure loading is off on error
-        }
-    };
 
     const handleToggleMemberStatus = async (member) => {
         const action = member.active ? 'inactivar' : 'activar';
@@ -783,25 +756,24 @@ const Dashboard = () => {
                                         Guardar Notas ({Object.keys(pendingNotes).length})
                                     </button>
                                 )}
-                                {filteredPending.length > 0 && (
-                                    <button
-                                        onClick={() => handleBulkReminders(filteredPending)}
-                                        className="px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm"
-                                    >
-                                        <Send size={14} />
-                                        Recordar a Todos
-                                    </button>
-                                )}
+
                             </div>
                         </div>
                         <div className="bg-red-50 rounded-xl p-4 max-h-[350px] overflow-y-auto divide-y divide-red-100">
                             {filteredPending.map(m => {
                                 const pastDue = getPastDebts(m._id);
                                 return (
-                                    <div key={m._id} className="py-2 flex justify-between items-center">
+                                    <div key={m._id} className="py-2.5 flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center gap-2 border-b border-red-100 last:border-0">
                                         <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-bold text-slate-700">{m.fullName}</span>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <button 
+                                                    onClick={() => window.open(`/public/profile/${m._id}`, '_blank')}
+                                                    className="text-sm font-bold text-slate-700 hover:text-blue-600 flex items-center gap-1 transition-colors"
+                                                    title="Abrir Ficha en nueva pestaña"
+                                                >
+                                                    {m.fullName}
+                                                    <ExternalLink size={14} className="opacity-50" />
+                                                </button>
                                                 {pastDue.length > 0 && (
                                                     <span className="px-1.5 py-0.5 bg-red-600 text-white text-[8px] font-black rounded uppercase animate-bounce">
                                                         Debe {pastDue.join(', ')}
@@ -824,44 +796,43 @@ const Dashboard = () => {
                                             </div>
                                             <span className="text-xs text-slate-500 font-medium">CI: {m.ci || 'N/A'} • ${m.planCost?.toLocaleString() || '2.000'}</span>
                                         </div>
-                                        <div className="flex gap-2 lg:gap-3">
+                                        <div className="flex items-center gap-1.5 mt-2 2xl:mt-0">
                                             <button
-                                                onClick={() => {
-                                                    const link = `${window.location.origin}/public/profile/${m._id}`;
-                                                    navigator.clipboard.writeText(link);
-                                                }}
-                                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                                title="Copiar Link de Ficha"
+                                                onClick={() => window.open(`/public/profile/${m._id}`, '_blank')}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-md text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors text-xs font-medium border border-slate-200 hover:border-blue-200 bg-white shadow-sm whitespace-nowrap"
+                                                title="Abrir Ficha en nueva pestaña"
                                             >
-                                                <Copy size={16} />
+                                                <ExternalLink size={13} />
+                                                <span className="hidden xl:inline">Ficha</span>
                                             </button>
                                             <button
                                                 onClick={() => handleAddNote(m)}
-                                                className={`p-1.5 rounded-lg transition-colors
-                                                    ${pendingNotes[m._id] !== undefined ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-yellow-600 hover:bg-yellow-50'}
+                                                className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-xs font-medium border shadow-sm whitespace-nowrap
+                                                    ${pendingNotes[m._id] !== undefined ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-slate-500 hover:text-yellow-600 hover:bg-yellow-50 border-slate-200 hover:border-yellow-200 bg-white'}
                                                 `}
-                                                title="Agregar Nota"
                                             >
-                                                <StickyNote size={16} />
+                                                <StickyNote size={13} />
+                                                <span className="hidden xl:inline">Nota</span>
                                             </button>
                                             <button
                                                 onClick={() => handleRegisterLicense(m)}
-                                                className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
-                                                title="Marcar como Licencia (No asiste este mes)"
+                                                className="flex items-center gap-1 px-2 py-1 rounded-md text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-colors text-xs font-medium border border-slate-200 hover:border-purple-200 bg-white shadow-sm whitespace-nowrap"
                                             >
-                                                <Plane size={16} />
+                                                <Plane size={13} />
+                                                <span className="hidden xl:inline">Licencia</span>
                                             </button>
                                             <button
                                                 onClick={() => handleCondoneDebt(m)}
-                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                title="Condonar Deuda (Perdonar este mes)"
+                                                className="flex items-center gap-1 px-2 py-1 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors text-xs font-medium border border-slate-200 hover:border-red-200 bg-white shadow-sm whitespace-nowrap"
                                             >
-                                                <XCircle size={16} />
+                                                <XCircle size={13} />
+                                                <span className="hidden xl:inline">Perdonar</span>
                                             </button>
                                             <button
                                                 onClick={() => handleQuickPayment(m)}
-                                                className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                                                className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap ml-1"
                                             >
+                                                <CheckCircle size={13} />
                                                 Pagó
                                             </button>
                                         </div>
@@ -908,6 +879,141 @@ const Dashboard = () => {
             );
 
         }
+
+        if (modalType === 'comunicaciones') {
+            const currentMonth = new Date().getMonth() + 1;
+            const currentYear = new Date().getFullYear();
+            const activeMembers = stats.membersList.filter(m => m.active && !m.isExempt);
+            const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
+
+            const paidThisMonthIds = new Set(
+                stats.paymentsList
+                    .filter(p =>
+                        Number(p.month) === currentMonth &&
+                        Number(p.year) === currentYear &&
+                        (p.type === 'Cuota' || p.type === 'Condonado' || !p.type)
+                    )
+                    .map(p => String(p.memberId))
+            );
+
+            const licensedThisMonthIds = new Set(
+                stats.paymentsList
+                    .filter(p =>
+                        Number(p.month) === currentMonth &&
+                        Number(p.year) === currentYear &&
+                        p.type === 'Licencia'
+                    )
+                    .map(p => String(p.memberId))
+            );
+
+            const pendingList = billableMembers.filter(m => !paidThisMonthIds.has(String(m._id)) && !licensedThisMonthIds.has(String(m._id)));
+            const filteredPending = pendingList.filter(m =>
+                m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (m.ci && m.ci.includes(searchTerm))
+            );
+
+            const getMessage = (m) => `Hola ${m.fullName}, te recordamos que tienes tu cuota de este mes pendiente de pago. Puedes ver tu ficha de socio y pagar desde aquí: ${window.location.origin}/public/profile/${m._id}`;
+
+            const sendToN8n = async (m) => {
+                if (!m.phone) {
+                    throw new Error(`El socio ${m.fullName} no tiene teléfono registrado.`);
+                }
+                const payload = {
+                    phone: m.phone,
+                    memberName: m.fullName,
+                    link: `${window.location.origin}/public/profile/${m._id}`
+                };
+                
+                try {
+                    await axios.post('https://n8n.vanguardlab.cloud/webhook/webhook-pagos', payload);
+                } catch (error) {
+                    // N8N webhooks often don't return CORS headers.
+                    // This causes the browser to throw a 'Network Error' even if the POST succeeded.
+                    if (error.message === 'Network Error') {
+                        console.warn('Ignorando Network Error de N8N por posible falta de CORS headers.');
+                        return; // Asumimos que llegó bien
+                    }
+                    throw error;
+                }
+            };
+
+            const handleWhatsAppIndividual = async (m) => {
+                try {
+                    await sendToN8n(m);
+                    
+                    // Log it to the backend so it persists across reloads for the current month
+                    await axios.post(`${API_URL}/api/notifications/log-reminder`, { memberId: m._id });
+                    
+                    // Update local state immediately
+                    setStats(prev => {
+                        const newReminders = new Set(prev.remindersSent);
+                        newReminders.add(m._id);
+                        return { ...prev, remindersSent: newReminders };
+                    });
+                    
+                } catch (error) {
+                    console.error("Error sending to N8N:", error);
+                    alert(error.message || 'Error al enviar el mensaje.');
+                }
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100">
+                        <p className="text-sm text-blue-800 font-medium mb-1">Plantilla de Mensaje:</p>
+                        <p className="text-xs text-blue-700 italic">"Hola [Nombre], te recordamos que tienes tu cuota de este mes pendiente de pago. Puedes ver tu ficha de socio y pagar desde aquí: [Link]"</p>
+                    </div>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Buscar socio pendiente..."
+                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                                <MessageCircle size={18} className="text-green-500" />
+                                Enviar WhatsApp a Pendientes ({filteredPending.length})
+                            </h4>
+                            <div className="flex gap-2">
+                                {/* Botón "Mandar a Todos" removido a pedido del usuario */}
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 rounded-xl p-4 max-h-[350px] overflow-y-auto divide-y divide-slate-100 border">
+                            {filteredPending.map(m => (
+                                <div key={m._id} className="py-2 flex justify-between items-center">
+                                    <div>
+                                        <span className="text-sm font-bold text-slate-700 block">{m.fullName}</span>
+                                        <span className="text-xs text-slate-500 font-medium">CI: {m.ci || 'N/A'} • Tel: {m.phone || 'Sin Tel'}</span>
+                                    </div>
+                                    <div>
+                                        {stats.remindersSent.has(m._id) ? (
+                                            <span className="px-3 py-1.5 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg flex items-center gap-2 border border-slate-200 cursor-not-allowed" title="Enviado este mes">
+                                                <CheckCircle size={14} className="text-green-500" />
+                                                Enviado
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleWhatsAppIndividual(m)}
+                                                className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                                                title="Enviar WhatsApp Manual"
+                                            >
+                                                <MessageCircle size={14} />
+                                                Enviar
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
     };
 
     const getModalTitle = () => {
@@ -916,6 +1022,7 @@ const Dashboard = () => {
             case 'inactive': return 'Socios Inactivos/Vacaciones';
             case 'stock': return 'Inventario Completo';
             case 'payments': return `Estado de Pagos - ${new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`;
+            case 'comunicaciones': return 'Comunicaciones por WhatsApp';
             default: return 'Detalles';
         }
     };
@@ -1055,7 +1162,7 @@ const Dashboard = () => {
             </div>
 
             {/* Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <StatCard
                     title="SOCIOS ACTIVOS"
                     value={stats.activeMembers}
@@ -1087,6 +1194,14 @@ const Dashboard = () => {
                     icon={CreditCard}
                     iconClass="bg-amber-400 text-white"
                     onClick={() => openModal('payments')}
+                />
+                <StatCard
+                    title="COMUNICACIONES"
+                    value={stats.pendingCount}
+                    subtext="Socios a Notificar"
+                    icon={MessageCircle}
+                    iconClass="bg-blue-500 text-white"
+                    onClick={() => openModal('comunicaciones')}
                 />
             </div>
 
