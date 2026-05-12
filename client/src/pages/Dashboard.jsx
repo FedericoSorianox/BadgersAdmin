@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane, ExternalLink, XCircle, Copy, Calculator, History } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, MessageCircle, Send, StickyNote, Calendar, UserCheck, Plane, ExternalLink, XCircle, Copy, Calculator, History, ClipboardList, RotateCcw, Trash2, ArrowLeftRight, Shield } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
@@ -106,10 +106,10 @@ const Dashboard = () => {
     const [showFiadoMemberDropdown, setShowFiadoMemberDropdown] = useState(false);
 
     const [partialPayModalOpen, setPartialPayModalOpen] = useState(false);
-    const [partialPayForm, setPartialPayForm] = useState({ 
-        memberId: '', 
-        amount: '', 
-        memberName: '', 
+    const [partialPayForm, setPartialPayForm] = useState({
+        memberId: '',
+        amount: '',
+        memberName: '',
         maxAmount: 0,
         items: [],
         adjustments: {},
@@ -117,6 +117,50 @@ const Dashboard = () => {
     });
     const [pendingNotes, setPendingNotes] = useState({});
 
+    // ── Tareas ──────────────────────────────────────────────────────────────
+    const [tasks, setTasks] = useState([]);
+    const [tasksLoading, setTasksLoading] = useState(false);
+    const [showAddTask, setShowAddTask] = useState(false);
+    const [newTaskName, setNewTaskName] = useState('');
+    const [newTaskFreq, setNewTaskFreq] = useState('weekly');
+
+    // ── Asignacion semanal─────────────────────────────────────────────────
+    // Monthly key ensures the starter is saved per-month (auto-resets next month)
+    const scheduleMonthKey = `guardia_starter_${new Date().getFullYear()}_${new Date().getMonth()}`;
+    const [scheduleStarter, setScheduleStarter] = useState(
+        () => localStorage.getItem(scheduleMonthKey) || 'fede'
+    );
+    const toggleScheduleStarter = () => {
+        const next = scheduleStarter === 'fede' ? 'gonza' : 'fede';
+        setScheduleStarter(next);
+        localStorage.setItem(scheduleMonthKey, next);
+    };
+
+    // Returns array of { start: Date, end: Date } for each Mon–Sun week overlapping current month
+    const monthWeeks = useMemo(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0-indexed
+        const lastDay = new Date(year, month + 1, 0);
+
+        // Find the Monday on or before the 1st of the month
+        const firstMonday = new Date(year, month, 1);
+        const dow = firstMonday.getDay(); // 0=Sun
+        if (dow !== 1) {
+            firstMonday.setDate(firstMonday.getDate() - (dow === 0 ? 6 : dow - 1));
+        }
+
+        const weeks = [];
+        let cursor = new Date(firstMonday);
+        while (cursor <= lastDay) {
+            const start = new Date(cursor);
+            const end = new Date(cursor);
+            end.setDate(end.getDate() + 6);
+            weeks.push({ start, end });
+            cursor.setDate(cursor.getDate() + 7);
+        }
+        return weeks;
+    }, []);
 
     const [error, setError] = useState(null);
 
@@ -204,6 +248,9 @@ const Dashboard = () => {
                 expenses: expenses,
                 plans: settings.plans || []
             });
+
+            // Load tasks (auto-reset already applied server-side)
+            setTasks(settings.tasks || []);
 
         } catch (error) {
             console.error("Error fetching dashboard data", error);
@@ -472,7 +519,7 @@ const Dashboard = () => {
 
     const handlePartialSubmit = async () => {
         const totalToPay = Object.values(partialPayForm.adjustments).reduce((acc, val) => acc + Number(val || 0), 0) || Number(partialPayForm.amount);
-        
+
         if (totalToPay <= 0) {
             alert('Ingrese un monto válido');
             return;
@@ -500,9 +547,9 @@ const Dashboard = () => {
 
         let remaining = amount;
         const newAdjustments = {};
-        
+
         const sortedItems = [...partialPayForm.items].sort((a, b) => new Date(a.date) - new Date(b.date));
-        
+
         for (const item of sortedItems) {
             if (remaining <= 0) break;
             const balance = item.totalAmount - (item.paidAmount || 0);
@@ -511,10 +558,10 @@ const Dashboard = () => {
             remaining -= toPay;
         }
 
-        setPartialPayForm(prev => ({ 
-            ...prev, 
+        setPartialPayForm(prev => ({
+            ...prev,
             adjustments: newAdjustments,
-            amount: amount 
+            amount: amount
         }));
     };
 
@@ -531,7 +578,7 @@ const Dashboard = () => {
     const handleQuickPayment = (member) => {
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
-        
+
         setPendingPayment({
             title: `Cobro de Cuota`,
             subtitle: member.fullName,
@@ -578,6 +625,75 @@ const Dashboard = () => {
             alert('Error al registrar el pago');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // ── Task handlers ──────────────────────────────────────────────────────
+
+    const handleToggleTask = async (taskId) => {
+        setTasksLoading(true);
+        try {
+            // Build updated tasks list locally (toggle the target task)
+            const updatedTasks = (tasks || []).map(t =>
+                t._id === taskId
+                    ? { ...t, completedAt: t.completedAt ? null : new Date().toISOString() }
+                    : t
+            );
+            // Optimistic update first so UI feels instant
+            setTasks(updatedTasks);
+            // Persist to backend using the existing POST endpoint
+            const res = await axios.post(`${API_URL}/api/settings`, { tasks: updatedTasks });
+            setTasks(res.data?.tasks || updatedTasks);
+        } catch (err) {
+            console.error('Error toggling task:', err);
+            alert('Error al actualizar la tarea.');
+            // Revert optimistic update on failure
+            setTasks(tasks);
+        } finally {
+            setTasksLoading(false);
+        }
+    };
+
+    const handleSaveNewTask = async () => {
+        const name = newTaskName.trim();
+        if (!name) { alert('Escribe un nombre para la tarea.'); return; }
+        setTasksLoading(true);
+        try {
+            const updatedTasks = [
+                ...(tasks || []).map(t => ({
+                    _id: t._id,
+                    name: t.name,
+                    frequency: t.frequency,
+                    completedAt: t.completedAt || null
+                })),
+                { name, frequency: newTaskFreq, completedAt: null }
+            ];
+            // Use the existing POST /api/settings endpoint — it already handles tenant correctly
+            const res = await axios.post(`${API_URL}/api/settings`, { tasks: updatedTasks });
+            setTasks(res.data?.tasks || updatedTasks);
+            setNewTaskName('');
+            setNewTaskFreq('weekly');
+            setShowAddTask(false);
+        } catch (err) {
+            console.error('Error saving task:', err);
+            alert('Error al guardar la tarea.');
+        } finally {
+            setTasksLoading(false);
+        }
+    };
+
+    const handleDeleteTask = async (taskId) => {
+        if (!window.confirm('¿Eliminar esta tarea?')) return;
+        setTasksLoading(true);
+        try {
+            const updatedTasks = (tasks || []).filter(t => t._id !== taskId);
+            const res = await axios.post(`${API_URL}/api/settings`, { tasks: updatedTasks });
+            setTasks(res.data?.tasks || updatedTasks);
+        } catch (err) {
+            console.error('Error deleting task:', err);
+            alert('Error al eliminar la tarea.');
+        } finally {
+            setTasksLoading(false);
         }
     };
 
@@ -693,7 +809,7 @@ const Dashboard = () => {
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <p className="font-bold text-slate-700">{m.fullName}</p>
-                                        <button 
+                                        <button
                                             onClick={() => window.open(`/public/profile/${m._id}`, '_blank')}
                                             className="text-slate-400 hover:text-blue-600 transition-colors"
                                             title="Ver Ficha Pública"
@@ -705,7 +821,7 @@ const Dashboard = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Activo</span>
-                                    <button 
+                                    <button
                                         onClick={() => handleToggleMemberStatus(m)}
                                         className="p-1 text-slate-400 hover:text-red-600 transition-colors bg-slate-50 hover:bg-red-50 rounded-full"
                                         title="Mover a inactivos"
@@ -731,7 +847,7 @@ const Dashboard = () => {
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <p className="font-bold text-slate-700">{m.fullName}</p>
-                                        <button 
+                                        <button
                                             onClick={() => window.open(`/public/profile/${m._id}`, '_blank')}
                                             className="text-slate-400 hover:text-blue-600 transition-colors"
                                             title="Ver Ficha Pública"
@@ -743,7 +859,7 @@ const Dashboard = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">Inactivo</span>
-                                    <button 
+                                    <button
                                         onClick={() => handleToggleMemberStatus(m)}
                                         className="p-1 text-slate-400 hover:text-green-600 transition-colors bg-slate-50 hover:bg-green-50 rounded-full"
                                         title="Mover a activos"
@@ -832,9 +948,9 @@ const Dashboard = () => {
                     const m = date.getMonth() + 1;
                     const y = date.getFullYear();
 
-                    const hasPayment = stats.paymentsList.some(p => 
-                        String(p.memberId) === String(memberId) && 
-                        p.month === m && p.year === y && 
+                    const hasPayment = stats.paymentsList.some(p =>
+                        String(p.memberId) === String(memberId) &&
+                        p.month === m && p.year === y &&
                         (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
                     );
 
@@ -926,7 +1042,7 @@ const Dashboard = () => {
                                     <div key={m._id} className="py-2.5 flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center gap-2 border-b border-red-100 last:border-0">
                                         <div>
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <button 
+                                                <button
                                                     onClick={() => window.open(`/public/profile/${m._id}`, '_blank')}
                                                     className="text-sm font-bold text-slate-700 hover:text-blue-600 flex items-center gap-1 transition-colors"
                                                     title="Abrir Ficha en nueva pestaña"
@@ -1083,7 +1199,7 @@ const Dashboard = () => {
                     memberName: m.fullName,
                     link: `${window.location.origin}/public/profile/${m._id}`
                 };
-                
+
                 try {
                     await axios.post('https://n8n.vanguardlab.cloud/webhook/webhook-pagos', payload);
                 } catch (error) {
@@ -1100,17 +1216,17 @@ const Dashboard = () => {
             const handleWhatsAppIndividual = async (m) => {
                 try {
                     await sendToN8n(m);
-                    
+
                     // Log it to the backend so it persists across reloads for the current month
                     await axios.post(`${API_URL}/api/notifications/log-reminder`, { memberId: m._id });
-                    
+
                     // Update local state immediately
                     setStats(prev => {
                         const newReminders = new Set(prev.remindersSent);
                         newReminders.add(m._id);
                         return { ...prev, remindersSent: newReminders };
                     });
-                    
+
                 } catch (error) {
                     console.error("Error sending to N8N:", error);
                     alert(error.message || 'Error al enviar el mensaje.');
@@ -1256,7 +1372,7 @@ const Dashboard = () => {
                         Acceso Rápido
                     </h3>
                 </div>
-                
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
                     {/* Primary Actions */}
                     <button
@@ -1309,7 +1425,7 @@ const Dashboard = () => {
 
                     {/* Quick Sale Favorites (User selected isQuickAccess) */}
                     {stats.products.filter(p => p.isQuickAccess && Number(p.stock) > 0).map(product => (
-                            <button
+                        <button
                             key={product._id}
                             onClick={() => {
                                 setPendingPayment({
@@ -1342,7 +1458,7 @@ const Dashboard = () => {
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-wider truncate w-full text-center px-1" title={product.name}>{product.name}</span>
                             <span className="text-xs font-black text-slate-900 mt-1">${product.salePrice}</span>
-                            
+
                             {/* Stock badge */}
                             <div className="absolute top-2 right-2 text-[8px] font-black bg-white px-1.5 py-0.5 rounded border border-slate-100 text-slate-400">
                                 {product.stock}
@@ -1396,49 +1512,321 @@ const Dashboard = () => {
                 />
             </div>
 
-            {/* Instructor Payments Section */}
-            {stats.instructors.length > 0 && (
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 className="text-xl font-bold text-slate-700 mb-6 flex items-center gap-2">
-                        <UserCheck className="text-blue-600" />
-                        Pago a Instructores
+            {/* ══════════════════════ TAREAS ══════════════════════ */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2">
+                        <ClipboardList className="text-indigo-600" size={22} />
+                        Tareas
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {stats.instructors.map((instructor, index) => {
-                            const currentMonth = new Date().getMonth() + 1;
-                            const currentYear = new Date().getFullYear();
-                            const isPaid = stats.expenses.some(e => {
-                                const eDate = new Date(e.date);
-                                return e.description && e.description.includes(`Pago Instructor: ${instructor.name}`) &&
-                                    (eDate.getMonth() + 1) === currentMonth &&
-                                    eDate.getFullYear() === currentYear;
-                            });
-
-                            return (
-                                <div key={index} className={`p-4 rounded-xl border flex items-center justify-between ${isPaid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <div>
-                                        <p className="font-bold text-slate-700">{instructor.name}</p>
-                                        <p className="text-xs text-slate-500">{instructor.hours} horas - ${instructor.hours * 500}</p>
-                                    </div>
-                                    {isPaid ? (
-                                        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-1">
-                                            <CheckCircle size={14} />
-                                            Pagado
-                                        </span>
-                                    ) : (
-                                        <button
-                                            onClick={() => handlePayInstructor(instructor)}
-                                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm animate-pulse"
-                                        >
-                                            Pagar
-                                        </button>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <button
+                        onClick={() => setShowAddTask(v => !v)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+                    >
+                        <Plus size={16} />
+                        Nueva Tarea
+                    </button>
                 </div>
-            )}
+
+                {/* Add-task form */}
+                {showAddTask && (
+                    <div className="mb-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                        <div className="flex-1 w-full">
+                            <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1">Nombre</label>
+                            <input
+                                type="text"
+                                className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 text-sm"
+                                placeholder="Ej: Limpiar el tatami..."
+                                value={newTaskName}
+                                onChange={e => setNewTaskName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleSaveNewTask()}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1">Frecuencia</label>
+                            <select
+                                className="px-3 py-2 border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 text-sm bg-white"
+                                value={newTaskFreq}
+                                onChange={e => setNewTaskFreq(e.target.value)}
+                            >
+                                <option value="weekly">Semanal (resetea cada Lunes)</option>
+                                <option value="monthly">Mensual (resetea el 1° de cada mes)</option>
+                            </select>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleSaveNewTask}
+                                disabled={tasksLoading}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
+                            >
+                                Guardar
+                            </button>
+                            <button
+                                onClick={() => { setShowAddTask(false); setNewTaskName(''); }}
+                                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl transition-colors hover:bg-slate-50"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ─────────────── GUARDIA SEMANAL ──────────────── */}
+                {(() => {
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0);
+                    const monthName = now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+                    const owners = ['fede', 'gonza'];
+
+                    const fmt = (d) =>
+                        d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+
+                    return (
+                        <div className="mb-8 p-5 bg-gradient-to-br from-slate-50 to-indigo-50/30 rounded-2xl border border-slate-100">
+                            {/* sub-header */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <Shield size={16} className="text-indigo-500" />
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                        Asignacion Semanal &mdash; {monthName}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={toggleScheduleStarter}
+                                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200 transition-all shadow-sm"
+                                    title="Invertir quén empieza este mes"
+                                >
+                                    <ArrowLeftRight size={13} />
+                                    Invertir
+                                </button>
+                            </div>
+
+                            {/* Week cards */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                {monthWeeks.map((week, idx) => {
+                                    const ownerKey = owners[idx % 2 === 0
+                                        ? (scheduleStarter === 'fede' ? 0 : 1)
+                                        : (scheduleStarter === 'fede' ? 1 : 0)];
+                                    const isFede = ownerKey === 'fede';
+                                    const isCurrent = now >= week.start && now <= week.end;
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`relative rounded-xl p-3.5 border-2 transition-all ${isCurrent
+                                                    ? isFede
+                                                        ? 'border-indigo-400 bg-indigo-50 shadow-lg shadow-indigo-100'
+                                                        : 'border-emerald-400 bg-emerald-50 shadow-lg shadow-emerald-100'
+                                                    : 'border-transparent bg-white shadow-sm'
+                                                }`}
+                                        >
+                                            {/* Week number */}
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${isFede ? 'text-indigo-400' : 'text-emerald-500'
+                                                }`}>
+                                                Sem {idx + 1}
+                                            </span>
+
+                                            {/* Date range */}
+                                            <p className="text-[11px] text-slate-400 font-medium mt-0.5 mb-2 leading-tight">
+                                                {fmt(week.start)} – {fmt(week.end)}
+                                            </p>
+
+                                            {/* Owner name */}
+                                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-black ${isFede
+                                                    ? 'bg-indigo-100 text-indigo-700'
+                                                    : 'bg-emerald-100 text-emerald-700'
+                                                }`}>
+                                                <span>{isFede ? '🔵' : '🟢'}</span>
+                                                {isFede ? 'Fede' : 'Gonza / Andy'}
+                                            </div>
+
+                                            {/* Current-week badge */}
+                                            {isCurrent && (
+                                                <span className={`absolute -top-2 -right-2 text-[9px] font-black px-2 py-0.5 rounded-full text-white shadow ${isFede ? 'bg-indigo-500' : 'bg-emerald-500'
+                                                    }`}>
+                                                    ● AHORA
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* ── Instructor payments (built-in monthly tasks) ── */}
+                {stats.instructors.length > 0 && (() => {
+                    const currentMonth = new Date().getMonth() + 1;
+                    const currentYear = new Date().getFullYear();
+                    return (
+                        <div className="mb-6">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Pago a Instructores (Mensual)</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {stats.instructors.map((instructor, idx) => {
+                                    const isPaid = stats.expenses.some(e => {
+                                        const eDate = new Date(e.date);
+                                        return e.description &&
+                                            e.description.includes(`Pago Instructor: ${instructor.name}`) &&
+                                            (eDate.getMonth() + 1) === currentMonth &&
+                                            eDate.getFullYear() === currentYear;
+                                    });
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isPaid
+                                                    ? 'bg-emerald-50 border-emerald-200'
+                                                    : 'bg-white border-slate-200 hover:border-indigo-200'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => !isPaid && handlePayInstructor(instructor)}
+                                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${isPaid
+                                                            ? 'bg-emerald-500 border-emerald-500 cursor-default'
+                                                            : 'border-slate-300 hover:border-indigo-400 cursor-pointer'
+                                                        }`}
+                                                    title={isPaid ? 'Pagado este mes' : 'Marcar como pagado'}
+                                                >
+                                                    {isPaid && <CheckCircle size={14} className="text-white" />}
+                                                </button>
+                                                <div>
+                                                    <p className={`text-sm font-bold ${isPaid ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                                        Pago a {instructor.name}
+                                                    </p>
+                                                    <p className="text-xs text-slate-400">{instructor.hours} hs · ${(instructor.hours * 500).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                            {isPaid ? (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full uppercase">Pagado</span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handlePayInstructor(instructor)}
+                                                    className="text-xs font-bold px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm"
+                                                >
+                                                    Pagar
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* ── Custom tasks ── */}
+                {(tasks || []).length === 0 && !showAddTask ? (
+                    <div className="text-center py-10 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        <ClipboardList size={32} className="mx-auto mb-2 opacity-30" />
+                        <p className="text-sm font-medium">No hay tareas personalizadas. Crea una con el botón de arriba.</p>
+                    </div>
+                ) : (
+                    (tasks || []).length > 0 && (
+                        <>
+                            {/* Weekly tasks */}
+                            {tasks.filter(t => t.frequency === 'weekly').length > 0 && (
+                                <div className="mb-5">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                        <RotateCcw size={12} />
+                                        Semanales (resetea cada Lunes)
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {tasks.filter(t => t.frequency === 'weekly').map(task => {
+                                            const done = !!task.completedAt;
+                                            return (
+                                                <div
+                                                    key={task._id}
+                                                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${done
+                                                            ? 'bg-emerald-50 border-emerald-200'
+                                                            : 'bg-white border-slate-200 hover:border-indigo-200'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <button
+                                                            onClick={() => !tasksLoading && handleToggleTask(task._id)}
+                                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${done
+                                                                    ? 'bg-emerald-500 border-emerald-500'
+                                                                    : 'border-slate-300 hover:border-indigo-400 cursor-pointer'
+                                                                }`}
+                                                        >
+                                                            {done && <CheckCircle size={14} className="text-white" />}
+                                                        </button>
+                                                        <p className={`text-sm font-semibold truncate ${done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                                            {task.name}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                                        {done && <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full uppercase">Hecho</span>}
+                                                        <button
+                                                            onClick={() => handleDeleteTask(task._id)}
+                                                            className="p-1 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                                                            title="Eliminar tarea"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Monthly tasks */}
+                            {tasks.filter(t => t.frequency === 'monthly').length > 0 && (
+                                <div>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                        <Calendar size={12} />
+                                        Mensuales (resetea el 1° de cada mes)
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {tasks.filter(t => t.frequency === 'monthly').map(task => {
+                                            const done = !!task.completedAt;
+                                            return (
+                                                <div
+                                                    key={task._id}
+                                                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${done
+                                                            ? 'bg-emerald-50 border-emerald-200'
+                                                            : 'bg-white border-slate-200 hover:border-indigo-200'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <button
+                                                            onClick={() => !tasksLoading && handleToggleTask(task._id)}
+                                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${done
+                                                                    ? 'bg-emerald-500 border-emerald-500'
+                                                                    : 'border-slate-300 hover:border-indigo-400 cursor-pointer'
+                                                                }`}
+                                                        >
+                                                            {done && <CheckCircle size={14} className="text-white" />}
+                                                        </button>
+                                                        <p className={`text-sm font-semibold truncate ${done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                                            {task.name}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                                        {done && <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full uppercase">Hecho</span>}
+                                                        <button
+                                                            onClick={() => handleDeleteTask(task._id)}
+                                                            className="p-1 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                                                            title="Eliminar tarea"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )
+                )}
+            </div>
 
             {/* Fiados / Deudas Section */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
@@ -2021,7 +2409,7 @@ const Dashboard = () => {
                                         ${Object.values(partialPayForm.adjustments).reduce((acc, val) => acc + Number(val || 0), 0).toLocaleString()}
                                     </span>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => {
                                         const total = prompt("Monto total a distribuir (FIFO):", partialPayForm.totalDebt || partialPayForm.maxAmount);
                                         if (total) distributeFIFO(total);
@@ -2095,11 +2483,10 @@ const Dashboard = () => {
                                     <button
                                         type="button"
                                         onClick={handleSaveInitialBalance}
-                                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all ${
-                                            initialBalanceSaved
+                                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all ${initialBalanceSaved
                                                 ? 'bg-green-100 text-green-700 border border-green-200'
                                                 : 'bg-slate-800 text-white hover:bg-slate-700'
-                                        }`}
+                                            }`}
                                         title="Guardar monto inicial para el día"
                                     >
                                         {initialBalanceSaved ? '✓ Guardado' : 'Guardar'}
@@ -2149,12 +2536,12 @@ const Dashboard = () => {
                                     </p>
                                 </div>
                             </div>
-                            
+
                             <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm font-medium text-slate-600">Balance Esperado:</span>
                                     <span className="text-lg font-bold text-blue-700">
-                                        ${ (Number(cashRegisterForm.initialBalance) + Number(cashRegisterForm.cashIn) - Number(cashRegisterForm.cashOut)).toLocaleString() }
+                                        ${(Number(cashRegisterForm.initialBalance) + Number(cashRegisterForm.cashIn) - Number(cashRegisterForm.cashOut)).toLocaleString()}
                                     </span>
                                 </div>
                             </div>
@@ -2256,7 +2643,7 @@ const Dashboard = () => {
                                                     {register.difference === 0 ? 'Exacto' : `Dif: $${register.difference.toLocaleString()}`}
                                                 </span>
                                             </div>
-                                            
+
                                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                                                 <div>
                                                     <p className="text-slate-500 text-xs uppercase">Inicial</p>
@@ -2418,7 +2805,7 @@ const Dashboard = () => {
                             <p className="text-slate-500">{pendingPayment.subtitle}</p>
                             <p className="text-2xl font-black text-slate-800 mt-2">${pendingPayment.amount.toLocaleString()}</p>
                         </div>
-                        
+
                         <div className="space-y-3">
                             <p className="text-center text-sm font-bold text-slate-400 uppercase tracking-wider">Selecciona Método</p>
                             <div className="grid grid-cols-1 gap-3">
@@ -2438,7 +2825,7 @@ const Dashboard = () => {
                                     </div>
                                     <CheckCircle size={20} className="text-slate-300 group-hover:text-green-500" />
                                 </button>
-                                
+
                                 <button
                                     onClick={async () => {
                                         await pendingPayment.action('Digital');
@@ -2457,7 +2844,7 @@ const Dashboard = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         <button
                             onClick={() => {
                                 setPayMethodModalOpen(false);
