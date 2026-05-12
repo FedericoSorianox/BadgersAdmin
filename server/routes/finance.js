@@ -334,6 +334,30 @@ router.post('/cash-register', async (req, res) => {
     }
 });
 
+// Get cash detail for current day (list of individual Efectivo records)
+router.get('/cash-detail', async (req, res) => {
+    try {
+        const tenantId = req.tenantId || null;
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const baseQuery = {
+            tenantId,
+            paymentMethod: 'Efectivo',
+            date: { $gte: startOfDay, $lte: endOfDay }
+        };
+
+        const payments = await Payment.find(baseQuery).sort({ date: -1 });
+        const expenses = await Expense.find(baseQuery).sort({ date: -1 });
+
+        res.json({ payments, expenses });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // Get cash summary for current day
 router.get('/cash-summary', async (req, res) => {
     try {

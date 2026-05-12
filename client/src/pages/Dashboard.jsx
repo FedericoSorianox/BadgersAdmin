@@ -81,12 +81,20 @@ const Dashboard = () => {
         actualBalance: '',
         notes: ''
     });
+    const [initialBalanceSaved, setInitialBalanceSaved] = useState(false);
+
+    // LocalStorage key scoped to today's date so it auto-expires
+    const todayKey = `cashRegister_initialBalance_${new Date().toISOString().slice(0, 10)}`;
 
     const [payMethodModalOpen, setPayMethodModalOpen] = useState(false);
     const [pendingPayment, setPendingPayment] = useState(null);
 
     const [cashRegisterHistoryModalOpen, setCashRegisterHistoryModalOpen] = useState(false);
     const [cashRegisterHistory, setCashRegisterHistory] = useState([]);
+
+    const [cashDetailModalOpen, setCashDetailModalOpen] = useState(false);
+    const [cashDetailData, setCashDetailData] = useState({ payments: [], expenses: [] });
+    const [cashDetailLoading, setCashDetailLoading] = useState(false);
 
     const [newFiadoModalOpen, setNewFiadoModalOpen] = useState(false);
     const [newFiadoForm, setNewFiadoForm] = useState({ memberId: '', products: [] });
@@ -277,6 +285,16 @@ const Dashboard = () => {
         }
     };
 
+    const handleSaveInitialBalance = () => {
+        const val = cashRegisterForm.initialBalance;
+        if (val === '' || Number(val) < 0) {
+            alert('Ingresa un monto inicial válido.');
+            return;
+        }
+        localStorage.setItem(todayKey, val);
+        setInitialBalanceSaved(true);
+    };
+
     const handleCashRegisterSubmit = async () => {
         try {
             const expected = Number(cashRegisterForm.initialBalance) + Number(cashRegisterForm.cashIn) - Number(cashRegisterForm.cashOut);
@@ -295,9 +313,12 @@ const Dashboard = () => {
             };
 
             await axios.post(`${API_URL}/api/finance/cash-register`, payload);
-            
+
+            // Clear persisted initial balance only after final close
+            localStorage.removeItem(todayKey);
             setCashRegisterModalOpen(false);
             setCashRegisterForm({ initialBalance: '', cashIn: '', cashOut: '', actualBalance: '', notes: '' });
+            setInitialBalanceSaved(false);
             alert('Cierre de caja guardado con éxito.');
         } catch (error) {
             console.error('Error saving cash register:', error);
@@ -329,8 +350,51 @@ const Dashboard = () => {
         }
     };
 
+    const fetchCashDetail = async () => {
+        setCashDetailLoading(true);
+        try {
+            const res = await axios.get(`${API_URL}/api/finance/cash-detail`);
+            setCashDetailData(res.data);
+            setCashDetailModalOpen(true);
+        } catch (error) {
+            console.error('Error fetching cash detail:', error);
+            alert('Error al obtener el detalle de ingresos.');
+        } finally {
+            setCashDetailLoading(false);
+        }
+    };
+
+    // Switch a payment record from Efectivo to Digital and refresh cashIn
+    const switchPaymentToDigital = async (id, kind) => {
+        try {
+            const url = kind === 'expense'
+                ? `${API_URL}/api/finance/expenses/${id}`
+                : `${API_URL}/api/finance/${id}`;
+            await axios.put(url, { paymentMethod: 'Digital' });
+            // Update local list
+            setCashDetailData(prev => ({
+                payments: kind === 'payment' ? prev.payments.filter(p => p._id !== id) : prev.payments,
+                expenses: kind === 'expense' ? prev.expenses.filter(e => e._id !== id) : prev.expenses
+            }));
+            // Refresh totals in the cash register form
+            await fetchCashSummary();
+        } catch (error) {
+            console.error('Error switching payment method:', error);
+            alert('Error al cambiar el método de pago.');
+        }
+    };
+
+
     useEffect(() => {
         if (cashRegisterModalOpen) {
+            // Restore persisted initialBalance for today if it exists
+            const savedInitial = localStorage.getItem(todayKey);
+            if (savedInitial !== null) {
+                setCashRegisterForm(prev => ({ ...prev, initialBalance: savedInitial }));
+                setInitialBalanceSaved(true);
+            } else {
+                setInitialBalanceSaved(false);
+            }
             fetchCashSummary();
         }
     }, [cashRegisterModalOpen]);
@@ -2013,19 +2077,53 @@ const Dashboard = () => {
                         </h3>
 
                         <div className="space-y-4">
+                            {/* Monto Inicial — persisted per day */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Monto Inicial en Caja ($)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    value={cashRegisterForm.initialBalance}
-                                    onChange={(e) => setCashRegisterForm({ ...cashRegisterForm, initialBalance: e.target.value })}
-                                />
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={cashRegisterForm.initialBalance}
+                                        onChange={(e) => {
+                                            setCashRegisterForm({ ...cashRegisterForm, initialBalance: e.target.value });
+                                            // Mark as unsaved if user edits after saving
+                                            setInitialBalanceSaved(false);
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveInitialBalance}
+                                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all ${
+                                            initialBalanceSaved
+                                                ? 'bg-green-100 text-green-700 border border-green-200'
+                                                : 'bg-slate-800 text-white hover:bg-slate-700'
+                                        }`}
+                                        title="Guardar monto inicial para el día"
+                                    >
+                                        {initialBalanceSaved ? '✓ Guardado' : 'Guardar'}
+                                    </button>
+                                </div>
+                                {initialBalanceSaved && (
+                                    <p className="text-xs text-green-600 mt-1">✓ El monto inicial se mantendrá aunque cierres el modal</p>
+                                )}
                             </div>
+
+                            {/* cashIn / cashOut — auto-populated from Efectivo only */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Ingresos Día ($)</label>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-sm font-medium text-slate-700">Ingresos Día ($)</label>
+                                        <button
+                                            type="button"
+                                            onClick={fetchCashDetail}
+                                            disabled={cashDetailLoading}
+                                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 disabled:opacity-50"
+                                        >
+                                            {cashDetailLoading ? '...' : '📋 Ver ventas'}
+                                        </button>
+                                    </div>
                                     <input
                                         type="number"
                                         min="0"
@@ -2033,6 +2131,9 @@ const Dashboard = () => {
                                         value={cashRegisterForm.cashIn}
                                         onChange={(e) => setCashRegisterForm({ ...cashRegisterForm, cashIn: e.target.value })}
                                     />
+                                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                        <DollarSign size={10} className="text-green-500" /> Solo pagos en efectivo
+                                    </p>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Gastos Día ($)</label>
@@ -2043,6 +2144,9 @@ const Dashboard = () => {
                                         value={cashRegisterForm.cashOut}
                                         onChange={(e) => setCashRegisterForm({ ...cashRegisterForm, cashOut: e.target.value })}
                                     />
+                                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                        <DollarSign size={10} className="text-red-400" /> Solo gastos en efectivo
+                                    </p>
                                 </div>
                             </div>
                             
@@ -2099,7 +2203,8 @@ const Dashboard = () => {
                             <button
                                 onClick={() => {
                                     setCashRegisterModalOpen(false);
-                                    setCashRegisterForm({ initialBalance: '', cashIn: '', cashOut: '', actualBalance: '', notes: '' });
+                                    // Do NOT reset initialBalance here — it persists until final close
+                                    setCashRegisterForm(prev => ({ ...prev, cashIn: '', cashOut: '', actualBalance: '', notes: '' }));
                                 }}
                                 className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
                             >
@@ -2185,8 +2290,124 @@ const Dashboard = () => {
                 </div>
             )}
 
+            {/* Cash Detail Modal — ventas/gastos en efectivo del día */}
+            {cashDetailModalOpen && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70]">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
+                        {/* Header */}
+                        <div className="flex justify-between items-center px-6 pt-5 pb-4 border-b border-slate-100">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <DollarSign size={20} className="text-green-600" />
+                                    Movimientos en Efectivo — Hoy
+                                </h3>
+                                <p className="text-xs text-slate-400 mt-0.5">Podés cambiar cualquier registro a Digital. Eso lo quitará de Ingresos Día.</p>
+                            </div>
+                            <button
+                                onClick={() => setCashDetailModalOpen(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5 mini-scrollbar">
+                            {/* Ingresos */}
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                                    Ingresos ({cashDetailData.payments.length})
+                                    <span className="ml-auto font-bold text-green-700 text-sm normal-case">
+                                        ${cashDetailData.payments.reduce((a, p) => a + (p.amount || 0), 0).toLocaleString()}
+                                    </span>
+                                </p>
+                                {cashDetailData.payments.length === 0 ? (
+                                    <p className="text-center text-slate-400 text-sm py-3 bg-slate-50 rounded-xl">Sin ingresos en efectivo hoy</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {cashDetailData.payments.map(p => (
+                                            <div key={p._id} className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-4 py-2.5">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-bold text-slate-700 truncate">
+                                                        {p.memberName || p.productName || p.type || 'Pago'}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400">
+                                                        {p.type} · {new Date(p.date).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+                                                    <span className="text-sm font-black text-green-700">${(p.amount || 0).toLocaleString()}</span>
+                                                    <button
+                                                        onClick={() => switchPaymentToDigital(p._id, 'payment')}
+                                                        className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 bg-white border border-slate-200 text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 rounded-lg transition-all"
+                                                        title="Cambiar a Digital"
+                                                    >
+                                                        <CreditCard size={11} />
+                                                        Digital
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Gastos */}
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block"></span>
+                                    Gastos ({cashDetailData.expenses.length})
+                                    <span className="ml-auto font-bold text-red-600 text-sm normal-case">
+                                        ${cashDetailData.expenses.reduce((a, e) => a + (e.amount || 0), 0).toLocaleString()}
+                                    </span>
+                                </p>
+                                {cashDetailData.expenses.length === 0 ? (
+                                    <p className="text-center text-slate-400 text-sm py-3 bg-slate-50 rounded-xl">Sin gastos en efectivo hoy</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {cashDetailData.expenses.map(e => (
+                                            <div key={e._id} className="flex items-center justify-between bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-bold text-slate-700 truncate">
+                                                        {e.description || e.concept || 'Gasto'}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400">
+                                                        {e.category || 'Otros'} · {new Date(e.date).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+                                                    <span className="text-sm font-black text-red-600">${(e.amount || 0).toLocaleString()}</span>
+                                                    <button
+                                                        onClick={() => switchPaymentToDigital(e._id, 'expense')}
+                                                        className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 bg-white border border-slate-200 text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 rounded-lg transition-all"
+                                                        title="Cambiar a Digital"
+                                                    >
+                                                        <CreditCard size={11} />
+                                                        Digital
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-slate-100">
+                            <button
+                                onClick={() => setCashDetailModalOpen(false)}
+                                className="w-full py-2.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition-colors"
+                            >
+                                Listo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Payment Method Selection Modal */}
             {payMethodModalOpen && pendingPayment && (
+
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
                     <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
                         <div className="text-center mb-6">
