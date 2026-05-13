@@ -1011,6 +1011,16 @@ const Dashboard = () => {
                 }
             };
 
+            const handleRevertStatus = async (paymentId) => {
+                if (!confirm(`¿Seguro que deseas deshacer este estado y volver a Pendiente?`)) return;
+                try {
+                    await axios.delete(`${API_URL}/api/finance/${paymentId}`);
+                    fetchData();
+                } catch (e) {
+                    alert('Error al deshacer estado');
+                }
+            };
+
             return (
                 <div className="space-y-6">
                     <div className="relative">
@@ -1133,12 +1143,26 @@ const Dashboard = () => {
                                     En Licencia ({licensedList.length})
                                 </h4>
                                 <div className="bg-purple-50/50 rounded-xl p-4 max-h-[150px] overflow-y-auto divide-y divide-purple-100 italic">
-                                    {licensedList.map(m => (
-                                        <div key={m._id} className="py-2 flex justify-between">
-                                            <span className="text-sm font-medium text-purple-800">{m.fullName}</span>
-                                            <span className="text-xs text-purple-400">Sin asistencia este mes</span>
-                                        </div>
-                                    ))}
+                                    {licensedList.map(m => {
+                                        const p = stats.paymentsList.find(pay => String(pay.memberId) === String(m._id) && Number(pay.month) === currentMonth && Number(pay.year) === currentYear && pay.type === 'Licencia');
+                                        return (
+                                            <div key={m._id} className="py-2 flex justify-between group">
+                                                <span className="text-sm font-medium text-purple-800">{m.fullName}</span>
+                                                <div className="flex items-center gap-2">
+                                                    {p && (
+                                                        <button
+                                                            onClick={() => handleRevertStatus(p._id)}
+                                                            className="px-2 py-1 bg-white border border-purple-200 text-purple-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 text-[10px] font-bold rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Deshacer estado"
+                                                        >
+                                                            Revertir
+                                                        </button>
+                                                    )}
+                                                    <span className="text-xs text-purple-400">Sin asistencia este mes</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -1146,15 +1170,31 @@ const Dashboard = () => {
                         <div className="mt-4">
                             <h4 className="font-bold text-green-600 mb-2 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-600"></span>
-                                Pagados ({filteredPaid.length})
+                                Pagados o Perdonados ({filteredPaid.length})
                             </h4>
                             <div className="bg-green-50 rounded-xl p-4 max-h-[150px] overflow-y-auto divide-y divide-green-100">
-                                {filteredPaid.map(m => (
-                                    <div key={m._id} className="py-2 flex justify-between">
-                                        <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
-                                        <span className="text-xs text-slate-500">CI: {m.ci}</span>
-                                    </div>
-                                ))}
+                                {filteredPaid.map(m => {
+                                    const p = stats.paymentsList.find(pay => String(pay.memberId) === String(m._id) && Number(pay.month) === currentMonth && Number(pay.year) === currentYear && (pay.type === 'Cuota' || pay.type === 'Condonado' || !pay.type));
+                                    return (
+                                        <div key={m._id} className="py-2 flex justify-between group">
+                                            <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
+                                            <div className="flex items-center gap-2">
+                                                {p && (
+                                                    <button
+                                                        onClick={() => handleRevertStatus(p._id)}
+                                                        className="px-2 py-1 bg-white border border-green-200 text-green-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 text-[10px] font-bold rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Deshacer pago"
+                                                    >
+                                                        Revertir
+                                                    </button>
+                                                )}
+                                                <span className="text-xs font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md">
+                                                    {p?.type === 'Condonado' ? 'Perdonado' : `CI: ${m.ci}`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>

@@ -61,7 +61,7 @@ const Payments = () => {
                 const pYear = p.year || d.getFullYear();
                 return Number(pMonth) === Number(selectedMonth) &&
                     Number(pYear) === Number(selectedYear) &&
-                    (p.type === 'Cuota' || p.type === 'Condonado' || !p.type) &&
+                    (p.type === 'Cuota' || p.type === 'Condonado' || p.type === 'Licencia' || !p.type) &&
                     (p.memberId === member._id || (p.socio && p.socio.trim().toLowerCase() === member.fullName.trim().toLowerCase()));
             });
 
@@ -108,9 +108,10 @@ const Payments = () => {
 
             return {
                 ...member,
-                paid: !!payment,
-                paymentDetails: payment,
+                paid: !!payment && (payment.type === 'Cuota' || !payment.type),
                 isForgiven: payment?.type === 'Condonado',
+                isLicensed: payment?.type === 'Licencia',
+                paymentDetails: payment,
                 note: note ? note.comments : null,
                 pastDebts // Array of month numbers
             };
@@ -124,19 +125,19 @@ const Payments = () => {
 
     const stats = {
         total: members.length,
-        paid: memberStatusList.filter(m => m.paid && !m.isForgiven).length, // Only real payments
+        paid: memberStatusList.filter(m => m.paid).length, 
         forgiven: memberStatusList.filter(m => m.isForgiven).length,
-        pending: memberStatusList.filter(m => !m.paid).length
+        licensed: memberStatusList.filter(m => m.isLicensed).length,
+        pending: memberStatusList.filter(m => !m.paid && !m.isForgiven && !m.isLicensed).length
     };
 
-    // Completion rate includes forgiven? User said "doesn't show they owe it", so they are "done".
-    // But for financial completion, it's different. Let's count them as "processed".
-    const processedCount = memberStatusList.filter(m => m.paid).length;
+    // Completion rate includes forgiven and licensed as "processed"
+    const processedCount = stats.paid + stats.forgiven + stats.licensed;
     const completionRate = stats.total > 0 ? ((processedCount / stats.total) * 100).toFixed(0) : 0;
 
     const fetchAnalytics = useCallback(() => {
         // Compute from existing 'payments' state instead of refetching
-        const allPayments = payments.filter(p => (p.type === 'Cuota' || !p.type) && p.type !== 'Condonado'); // Exclude forgiven from revenue
+        const allPayments = payments.filter(p => (p.type === 'Cuota' || !p.type) && p.type !== 'Condonado' && p.type !== 'Licencia'); // Exclude forgiven/licensed from revenue
         const monthlyData = Array(12).fill(0).map((_, i) => ({
             month: i + 1,
             name: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][i],
@@ -216,6 +217,18 @@ const Payments = () => {
         }
     };
 
+    const handleRevertStatus = async (paymentId) => {
+        const confirmRevert = window.confirm('¿Seguro que deseas deshacer este estado y volver a Pendiente?');
+        if (!confirmRevert) return;
+        try {
+            await axios.delete(`${API_URL}/api/finance/${paymentId}`);
+            fetchData();
+        } catch (error) {
+            console.error('Error al deshacer estado:', error);
+            alert('Hubo un error al deshacer el estado');
+        }
+    };
+
     const getMonthName = (m) => ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][m - 1];
 
     if (loading) {
@@ -228,7 +241,8 @@ const Payments = () => {
 
     // Split lists
     const paidList = memberStatusList.filter(m => m.paid);
-    const pendingList = memberStatusList.filter(m => !m.paid);
+    const specialList = memberStatusList.filter(m => m.isForgiven || m.isLicensed);
+    const pendingList = memberStatusList.filter(m => !m.paid && !m.isForgiven && !m.isLicensed);
 
     return (
         <div className="space-y-6 pb-20">
@@ -399,31 +413,75 @@ const Payments = () => {
                     </div>
                 </div>
 
-                {/* Right Column: Paid */}
-                <div className="lg:w-1/3 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-                    <div className="p-6 border-b border-slate-100 bg-green-50/30">
-                        <h3 className="font-bold text-green-600 flex items-center gap-2">
-                            <CheckCircle size={20} />
-                            Pagados ({stats.paid})
-                        </h3>
-                    </div>
-                    <div className="flex-1 overflow-y-auto max-h-[600px] divide-y divide-slate-50">
-                        {paidList.map(member => (
-                            <div key={member._id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
-                                <div>
-                                    <h4 className="text-sm font-medium text-slate-700">{member.fullName}</h4>
-                                    <p className="text-xs text-slate-400 capitalize">{new Date(member.paymentDetails.date || member.paymentDetails.createdAt).toLocaleDateString('es-UY', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                {/* Right Column: Special & Paid */}
+                <div className="lg:w-1/3 flex flex-col gap-6">
+                    
+                    {/* Special Status Section */}
+                    {specialList.length > 0 && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col max-h-[300px]">
+                            <div className="p-4 border-b border-slate-100 bg-purple-50/30">
+                                <h3 className="font-bold text-purple-600 flex items-center gap-2">
+                                    <AlertCircle size={18} />
+                                    Licencia o Perdonados ({specialList.length})
+                                </h3>
+                            </div>
+                            <div className="overflow-y-auto divide-y divide-slate-50">
+                                {specialList.map(member => (
+                                    <div key={member._id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center group">
+                                        <div>
+                                            <h4 className="text-sm font-medium text-purple-800">{member.fullName}</h4>
+                                            <p className="text-xs text-purple-400">
+                                                {member.isLicensed ? 'En Licencia' : 'Condonado'}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleRevertStatus(member.paymentDetails._id)}
+                                            className="px-2 py-1 bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 text-[10px] font-bold rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Deshacer estado"
+                                        >
+                                            Revertir
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Paid Section */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col flex-1">
+                        <div className="p-6 border-b border-slate-100 bg-green-50/30">
+                            <h3 className="font-bold text-green-600 flex items-center gap-2">
+                                <CheckCircle size={20} />
+                                Pagados ({stats.paid})
+                            </h3>
+                        </div>
+                        <div className="flex-1 overflow-y-auto max-h-[600px] divide-y divide-slate-50">
+                            {paidList.map(member => (
+                                <div key={member._id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center group">
+                                    <div>
+                                        <h4 className="text-sm font-medium text-slate-700">{member.fullName}</h4>
+                                        <p className="text-xs text-slate-400 capitalize">{new Date(member.paymentDetails.date || member.paymentDetails.createdAt).toLocaleDateString('es-UY', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleRevertStatus(member.paymentDetails._id)}
+                                            className="px-2 py-1 bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 text-[10px] font-bold rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Deshacer pago"
+                                        >
+                                            Revertir
+                                        </button>
+                                        <span className="font-bold text-green-600 text-sm bg-green-50 px-2 py-1 rounded-md">
+                                            ${member.paymentDetails.amount.toLocaleString()}
+                                        </span>
+                                    </div>
                                 </div>
-                                <span className="font-bold text-green-600 text-sm bg-green-50 px-2 py-1 rounded-md">
-                                    ${member.paymentDetails.amount.toLocaleString()}
-                                </span>
-                            </div>
-                        ))}
-                        {paidList.length === 0 && (
-                            <div className="p-8 text-center text-slate-400 text-sm">
-                                Nadie ha pagado aún en este período.
-                            </div>
-                        )}
+                            ))}
+                            {paidList.length === 0 && (
+                                <div className="p-8 text-center text-slate-400 text-sm">
+                                    Nadie ha pagado aún en este período.
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
