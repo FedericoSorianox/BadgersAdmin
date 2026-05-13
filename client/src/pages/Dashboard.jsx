@@ -83,8 +83,10 @@ const Dashboard = () => {
     });
     const [initialBalanceSaved, setInitialBalanceSaved] = useState(false);
 
-    // LocalStorage key scoped to today's date so it auto-expires
-    const todayKey = `cashRegister_initialBalance_${new Date().toISOString().slice(0, 10)}`;
+    // LocalStorage key scoped to today's date (local timezone) so it auto-expires
+    const now = new Date();
+    const localTodayString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayKey = `cashRegister_initialBalance_${localTodayString}`;
 
     const [payMethodModalOpen, setPayMethodModalOpen] = useState(false);
     const [pendingPayment, setPendingPayment] = useState(null);
