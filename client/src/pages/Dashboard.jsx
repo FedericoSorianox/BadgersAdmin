@@ -413,17 +413,22 @@ const Dashboard = () => {
         }
     };
 
-    // Switch a payment record from Efectivo to Digital and refresh cashIn
-    const switchPaymentToDigital = async (id, kind) => {
+    // Toggle payment method between Efectivo and Digital and refresh cashIn/cashOut
+    const togglePaymentMethod = async (id, kind, currentMethod) => {
         try {
+            const newMethod = currentMethod === 'Efectivo' ? 'Digital' : 'Efectivo';
             const url = kind === 'expense'
                 ? `${API_URL}/api/finance/expenses/${id}`
                 : `${API_URL}/api/finance/${id}`;
-            await axios.put(url, { paymentMethod: 'Digital' });
+            await axios.put(url, { paymentMethod: newMethod });
             // Update local list
             setCashDetailData(prev => ({
-                payments: kind === 'payment' ? prev.payments.filter(p => p._id !== id) : prev.payments,
-                expenses: kind === 'expense' ? prev.expenses.filter(e => e._id !== id) : prev.expenses
+                payments: kind === 'payment' 
+                    ? prev.payments.map(p => p._id === id ? { ...p, paymentMethod: newMethod } : p)
+                    : prev.payments,
+                expenses: kind === 'expense' 
+                    ? prev.expenses.map(e => e._id === id ? { ...e, paymentMethod: newMethod } : e)
+                    : prev.expenses
             }));
             // Refresh totals in the cash register form
             await fetchCashSummary();
@@ -2687,10 +2692,10 @@ const Dashboard = () => {
                         <div className="flex justify-between items-center px-6 pt-5 pb-4 border-b border-slate-100">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                    <DollarSign size={20} className="text-green-600" />
-                                    Movimientos en Efectivo — Hoy
+                                    <ArrowLeftRight size={20} className="text-blue-600" />
+                                    Movimientos del Día
                                 </h3>
-                                <p className="text-xs text-slate-400 mt-0.5">Podés cambiar cualquier registro a Digital. Eso lo quitará de Ingresos Día.</p>
+                                <p className="text-xs text-slate-400 mt-0.5">Podés alternar cualquier registro entre Efectivo y Digital.</p>
                             </div>
                             <button
                                 onClick={() => setCashDetailModalOpen(false)}
@@ -2711,32 +2716,36 @@ const Dashboard = () => {
                                     </span>
                                 </p>
                                 {cashDetailData.payments.length === 0 ? (
-                                    <p className="text-center text-slate-400 text-sm py-3 bg-slate-50 rounded-xl">Sin ingresos en efectivo hoy</p>
+                                    <p className="text-center text-slate-400 text-sm py-3 bg-slate-50 rounded-xl">Sin ingresos hoy</p>
                                 ) : (
                                     <div className="space-y-2">
-                                        {cashDetailData.payments.map(p => (
-                                            <div key={p._id} className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-4 py-2.5">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-bold text-slate-700 truncate">
-                                                        {p.memberName || p.productName || p.type || 'Pago'}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400">
-                                                        {p.type} · {new Date(p.date).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
-                                                    </p>
+                                        {cashDetailData.payments.map(p => {
+                                            const isDigital = p.paymentMethod === 'Digital';
+                                            return (
+                                                <div key={p._id} className={`flex items-center justify-between border rounded-xl px-4 py-2.5 ${isDigital ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-bold text-slate-700 truncate flex items-center gap-2">
+                                                            {p.memberName || p.productName || p.type || 'Pago'}
+                                                            {isDigital ? <CreditCard size={12} className="text-blue-500" /> : <DollarSign size={12} className="text-green-600" />}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-400">
+                                                            {p.type} · {new Date(p.date).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+                                                        <span className={`text-sm font-black ${isDigital ? 'text-blue-700' : 'text-green-700'}`}>${(p.amount || 0).toLocaleString()}</span>
+                                                        <button
+                                                            onClick={() => togglePaymentMethod(p._id, 'payment', p.paymentMethod || 'Efectivo')}
+                                                            className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 bg-white border text-slate-600 hover:text-white rounded-lg transition-all ${isDigital ? 'border-green-200 hover:bg-green-600 hover:border-green-600' : 'border-blue-200 hover:bg-blue-600 hover:border-blue-600'}`}
+                                                            title={`Cambiar a ${isDigital ? 'Efectivo' : 'Digital'}`}
+                                                        >
+                                                            {isDigital ? <DollarSign size={11} /> : <CreditCard size={11} />}
+                                                            {isDigital ? 'Efectivo' : 'Digital'}
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-3 ml-3 flex-shrink-0">
-                                                    <span className="text-sm font-black text-green-700">${(p.amount || 0).toLocaleString()}</span>
-                                                    <button
-                                                        onClick={() => switchPaymentToDigital(p._id, 'payment')}
-                                                        className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 bg-white border border-slate-200 text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 rounded-lg transition-all"
-                                                        title="Cambiar a Digital"
-                                                    >
-                                                        <CreditCard size={11} />
-                                                        Digital
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -2751,32 +2760,36 @@ const Dashboard = () => {
                                     </span>
                                 </p>
                                 {cashDetailData.expenses.length === 0 ? (
-                                    <p className="text-center text-slate-400 text-sm py-3 bg-slate-50 rounded-xl">Sin gastos en efectivo hoy</p>
+                                    <p className="text-center text-slate-400 text-sm py-3 bg-slate-50 rounded-xl">Sin gastos hoy</p>
                                 ) : (
                                     <div className="space-y-2">
-                                        {cashDetailData.expenses.map(e => (
-                                            <div key={e._id} className="flex items-center justify-between bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-bold text-slate-700 truncate">
-                                                        {e.description || e.concept || 'Gasto'}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400">
-                                                        {e.category || 'Otros'} · {new Date(e.date).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
-                                                    </p>
+                                        {cashDetailData.expenses.map(e => {
+                                            const isDigital = e.paymentMethod === 'Digital';
+                                            return (
+                                                <div key={e._id} className={`flex items-center justify-between border rounded-xl px-4 py-2.5 ${isDigital ? 'bg-orange-50 border-orange-100' : 'bg-red-50 border-red-100'}`}>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-bold text-slate-700 truncate flex items-center gap-2">
+                                                            {e.description || e.concept || 'Gasto'}
+                                                            {isDigital ? <CreditCard size={12} className="text-orange-500" /> : <DollarSign size={12} className="text-red-600" />}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-400">
+                                                            {e.category || 'Otros'} · {new Date(e.date).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+                                                        <span className={`text-sm font-black ${isDigital ? 'text-orange-600' : 'text-red-600'}`}>${(e.amount || 0).toLocaleString()}</span>
+                                                        <button
+                                                            onClick={() => togglePaymentMethod(e._id, 'expense', e.paymentMethod || 'Efectivo')}
+                                                            className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 bg-white border text-slate-600 hover:text-white rounded-lg transition-all ${isDigital ? 'border-green-200 hover:bg-green-600 hover:border-green-600' : 'border-blue-200 hover:bg-blue-600 hover:border-blue-600'}`}
+                                                            title={`Cambiar a ${isDigital ? 'Efectivo' : 'Digital'}`}
+                                                        >
+                                                            {isDigital ? <DollarSign size={11} /> : <CreditCard size={11} />}
+                                                            {isDigital ? 'Efectivo' : 'Digital'}
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-3 ml-3 flex-shrink-0">
-                                                    <span className="text-sm font-black text-red-600">${(e.amount || 0).toLocaleString()}</span>
-                                                    <button
-                                                        onClick={() => switchPaymentToDigital(e._id, 'expense')}
-                                                        className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 bg-white border border-slate-200 text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 rounded-lg transition-all"
-                                                        title="Cambiar a Digital"
-                                                    >
-                                                        <CreditCard size={11} />
-                                                        Digital
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

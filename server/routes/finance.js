@@ -345,7 +345,6 @@ router.get('/cash-detail', async (req, res) => {
 
         const baseQuery = {
             tenantId,
-            paymentMethod: 'Efectivo',
             date: { $gte: startOfDay, $lte: endOfDay }
         };
 
