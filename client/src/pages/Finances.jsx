@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2, Filter, Plus } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2, Filter, Plus, ArrowUpRight, ArrowDownRight, Package, CreditCard, Wallet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import axios from 'axios';
 import { API_URL } from '../config';
@@ -211,11 +211,11 @@ const Finances = () => {
     // Helper function to get category badge color
     const getCategoryBadge = (category) => {
         switch (category) {
-            case 'Cuota': return 'bg-blue-100 text-blue-800';
+            case 'Cuota': return { color: 'bg-blue-100 text-blue-800', icon: <CreditCard size={14} className="mr-1" /> };
             case 'Producto':
-            case 'Venta': return 'bg-purple-100 text-purple-800';
-            case 'Gasto': return 'bg-red-100 text-red-800';
-            default: return 'bg-slate-100 text-slate-800';
+            case 'Venta': return { color: 'bg-purple-100 text-purple-800', icon: <Package size={14} className="mr-1" /> };
+            case 'Gasto': return { color: 'bg-red-100 text-red-800', icon: <Wallet size={14} className="mr-1" /> };
+            default: return { color: 'bg-slate-100 text-slate-800', icon: null };
         }
     };
 
@@ -307,188 +307,204 @@ const Finances = () => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                            <DollarSign size={24} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                            <CreditCard size={24} />
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-slate-500">Total Venta Cuotas</p>
-                            <h3 className="text-2xl font-bold text-slate-800">${stats.totalCuotas.toLocaleString()}</h3>
-                        </div>
+                        <span className="text-xs font-bold px-2 py-1 bg-blue-50 text-blue-600 rounded-full">Cuotas</span>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-slate-500 mb-1">Total Ingresos</p>
+                        <h3 className="text-2xl font-black text-slate-800">${stats.totalCuotas.toLocaleString()}</h3>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
-                            <TrendingUp size={24} />
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-110 transition-transform">
+                            <Package size={24} />
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-slate-500">Total Venta Productos</p>
-                            <h3 className="text-2xl font-bold text-slate-800">${stats.totalVentas.toLocaleString()}</h3>
-                        </div>
+                        <span className="text-xs font-bold px-2 py-1 bg-purple-50 text-purple-600 rounded-full">Ventas</span>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-slate-500 mb-1">Total Productos</p>
+                        <h3 className="text-2xl font-black text-slate-800">${stats.totalVentas.toLocaleString()}</h3>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-red-50 text-red-600 rounded-xl">
-                            <TrendingDown size={24} />
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-red-50 text-red-600 rounded-xl group-hover:scale-110 transition-transform">
+                            <ArrowDownRight size={24} />
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-slate-500">Total Gastos</p>
-                            <h3 className="text-2xl font-bold text-slate-800">${stats.totalGastos.toLocaleString()}</h3>
-                        </div>
+                        <span className="text-xs font-bold px-2 py-1 bg-red-50 text-red-600 rounded-full">Egresos</span>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-slate-500 mb-1">Total Gastos</p>
+                        <h3 className="text-2xl font-black text-slate-800">${stats.totalGastos.toLocaleString()}</h3>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-xl ${stats.balance >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                            <DollarSign size={24} />
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className={`p-3 rounded-xl group-hover:scale-110 transition-transform ${stats.balance >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                            <Wallet size={24} />
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-slate-500">Balance</p>
-                            <h3 className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                ${stats.balance.toLocaleString()}
-                            </h3>
-                        </div>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${stats.balance >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                            Neto
+                        </span>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-slate-500 mb-1">Balance General</p>
+                        <h3 className={`text-2xl font-black ${stats.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ${stats.balance.toLocaleString()}
+                        </h3>
                     </div>
                 </div>
             </div>
 
             {/* Filter Buttons */}
-            <div className="flex gap-2">
+            <div className="bg-white p-1 rounded-xl inline-flex shadow-sm border border-slate-100">
                 <button
                     onClick={() => setFilterType('all')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterType === 'all'
-                        ? 'bg-slate-800 text-white'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === 'all' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                 >
                     Todas
                 </button>
                 <button
                     onClick={() => setFilterType('cuotas')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterType === 'cuotas'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === 'cuotas' ? 'bg-blue-600 text-white shadow-sm shadow-blue-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                 >
                     Cuotas
                 </button>
                 <button
                     onClick={() => setFilterType('ventas')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterType === 'ventas'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === 'ventas' ? 'bg-purple-600 text-white shadow-sm shadow-purple-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                 >
                     Ventas
                 </button>
                 <button
                     onClick={() => setFilterType('gastos')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterType === 'gastos'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === 'gastos' ? 'bg-red-600 text-white shadow-sm shadow-red-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                 >
                     Gastos
                 </button>
             </div>
 
-            {/* Chart Section - MOVED UP */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="text-lg font-bold text-slate-800 mb-6">
-                    Flujo de Caja Mensual - {MONTHS.find(m => m.value === selectedMonth)?.label} {selectedYear}
-                </h3>
-                <div className="h-[400px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={monthlyData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8' }} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8' }} prefix="$" />
-                            <Tooltip
-                                cursor={{ fill: '#f1f5f9' }}
-                                contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                            />
-                            <Legend />
-                            <Bar dataKey="ingresos" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Ingresos" />
-                            <Bar dataKey="gastos" fill="#ef4444" radius={[4, 4, 0, 0]} name="Gastos" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* Transactions List - MOVED DOWN */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-100">
-                    <h3 className="text-lg font-bold text-slate-800">
-                        Lista de Transacciones - {MONTHS.find(m => m.value === selectedMonth)?.label} {selectedYear}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                {/* Chart Section */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 xl:col-span-1">
+                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <TrendingUp className="text-slate-400" size={20} />
+                        Flujo de Caja Mensual
                     </h3>
+                    <div className="h-[350px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={monthlyData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} prefix="$" />
+                                <Tooltip
+                                    cursor={{ fill: '#f1f5f9' }}
+                                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                />
+                                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
+                                <Bar dataKey="ingresos" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Ingresos" maxBarSize={40} />
+                                <Bar dataKey="gastos" fill="#ef4444" radius={[4, 4, 0, 0]} name="Gastos" maxBarSize={40} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
 
-                {loading ? (
-                    <div className="p-12 text-center text-slate-400">Cargando...</div>
-                ) : filteredTransactions.length === 0 ? (
-                    <div className="p-12 text-center text-slate-400">No hay transacciones registradas</div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-slate-50 border-b border-slate-100">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Fecha</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Nombre</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Descripción</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Categoría</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Monto</th>
-                                    <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredTransactions.map((transaction) => (
-                                    <tr key={transaction._id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                                            {new Date(transaction.date).toLocaleDateString('es-UY')}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-800">
-                                            {transaction.category === 'Gasto' ? transaction.description : (transaction.productName || transaction.memberName || 'N/A')}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                                            {transaction.category === 'Gasto' ? (transaction.concept || '-') : (transaction.description || transaction.concept || '-')}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryBadge(transaction.category)}`}>
-                                                {transaction.category}
-                                            </span>
-                                        </td>
-                                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${getTransactionColor(transaction.category)}`}>
-                                            ${Math.abs(transaction.amount).toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button
-                                                onClick={() => handleEdit(transaction)}
-                                                className="text-slate-400 hover:text-blue-600 transition-colors p-2"
-                                            >
-                                                <Edit size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(transaction)}
-                                                className="text-slate-400 hover:text-red-500 transition-colors p-2"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                {/* Transactions List */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden xl:col-span-2 flex flex-col max-h-[450px]">
+                    <div className="p-6 border-b border-slate-100 flex-shrink-0 flex justify-between items-center bg-slate-50/50">
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <Calendar className="text-slate-400" size={20} />
+                            Transacciones
+                            <span className="text-sm font-medium text-slate-400 ml-2">
+                                {MONTHS.find(m => m.value === selectedMonth)?.label} {selectedYear}
+                            </span>
+                        </h3>
                     </div>
-                )}
-            </div>
 
+                    {loading ? (
+                        <div className="p-12 text-center text-slate-400 flex-1 flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : filteredTransactions.length === 0 ? (
+                        <div className="p-12 text-center text-slate-400 flex-1 flex flex-col items-center justify-center gap-3">
+                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center">
+                                <DollarSign size={24} className="text-slate-300" />
+                            </div>
+                            <p>No hay transacciones registradas</p>
+                        </div>
+                    ) : (
+                        <div className="flex-1 overflow-y-auto mini-scrollbar relative">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm border-b border-slate-100 backdrop-blur-md bg-slate-50/90">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Detalle</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Categoría</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Monto</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredTransactions.map((transaction) => {
+                                        const badge = getCategoryBadge(transaction.category);
+                                        return (
+                                            <tr key={transaction._id} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-500">
+                                                    {new Date(transaction.date).toLocaleDateString('es-UY', { day: '2-digit', month: 'short' })}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm font-bold text-slate-800">
+                                                        {transaction.category === 'Gasto' ? transaction.description : (transaction.productName || transaction.memberName || 'N/A')}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[200px]">
+                                                        {transaction.category === 'Gasto' ? (transaction.concept || '-') : (transaction.description || transaction.concept || '-')}
+                                                    </p>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${badge.color}`}>
+                                                        {badge.icon}
+                                                        {transaction.category}
+                                                    </span>
+                                                </td>
+                                                <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-black ${getTransactionColor(transaction.category)}`}>
+                                                    {transaction.category === 'Gasto' ? '-' : '+'}${Math.abs(transaction.amount).toLocaleString()}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleEdit(transaction)}
+                                                            className="text-slate-400 hover:text-blue-600 transition-colors p-1.5 hover:bg-blue-50 rounded-lg"
+                                                            title="Editar"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(transaction)}
+                                                            className="text-slate-400 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                                                            title="Eliminar"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
             {/* New Sale Modal */}
             {newSaleModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

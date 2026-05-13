@@ -79,8 +79,20 @@ const Payments = () => {
             // Calculate Past Debts (Previous months of selected Year)
             const pastDebts = [];
             if (Number(selectedYear) === new Date().getFullYear()) {
-                // Check months from Jan up to (SelectedMonth - 1)
-                for (let m = 1; m < selectedMonth; m++) {
+                // Determine start month based on when the member joined
+                const joinDate = new Date(member.joinDate || member.createdAt || new Date());
+                const joinMonth = joinDate.getMonth() + 1;
+                const joinYear = joinDate.getFullYear();
+
+                let startMonth = 1;
+                if (Number(selectedYear) === joinYear) {
+                    startMonth = joinMonth;
+                } else if (Number(selectedYear) < joinYear) {
+                    startMonth = 13; // Prevent loop, not a member yet
+                }
+
+                // Check months from startMonth up to (SelectedMonth - 1)
+                for (let m = startMonth; m < selectedMonth; m++) {
                     const hasPaid = payments.some(p => {
                         const d = new Date(p.date || p.createdAt);
                         const pMonth = p.month || (d.getMonth() + 1);
@@ -400,10 +412,10 @@ const Payments = () => {
                             <div key={member._id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                 <div>
                                     <h4 className="text-sm font-medium text-slate-700">{member.fullName}</h4>
-                                    <p className="text-xs text-slate-400">{new Date(member.paymentDetails.date || member.paymentDetails.createdAt).toLocaleDateString()}</p>
+                                    <p className="text-xs text-slate-400 capitalize">{new Date(member.paymentDetails.date || member.paymentDetails.createdAt).toLocaleDateString('es-UY', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                                 </div>
-                                <span className="font-bold text-green-600 text-sm">
-                                    ${member.paymentDetails.amount}
+                                <span className="font-bold text-green-600 text-sm bg-green-50 px-2 py-1 rounded-md">
+                                    ${member.paymentDetails.amount.toLocaleString()}
                                 </span>
                             </div>
                         ))}
