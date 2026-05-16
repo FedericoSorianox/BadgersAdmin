@@ -28,6 +28,27 @@ const MONTHS = [
     { value: 12, label: 'Diciembre' },
 ];
 
+const PaymentMethodToggle = ({ value, onChange }) => (
+    <div className="flex bg-slate-100 p-1 rounded-xl">
+        <button
+            type="button"
+            onClick={() => onChange('Efectivo')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-bold transition-all ${value === 'Efectivo' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            <DollarSign size={16} className={value === 'Efectivo' ? 'text-green-600' : ''} />
+            Efectivo
+        </button>
+        <button
+            type="button"
+            onClick={() => onChange('Digital')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-bold transition-all ${value === 'Digital' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            <CreditCard size={16} className={value === 'Digital' ? 'text-blue-600' : ''} />
+            Digital
+        </button>
+    </div>
+);
+
 const Finances = () => {
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
@@ -44,13 +65,15 @@ const Finances = () => {
         productId: '',
         productName: '',
         amount: 0,
-        quantity: 1
+        quantity: 1,
+        paymentMethod: 'Efectivo'
     });
     const [newExpenseModalOpen, setNewExpenseModalOpen] = useState(false);
     const [newExpenseForm, setNewExpenseForm] = useState({
         description: '',
         amount: 0,
-        concept: 'Gasto'
+        concept: 'Gasto',
+        paymentMethod: 'Efectivo'
     });
 
     const fetchTransactions = useCallback(async () => {
@@ -139,6 +162,7 @@ const Finances = () => {
                 quantity: newSaleForm.quantity,   // Add quantity for stock deduction
                 amount: newSaleForm.amount * newSaleForm.quantity,
                 type: 'Producto',
+                paymentMethod: newSaleForm.paymentMethod,
                 month: selectedMonth,
                 year: selectedYear,
                 date: new Date()
@@ -162,7 +186,8 @@ const Finances = () => {
                 productId: product._id,
                 productName: product.name,
                 amount: product.salePrice,
-                quantity: 1
+                quantity: 1,
+                paymentMethod: newSaleForm.paymentMethod
             });
         }
     };
@@ -178,6 +203,7 @@ const Finances = () => {
                 description: newExpenseForm.description,
                 concept: newExpenseForm.concept,
                 amount: newExpenseForm.amount,
+                paymentMethod: newExpenseForm.paymentMethod,
                 date: new Date()
             };
 
@@ -449,6 +475,7 @@ const Finances = () => {
                                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
                                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Detalle</th>
                                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Categoría</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Método</th>
                                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Monto</th>
                                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Acciones</th>
                                     </tr>
@@ -473,6 +500,12 @@ const Finances = () => {
                                                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${badge.color}`}>
                                                         {badge.icon}
                                                         {transaction.category}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold ${transaction.paymentMethod === 'Digital' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                                                        {transaction.paymentMethod === 'Digital' ? <CreditCard size={12} /> : <DollarSign size={12} />}
+                                                        {transaction.paymentMethod || 'Efectivo'}
                                                     </span>
                                                 </td>
                                                 <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-black ${getTransactionColor(transaction.category)}`}>
@@ -552,6 +585,14 @@ const Finances = () => {
                             </div>
 
                             <div className="p-3 bg-slate-50 rounded-lg">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Método de Pago</label>
+                                <PaymentMethodToggle
+                                    value={newSaleForm.paymentMethod}
+                                    onChange={(val) => setNewSaleForm({ ...newSaleForm, paymentMethod: val })}
+                                />
+                            </div>
+
+                            <div className="p-3 bg-slate-50 rounded-lg">
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm font-medium text-slate-600">Total:</span>
                                     <span className="text-xl font-bold text-green-600">
@@ -611,6 +652,14 @@ const Finances = () => {
                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     value={newExpenseForm.amount}
                                     onChange={(e) => setNewExpenseForm({ ...newExpenseForm, amount: Number(e.target.value) })}
+                                />
+                            </div>
+
+                            <div className="p-3 bg-slate-50 rounded-lg">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Método de Pago</label>
+                                <PaymentMethodToggle
+                                    value={newExpenseForm.paymentMethod}
+                                    onChange={(val) => setNewExpenseForm({ ...newExpenseForm, paymentMethod: val })}
                                 />
                             </div>
 
@@ -694,7 +743,7 @@ const Finances = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
                                 <select
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 mb-4"
                                     value={editingTransaction.category}
                                     onChange={(e) => setEditingTransaction({ ...editingTransaction, category: e.target.value })}
                                 >
@@ -703,6 +752,14 @@ const Finances = () => {
                                     <option value="Venta">Venta</option>
                                     <option value="Gasto">Gasto</option>
                                 </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Método de Pago</label>
+                                <PaymentMethodToggle
+                                    value={editingTransaction.paymentMethod || 'Efectivo'}
+                                    onChange={(val) => setEditingTransaction({ ...editingTransaction, paymentMethod: val })}
+                                />
                             </div>
                         </div>
 

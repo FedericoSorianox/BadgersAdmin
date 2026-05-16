@@ -388,7 +388,9 @@ const Dashboard = () => {
 
     const fetchCashSummary = async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/finance/cash-summary`);
+            const res = await axios.get(`${API_URL}/api/finance/cash-summary`, {
+                params: { localDate: localTodayString }
+            });
             setCashRegisterForm(prev => ({
                 ...prev,
                 cashIn: res.data.cashIn,
@@ -402,7 +404,9 @@ const Dashboard = () => {
     const fetchCashDetail = async () => {
         setCashDetailLoading(true);
         try {
-            const res = await axios.get(`${API_URL}/api/finance/cash-detail`);
+            const res = await axios.get(`${API_URL}/api/finance/cash-detail`, {
+                params: { localDate: localTodayString }
+            });
             setCashDetailData(res.data);
             setCashDetailModalOpen(true);
         } catch (error) {
