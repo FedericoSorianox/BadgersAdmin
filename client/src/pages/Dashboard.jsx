@@ -1265,6 +1265,11 @@ const Dashboard = () => {
             };
 
             const handleWhatsAppIndividual = async (m) => {
+                if (stats.remindersSent.has(m._id)) {
+                    const confirmSend = window.confirm(`Este mensaje ya fue enviado a ${m.fullName} este mes. ¿Deseas volver a mandarlo?`);
+                    if (!confirmSend) return;
+                }
+
                 try {
                     await sendToN8n(m);
 
@@ -1319,14 +1324,18 @@ const Dashboard = () => {
                                     </div>
                                     <div>
                                         {stats.remindersSent.has(m._id) ? (
-                                            <span className="px-3 py-1.5 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg flex items-center gap-2 border border-slate-200 cursor-not-allowed" title="Enviado este mes">
+                                            <button
+                                                onClick={() => handleWhatsAppIndividual(m)}
+                                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-bold rounded-lg flex items-center gap-2 border border-slate-200 transition-colors shadow-sm cursor-pointer"
+                                                title="Ya enviado este mes. Clic para volver a enviar"
+                                            >
                                                 <CheckCircle size={14} className="text-green-500" />
                                                 Enviado
-                                            </span>
+                                            </button>
                                         ) : (
                                             <button
                                                 onClick={() => handleWhatsAppIndividual(m)}
-                                                className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                                                className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
                                                 title="Enviar WhatsApp Manual"
                                             >
                                                 <MessageCircle size={14} />
