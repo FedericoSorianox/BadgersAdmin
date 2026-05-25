@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Save, Calculator } from 'lucide-react';
+import { Save, Calculator, PiggyBank } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { useTenant } from '../context/TenantContext';
@@ -28,7 +28,8 @@ const Admin = () => {
         fedeAmount: 0,
         hourlyPaymentGonza: 0,
         utilityGonza: 0,
-        gonzaAmount: 0
+        gonzaAmount: 0,
+        academySavings: 0
     });
 
     const [loading, setLoading] = useState(true);
@@ -106,6 +107,10 @@ const Admin = () => {
 
         if (totalEffectiveHours <= 0) return;
 
+        // A la Ganancia bruta mensual se le calcula el 10 % para Ahorros Academia
+        const academySavings = grossProfit > 0 ? grossProfit * 0.10 : 0;
+        const availableProfit = grossProfit - academySavings;
+
         // 1. Pago por horas de cada uno (Horas * 1000)
         let hourlyPaymentFede = effectiveFedeHours * hourlyRate;
         let hourlyPaymentGonza = effectiveGonzaHours * hourlyRate;
@@ -116,12 +121,12 @@ const Admin = () => {
         let fedeAmount = 0;
         let gonzaAmount = 0;
 
-        if (grossProfit >= totalHourlyPayment) {
+        if (availableProfit >= totalHourlyPayment) {
             // Caso 1: Alcanza para pagar las horas
-            // 2. Restar suma de pagos a Ganancia Bruta para Utilidad
-            utility = grossProfit - totalHourlyPayment;
+            // 2. Restar suma de pagos y ahorros a Ganancia Bruta para Utilidad
+            utility = availableProfit - totalHourlyPayment;
 
-            // 3. Dividir Utilidad en dos partes iguales
+            // 3. Dividir Utilidad en dos partes iguales (50% a cada socio)
             utilityPerPartner = utility / 2;
 
             // 4. Pago Final = Pago por Horas + Utilidad (50%)
@@ -129,16 +134,16 @@ const Admin = () => {
             gonzaAmount = hourlyPaymentGonza + utilityPerPartner;
         } else {
             // Caso 2: No alcanza. Reparto proporcional.
-            // La utilidad es 0 porque se distribuye toda la ganancia
+            // La utilidad es 0 porque se distribuye toda la ganancia disponible
             utilityPerPartner = 0;
             
             // Calculamos el porcentaje de horas de cada uno
             const percentageFede = effectiveFedeHours / totalEffectiveHours;
             const percentageGonza = effectiveGonzaHours / totalEffectiveHours;
 
-            // Su "pago por horas" ahora es directamente su porcentaje de la ganancia
-            hourlyPaymentFede = grossProfit * percentageFede;
-            hourlyPaymentGonza = grossProfit * percentageGonza;
+            // Su "pago por horas" ahora es directamente su porcentaje de la ganancia disponible
+            hourlyPaymentFede = availableProfit * percentageFede;
+            hourlyPaymentGonza = availableProfit * percentageGonza;
 
             fedeAmount = hourlyPaymentFede;
             gonzaAmount = hourlyPaymentGonza;
@@ -150,7 +155,8 @@ const Admin = () => {
             fedeAmount,
             hourlyPaymentGonza,
             utilityGonza: utilityPerPartner,
-            gonzaAmount
+            gonzaAmount,
+            academySavings
         });
     }, [config]);
 
@@ -302,7 +308,32 @@ const Admin = () => {
 
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl shadow-sm border border-blue-100 flex flex-col justify-between">
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <p className="text-sm font-bold text-blue-600 uppercase flex items-center gap-1.5">
+                                <PiggyBank size={16} className="text-blue-500" />
+                                Ahorros Academia
+                            </p>
+                            <span className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-700 font-semibold">
+                                10% Fijo
+                            </span>
+                        </div>
+                        <p className="text-4xl font-bold text-blue-900 mb-4">{formatCurrency(results.academySavings)}</p>
+                    </div>
+                    <div className="space-y-1 text-sm text-blue-700/80 border-t border-blue-200/60 pt-3 mt-auto">
+                        <div className="flex justify-between">
+                            <span>Ganancia Bruta:</span>
+                            <span className="font-medium text-blue-950">{formatCurrency(config.grossProfit)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>Porcentaje Ahorro:</span>
+                            <span className="font-medium text-blue-950">10.0%</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-center mb-2">
                         <p className="text-sm font-bold text-slate-400 uppercase">{partner1Name}</p>
@@ -322,6 +353,7 @@ const Admin = () => {
                         </div>
                     </div>
                 </div>
+
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-center mb-2">
                         <p className="text-sm font-bold text-slate-400 uppercase">{partner2Name}</p>
