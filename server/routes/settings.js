@@ -80,18 +80,19 @@ router.get('/', async (req, res) => {
 /* ─── POST /api/settings ─────────────────────────────────────────────────── */
 router.post('/', async (req, res) => {
     try {
-        const { fedeHours, gonzaHours, fedeDaysOff, gonzaDaysOff, instructors, plans, tasks } = req.body;
+        const { fedeHours, gonzaHours, fedeDaysOff, gonzaDaysOff, instructors, plans, tasks, academySavingsBox } = req.body;
 
         let settings = await Settings.findOne({ key: 'admin_config' });
         if (!settings) settings = new Settings({ key: 'admin_config' });
 
-        if (fedeHours    !== undefined) settings.fedeHours    = fedeHours;
-        if (gonzaHours   !== undefined) settings.gonzaHours   = gonzaHours;
-        if (fedeDaysOff  !== undefined) settings.fedeDaysOff  = fedeDaysOff;
-        if (gonzaDaysOff !== undefined) settings.gonzaDaysOff = gonzaDaysOff;
-        if (instructors  !== undefined) settings.instructors  = instructors;
-        if (plans        !== undefined) settings.plans        = plans;
-        if (tasks        !== undefined) settings.tasks        = tasks;
+        if (fedeHours          !== undefined) settings.fedeHours          = fedeHours;
+        if (gonzaHours         !== undefined) settings.gonzaHours         = gonzaHours;
+        if (fedeDaysOff        !== undefined) settings.fedeDaysOff        = fedeDaysOff;
+        if (gonzaDaysOff       !== undefined) settings.gonzaDaysOff       = gonzaDaysOff;
+        if (instructors        !== undefined) settings.instructors        = instructors;
+        if (plans              !== undefined) settings.plans              = plans;
+        if (tasks              !== undefined) settings.tasks              = tasks;
+        if (academySavingsBox  !== undefined) settings.academySavingsBox  = academySavingsBox;
 
         const updated = await settings.save();
         res.json(updated);

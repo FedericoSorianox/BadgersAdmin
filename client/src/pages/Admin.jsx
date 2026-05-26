@@ -19,7 +19,8 @@ const Admin = () => {
         fedeDaysOff: 0,
         gonzaDaysOff: 0,
         instructors: [],
-        plans: []
+        plans: [],
+        academySavingsBox: 0
     });
 
     const [results, setResults] = useState({
@@ -77,7 +78,8 @@ const Admin = () => {
                     fedeDaysOff: settings.fedeDaysOff,
                     gonzaDaysOff: settings.gonzaDaysOff,
                     instructors: settings.instructors || [],
-                    plans: settings.plans || []
+                    plans: settings.plans || [],
+                    academySavingsBox: settings.academySavingsBox !== undefined ? settings.academySavingsBox : 0
                 }));
             } catch (error) {
                 console.error('Error fetching settings:', error);
@@ -174,7 +176,8 @@ const Admin = () => {
                 fedeDaysOff: config.fedeDaysOff,
                 gonzaDaysOff: config.gonzaDaysOff,
                 instructors: config.instructors,
-                plans: config.plans
+                plans: config.plans,
+                academySavingsBox: config.academySavingsBox
             });
             alert('Configuración guardada exitosamente');
         } catch (error) {
@@ -241,17 +244,32 @@ const Admin = () => {
             </div>
 
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 space-y-6">
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Ganancia Bruta Mensual</label>
-                    <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-slate-400">$</span>
-                        <input
-                            type="number"
-                            className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={config.grossProfit}
-                            onChange={(e) => setConfig({ ...config, grossProfit: e.target.value })}
-                            disabled={loading}
-                        />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Ganancia Bruta Mensual</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-slate-400">$</span>
+                            <input
+                                type="number"
+                                className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={config.grossProfit}
+                                onChange={(e) => setConfig({ ...config, grossProfit: e.target.value })}
+                                disabled={loading}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Caja Ahorros Academia</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-slate-400">$</span>
+                            <input
+                                type="number"
+                                className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={config.academySavingsBox}
+                                onChange={(e) => setConfig({ ...config, academySavingsBox: Number(e.target.value) })}
+                                disabled={loading}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -330,6 +348,10 @@ const Admin = () => {
                         <div className="flex justify-between">
                             <span>Porcentaje Ahorro:</span>
                             <span className="font-medium text-blue-950">10.0%</span>
+                        </div>
+                        <div className="flex justify-between border-t border-blue-200/30 pt-1 mt-1">
+                            <span>Total Caja Ahorros:</span>
+                            <span className="font-bold text-blue-950">{formatCurrency(config.academySavingsBox)}</span>
                         </div>
                     </div>
                 </div>

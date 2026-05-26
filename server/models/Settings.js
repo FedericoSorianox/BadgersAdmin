@@ -22,6 +22,7 @@ const settingsSchema = new mongoose.Schema({
         cost: { type: Number, required: true },
         type: { type: String, enum: ['Individual', 'Familiar'], default: 'Individual' }
     }],
+    academySavingsBox: { type: Number, default: 0 },
     tasks: [taskSchema]
 }, { timestamps: true });
 
