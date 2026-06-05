@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
         const query = { status: 'pending', tenantId: req.tenantId || null };
         const debts = await Debt.find(query)
             .sort({ date: -1 })
-            .populate('memberId', 'fullName ci photoUrl');
+            .populate('memberId', 'fullName ci photoUrl phone');
         res.json(debts);
     } catch (err) {
         res.status(500).json({ message: err.message });

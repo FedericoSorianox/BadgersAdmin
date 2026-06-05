@@ -55,6 +55,7 @@ const Dashboard = () => {
         membersList: [],
         paymentsList: [],
         remindersSent: [], // New state for tracking sent reminders
+        fiadoRemindersSent: [], // New state for tracking sent fiado reminders
         notesMap: {}, // memberId -> note string
         birthdaysList: [], // Members with birthday this month
         instructors: [],
@@ -175,12 +176,13 @@ const Dashboard = () => {
             // Set a long timeout (60s) to allow for Render Clean/Cold start
             const config = { timeout: 60000 };
 
-            const [financeRes, productsRes, membersRes, debtsRes, remindersRes, settingsRes, expensesRes] = await Promise.all([
+            const [financeRes, productsRes, membersRes, debtsRes, remindersRes, fiadoRemindersRes, settingsRes, expensesRes] = await Promise.all([
                 axios.get(`${API_URL}/api/finance`, config),
                 axios.get(`${API_URL}/api/products`, config),
                 axios.get(`${API_URL}/api/members`, config),
                 axios.get(`${API_URL}/api/debts`, config),
                 axios.get(`${API_URL}/api/notifications/reminders`, config), // Fetch sent reminders
+                axios.get(`${API_URL}/api/notifications/reminders?type=fiado_reminder`, config), // Fetch sent fiado reminders
                 axios.get(`${API_URL}/api/settings`, config),
                 axios.get(`${API_URL}/api/finance/expenses`, config)
             ]);
@@ -190,6 +192,7 @@ const Dashboard = () => {
             const members = membersRes.data;
             const fetchedDebts = debtsRes.data;
             const remindersSent = remindersRes.data || [];
+            const fiadoRemindersSent = fiadoRemindersRes.data || [];
             const settings = settingsRes.data || {};
             const expenses = expensesRes.data || [];
 
@@ -232,6 +235,7 @@ const Dashboard = () => {
                 membersList: members,
                 paymentsList: payments,
                 remindersSent: new Set(remindersSent), // Convert to Set for faster lookup
+                fiadoRemindersSent: new Set(fiadoRemindersSent), // Convert to Set for faster lookup
                 notesMap: payments
                     .filter(p => Number(p.month) === currentMonth && Number(p.year) === currentYear && p.type === 'Nota')
                     .reduce((acc, p) => ({ ...acc, [p.memberId]: p.comments }), {}),
@@ -791,7 +795,51 @@ const Dashboard = () => {
         }
     };
 
+    const handleFiadoWhatsApp = async (group) => {
+        try {
+            if (!group.phone) {
+                alert('Este socio no tiene número de teléfono registrado.');
+                return;
+            }
 
+            const isResend = stats.fiadoRemindersSent.has(group.id);
+            const confirmMsg = isResend
+                ? `Ya se envió un recordatorio de productos a ${group.name} este mes. ¿Desea enviarlo de nuevo?`
+                : `¿Enviar recordatorio de deudas de productos a ${group.name} por WhatsApp?`;
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            const payload = {
+                phone: group.phone,
+                memberName: group.name,
+                type: 'fiado',
+                message: `Hola ${group.name}, te recordamos que tienes productos pendiente de pago. Puedes ver tu ficha de socio ${window.location.origin}/public/profile/${group.id}`,
+                link: `${window.location.origin}/public/profile/${group.id}`
+            };
+
+            try {
+                await axios.post('https://n8n.vanguardlab.cloud/webhook/webhook-pagos', payload);
+            } catch (error) {
+                if (error.message !== 'Network Error') {
+                    throw error;
+                }
+                console.warn('Ignorando Network Error de N8N por posible falta de CORS headers.');
+            }
+
+            await axios.post(`${API_URL}/api/notifications/log-reminder`, { 
+                memberId: group.id,
+                type: 'fiado_reminder'
+            });
+
+            alert(`Recordatorio de productos enviado a ${group.name}`);
+            fetchData();
+        } catch (error) {
+            console.error('Error sending fiado reminder:', error);
+            alert('Error al enviar el recordatorio de fiado.');
+        }
+    };
 
     const handleToggleMemberStatus = async (member) => {
         const action = member.active ? 'inactivar' : 'activar';
@@ -1931,6 +1979,7 @@ const Dashboard = () => {
                                         acc[mId] = {
                                             id: mId,
                                             name: mName,
+                                            phone: debt.memberId?.phone || '',
                                             count: 0,
                                             totalDebt: 0,
                                             items: []
@@ -1981,6 +2030,25 @@ const Dashboard = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2">
+                                                {stats.fiadoRemindersSent?.has(group.id) ? (
+                                                    <button
+                                                        onClick={() => handleFiadoWhatsApp(group)}
+                                                        className="bg-slate-100 hover:bg-slate-200 text-slate-500 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 border border-slate-200"
+                                                        title="Ya enviado este mes. Clic para volver a enviar"
+                                                    >
+                                                        <CheckCircle size={14} className="text-green-500" />
+                                                        Enviado
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleFiadoWhatsApp(group)}
+                                                        className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                                                        title="Enviar recordatorio de productos por WhatsApp"
+                                                    >
+                                                        <MessageCircle size={14} />
+                                                        Enviar
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         setPartialPayForm({

@@ -57,11 +57,12 @@ router.post('/send-reminder', async (req, res) => {
 // Get all reminders sent for the current month
 router.get('/reminders', async (req, res) => {
     try {
+        const { type } = req.query;
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
 
         const reminders = await Notification.find({
-            type: 'payment_reminder',
+            type: type || 'payment_reminder',
             month: currentMonth,
             year: currentYear
         });
@@ -76,14 +77,15 @@ router.get('/reminders', async (req, res) => {
 
 // POST /api/notifications/log-reminder
 router.post('/log-reminder', async (req, res) => {
-    const { memberId } = req.body;
+    const { memberId, type } = req.body;
+    const notificationType = type || 'payment_reminder';
     try {
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
         
         const existing = await Notification.findOne({
             memberId,
-            type: 'payment_reminder',
+            type: notificationType,
             month: currentMonth,
             year: currentYear
         });
@@ -91,7 +93,7 @@ router.post('/log-reminder', async (req, res) => {
         if (!existing) {
             const notification = new Notification({
                 memberId,
-                type: 'payment_reminder',
+                type: notificationType,
                 month: currentMonth,
                 year: currentYear
             });
