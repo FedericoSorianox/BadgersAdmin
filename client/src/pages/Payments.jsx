@@ -54,6 +54,16 @@ const Payments = () => {
     // 1. Current Month Status
     const memberStatusList = useMemo(() => {
         const processed = members.map(member => {
+            // Determine start month based on when the member joined using UTC
+            const joinDate = new Date(member.joinDate || member.createdAt || new Date());
+            const joinMonth = joinDate.getUTCMonth() + 1;
+            const joinYear = joinDate.getUTCFullYear();
+
+            // If selected period is prior to the member's join date, they shouldn't appear/owe anything in this month
+            if (Number(selectedYear) < joinYear || (Number(selectedYear) === joinYear && Number(selectedMonth) < joinMonth)) {
+                return null;
+            }
+
             // Find payment for SELECTED month/year
             const payment = payments.find(p => {
                 const d = new Date(p.date || p.createdAt);
@@ -79,11 +89,6 @@ const Payments = () => {
             // Calculate Past Debts (Previous months of selected Year)
             const pastDebts = [];
             if (Number(selectedYear) === new Date().getFullYear()) {
-                // Determine start month based on when the member joined
-                const joinDate = new Date(member.joinDate || member.createdAt || new Date());
-                const joinMonth = joinDate.getMonth() + 1;
-                const joinYear = joinDate.getFullYear();
-
                 let startMonth = 1;
                 if (Number(selectedYear) === joinYear) {
                     startMonth = joinMonth;
@@ -115,7 +120,7 @@ const Payments = () => {
                 note: note ? note.comments : null,
                 pastDebts // Array of month numbers
             };
-        });
+        }).filter(Boolean);
 
         return processed.filter(m =>
             m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -373,13 +378,22 @@ const Payments = () => {
                                             <h4 className="font-bold text-slate-800">{member.fullName}</h4>
                                             <p className="text-xs text-slate-400 font-mono">CI: {member.ci}</p>
                                         </div>
-                                        <button
-                                            onClick={() => handleQuickPayment(member)}
-                                            className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
-                                        >
-                                            <DollarSign size={14} />
-                                            Cobrar
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => handleDismissDebt(member)}
+                                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                                                title="Condonar/Borrar deuda de este mes"
+                                            >
+                                                Condonar
+                                            </button>
+                                            <button
+                                                onClick={() => handleQuickPayment(member)}
+                                                className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                                            >
+                                                <DollarSign size={14} />
+                                                Cobrar
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Warnings / Context */}

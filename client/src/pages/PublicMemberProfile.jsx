@@ -112,6 +112,11 @@ const PublicMemberProfile = () => {
     const isLicensed = currentPayment && currentPayment.type === 'Licencia';
     const isCondoned = currentPayment && currentPayment.type === 'Condonado';
 
+    // Determine join date safely using UTC to avoid timezone shift
+    const joinDate = new Date(member.joinDate || member.createdAt || new Date());
+    const joinMonth = joinDate.getUTCMonth() + 1;
+    const joinYear = joinDate.getUTCFullYear();
+
     // Calculate Past Debt (last 3 months)
     let pastDebtAmount = 0;
     const pastMonthsPending = [];
@@ -120,6 +125,11 @@ const PublicMemberProfile = () => {
         d.setMonth(d.getMonth() - i);
         const m = d.getMonth() + 1;
         const y = d.getFullYear();
+
+        // Skip months prior to the member's join date
+        if (y < joinYear || (y === joinYear && m < joinMonth)) {
+            continue;
+        }
 
         const hasRecord = payments.some(p => 
             p.month === m && p.year === y && 
@@ -140,16 +150,19 @@ const PublicMemberProfile = () => {
     // Create Virtual History for missing months
     const virtualDebts = [];
     if (!isPaid && !isLicensed && !isCondoned) {
-        virtualDebts.push({
-            _id: `v-current`,
-            month: currentMonth,
-            year: currentYear,
-            amount: memberPrice,
-            type: 'Cuota',
-            isDebt: true,
-            isVirtual: true,
-            date: new Date()
-        });
+        // Only if current month is on or after join date
+        if (currentYear > joinYear || (currentYear === joinYear && currentMonth >= joinMonth)) {
+            virtualDebts.push({
+                _id: `v-current`,
+                month: currentMonth,
+                year: currentYear,
+                amount: memberPrice,
+                type: 'Cuota',
+                isDebt: true,
+                isVirtual: true,
+                date: new Date()
+            });
+        }
     }
 
     // Add virtual records for past unpaid months
@@ -158,6 +171,11 @@ const PublicMemberProfile = () => {
         d.setMonth(d.getMonth() - i);
         const m = d.getMonth() + 1;
         const y = d.getFullYear();
+
+        // Skip months prior to the member's join date
+        if (y < joinYear || (y === joinYear && m < joinMonth)) {
+            continue;
+        }
 
         const hasRecord = payments.some(p => 
             p.month === m && p.year === y && 

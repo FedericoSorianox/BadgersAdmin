@@ -973,7 +973,16 @@ const Dashboard = () => {
         if (modalType === 'payments') {
             const currentMonth = new Date().getMonth() + 1;
             const currentYear = new Date().getFullYear();
-            const activeMembers = stats.membersList.filter(m => m.active && !m.isExempt);
+            const activeMembers = stats.membersList.filter(m => {
+                if (!m.active || m.isExempt) return false;
+                const joinDate = new Date(m.joinDate || m.createdAt || new Date());
+                const joinMonth = joinDate.getUTCMonth() + 1;
+                const joinYear = joinDate.getUTCFullYear();
+                if (currentYear < joinYear || (currentYear === joinYear && currentMonth < joinMonth)) {
+                    return false;
+                }
+                return true;
+            });
             const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
 
             // Paid this month or has license this month
@@ -998,8 +1007,12 @@ const Dashboard = () => {
             );
 
             // Helper to check past debts (unpaid months without license)
-            const getPastDebts = (memberId) => {
+            const getPastDebts = (member) => {
                 const pastMonths = [];
+                const joinDate = new Date(member.joinDate || member.createdAt || new Date());
+                const joinMonth = joinDate.getUTCMonth() + 1;
+                const joinYear = joinDate.getUTCFullYear();
+
                 // Check last 3 months for simplicity
                 for (let i = 1; i <= 3; i++) {
                     const date = new Date();
@@ -1007,8 +1020,12 @@ const Dashboard = () => {
                     const m = date.getMonth() + 1;
                     const y = date.getFullYear();
 
+                    if (y < joinYear || (y === joinYear && m < joinMonth)) {
+                        continue;
+                    }
+
                     const hasPayment = stats.paymentsList.some(p =>
-                        String(p.memberId) === String(memberId) &&
+                        String(p.memberId) === String(member._id) &&
                         p.month === m && p.year === y &&
                         (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
                     );
@@ -1106,7 +1123,7 @@ const Dashboard = () => {
                         </div>
                         <div className="bg-red-50 rounded-xl p-4 max-h-[350px] overflow-y-auto divide-y divide-red-100">
                             {filteredPending.map(m => {
-                                const pastDue = getPastDebts(m._id);
+                                const pastDue = getPastDebts(m);
                                 return (
                                     <div key={m._id} className="py-2.5 flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center gap-2 border-b border-red-100 last:border-0">
                                         <div>
