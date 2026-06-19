@@ -73,7 +73,8 @@ const Finances = () => {
         description: '',
         amount: 0,
         concept: 'Gasto',
-        paymentMethod: 'Efectivo'
+        paymentMethod: 'Efectivo',
+        expenseType: 'Normal'
     });
 
     const fetchTransactions = useCallback(async () => {
@@ -204,12 +205,13 @@ const Finances = () => {
                 concept: newExpenseForm.concept,
                 amount: newExpenseForm.amount,
                 paymentMethod: newExpenseForm.paymentMethod,
+                expenseType: newExpenseForm.expenseType || 'Normal',
                 date: new Date()
             };
 
             await axios.post(`${API_URL}/api/finance/expenses`, expenseData);
             setNewExpenseModalOpen(false);
-            setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto' });
+            setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo', expenseType: 'Normal' });
             fetchTransactions();
         } catch (error) {
             console.error('Error registering expense:', error);
@@ -221,7 +223,7 @@ const Finances = () => {
     const stats = {
         totalCuotas: transactions.filter(t => t.category === 'Cuota').reduce((acc, t) => acc + t.amount, 0),
         totalVentas: transactions.filter(t => t.category === 'Producto' || t.category === 'Venta').reduce((acc, t) => acc + t.amount, 0),
-        totalGastos: Math.abs(transactions.filter(t => t.category === 'Gasto').reduce((acc, t) => acc + t.amount, 0)),
+        totalGastos: Math.abs(transactions.filter(t => t.category === 'Gasto' && t.expenseType !== 'Ahorros').reduce((acc, t) => acc + t.amount, 0)),
     };
     stats.balance = stats.totalCuotas + stats.totalVentas - stats.totalGastos;
 
@@ -271,7 +273,7 @@ const Finances = () => {
                 .reduce((acc, t) => acc + t.amount, 0);
 
             const gastos = Math.abs(dayTransactions
-                .filter(t => t.category === 'Gasto')
+                .filter(t => t.category === 'Gasto' && t.expenseType !== 'Ahorros')
                 .reduce((acc, t) => acc + t.amount, 0));
 
             dailyData.push({
@@ -489,9 +491,16 @@ const Finances = () => {
                                                     {new Date(transaction.date).toLocaleDateString('es-UY', { day: '2-digit', month: 'short' })}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <p className="text-sm font-bold text-slate-800">
-                                                        {transaction.category === 'Gasto' ? transaction.description : (transaction.productName || transaction.memberName || 'N/A')}
-                                                    </p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-bold text-slate-800">
+                                                            {transaction.category === 'Gasto' ? transaction.description : (transaction.productName || transaction.memberName || 'N/A')}
+                                                        </p>
+                                                        {transaction.category === 'Gasto' && transaction.expenseType === 'Ahorros' && (
+                                                            <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                                                Ahorros Box
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[200px]">
                                                         {transaction.category === 'Gasto' ? (transaction.concept || '-') : (transaction.description || transaction.concept || '-')}
                                                     </p>
@@ -656,6 +665,18 @@ const Finances = () => {
                             </div>
 
                             <div className="p-3 bg-slate-50 rounded-lg">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Destino del Gasto</label>
+                                <select
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-bold"
+                                    value={newExpenseForm.expenseType || 'Normal'}
+                                    onChange={(e) => setNewExpenseForm({ ...newExpenseForm, expenseType: e.target.value })}
+                                >
+                                    <option value="Normal">Gasto Mensual Regular (Operativo)</option>
+                                    <option value="Ahorros">Caja Ahorros Academia (Fondo de Ahorro)</option>
+                                </select>
+                            </div>
+
+                            <div className="p-3 bg-slate-50 rounded-lg">
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Método de Pago</label>
                                 <PaymentMethodToggle
                                     value={newExpenseForm.paymentMethod}
@@ -677,7 +698,7 @@ const Finances = () => {
                             <button
                                 onClick={() => {
                                     setNewExpenseModalOpen(false);
-                                    setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto' });
+                                    setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo', expenseType: 'Normal' });
                                 }}
                                 className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
                             >
@@ -753,6 +774,20 @@ const Finances = () => {
                                     <option value="Gasto">Gasto</option>
                                 </select>
                             </div>
+
+                            {editingTransaction.category === 'Gasto' && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Destino del Gasto</label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={editingTransaction.expenseType || 'Normal'}
+                                        onChange={(e) => setEditingTransaction({ ...editingTransaction, expenseType: e.target.value })}
+                                    >
+                                        <option value="Normal">Gasto Mensual Regular (Operativo)</option>
+                                        <option value="Ahorros">Caja Ahorros Academia (Fondo de Ahorro)</option>
+                                    </select>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Método de Pago</label>

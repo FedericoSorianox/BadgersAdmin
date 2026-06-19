@@ -72,7 +72,7 @@ const Dashboard = () => {
     const [showProductDropdown, setShowProductDropdown] = useState(false);
 
     const [newExpenseModalOpen, setNewExpenseModalOpen] = useState(false);
-    const [newExpenseForm, setNewExpenseForm] = useState({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo' });
+    const [newExpenseForm, setNewExpenseForm] = useState({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo', expenseType: 'Normal' });
 
     const [cashRegisterModalOpen, setCashRegisterModalOpen] = useState(false);
     const [cashRegisterForm, setCashRegisterForm] = useState({
@@ -326,11 +326,12 @@ const Dashboard = () => {
                 concept: newExpenseForm.concept,
                 amount: newExpenseForm.amount,
                 paymentMethod: newExpenseForm.paymentMethod,
+                expenseType: newExpenseForm.expenseType || 'Normal',
                 date: new Date()
             };
             await axios.post(`${API_URL}/api/finance/expenses`, expenseData);
             setNewExpenseModalOpen(false);
-            setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo' });
+            setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo', expenseType: 'Normal' });
             fetchData(); // Refresh to update financials if we were showing them, although mainly updates stats here
         } catch (error) {
             console.error('Error registering expense:', error);
@@ -2276,6 +2277,17 @@ const Dashboard = () => {
                                 />
                             </div>
                             <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Destino del Gasto</label>
+                                <select
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-bold"
+                                    value={newExpenseForm.expenseType || 'Normal'}
+                                    onChange={(e) => setNewExpenseForm({ ...newExpenseForm, expenseType: e.target.value })}
+                                >
+                                    <option value="Normal">Gasto Mensual Regular (Operativo)</option>
+                                    <option value="Ahorros">Caja Ahorros Academia (Fondo de Ahorro)</option>
+                                </select>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Método de Pago</label>
                                 <PaymentMethodToggle
                                     value={newExpenseForm.paymentMethod}
@@ -2285,7 +2297,10 @@ const Dashboard = () => {
                         </div>
                         <div className="flex gap-3 mt-6">
                             <button
-                                onClick={() => setNewExpenseModalOpen(false)}
+                                onClick={() => {
+                                    setNewExpenseModalOpen(false);
+                                    setNewExpenseForm({ description: '', amount: 0, concept: 'Gasto', paymentMethod: 'Efectivo', expenseType: 'Normal' });
+                                }}
                                 className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
                             >
                                 Cancelar

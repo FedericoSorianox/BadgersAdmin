@@ -5,6 +5,31 @@ const Expense = require('../models/Expense');
 const Member = require('../models/Member');
 const Product = require('../models/Product');
 const CashRegister = require('../models/CashRegister');
+const Settings = require('../models/Settings');
+
+async function adjustAcademySavingsBox(tenantId, oldType, oldAmount, newType, newAmount) {
+    try {
+        let settings = await Settings.findOne({ key: 'admin_config', ...(tenantId ? { tenantId } : {}) });
+        if (!settings) {
+            settings = new Settings({ key: 'admin_config', tenantId: tenantId || null });
+        }
+
+        let adjustment = 0;
+        if (oldType === 'Ahorros') {
+            adjustment += oldAmount;
+        }
+        if (newType === 'Ahorros') {
+            adjustment -= newAmount;
+        }
+
+        if (adjustment !== 0) {
+            settings.academySavingsBox = (settings.academySavingsBox || 0) + adjustment;
+            await settings.save();
+        }
+    } catch (err) {
+        console.error('Error adjusting academy savings box:', err);
+    }
+}
 
 // Get payments (optionally filter by month/year)
 router.get('/', async (req, res) => {
@@ -236,6 +261,9 @@ router.post('/expenses', async (req, res) => {
     const expense = new Expense(expenseData);
     try {
         const newExpense = await expense.save();
+        if (newExpense.expenseType === 'Ahorros') {
+            await adjustAcademySavingsBox(req.tenantId, 'Normal', 0, 'Ahorros', newExpense.amount);
+        }
         res.status(201).json(newExpense);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -245,7 +273,18 @@ router.post('/expenses', async (req, res) => {
 // Update expense
 router.put('/expenses/:id', async (req, res) => {
     try {
+        const oldExpense = await Expense.findById(req.params.id);
+        if (!oldExpense) {
+            return res.status(404).json({ message: 'Expense not found' });
+        }
         const updatedExpense = await Expense.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        await adjustAcademySavingsBox(
+            req.tenantId,
+            oldExpense.expenseType || 'Normal',
+            oldExpense.amount,
+            updatedExpense.expenseType || 'Normal',
+            updatedExpense.amount
+        );
         res.json(updatedExpense);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -255,7 +294,14 @@ router.put('/expenses/:id', async (req, res) => {
 // Delete expense
 router.delete('/expenses/:id', async (req, res) => {
     try {
+        const expense = await Expense.findById(req.params.id);
+        if (!expense) {
+            return res.status(404).json({ message: 'Expense not found' });
+        }
         await Expense.findByIdAndDelete(req.params.id);
+        if (expense.expenseType === 'Ahorros') {
+            await adjustAcademySavingsBox(req.tenantId, 'Ahorros', expense.amount, 'Normal', 0);
+        }
         res.json({ message: 'Expense deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -275,7 +321,7 @@ router.get('/stats', async (req, res) => {
         const payments = await Payment.find(query);
         const totalIncome = payments.reduce((acc, curr) => acc + curr.amount, 0);
 
-        const expenses = await Expense.find(query);
+        const expenses = await Expense.find({ ...query, expenseType: { $ne: 'Ahorros' } });
         const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
         res.json({
@@ -359,8 +405,8 @@ router.get('/cash-detail', async (req, res) => {
             date: { $gte: startOfDay, $lte: endOfDay }
         };
 
-        const payments = await Payment.find(baseQuery).sort({ date: -1 });
-        const expenses = await Expense.find(baseQuery).sort({ date: -1 });
+                const payments = await Payment.find(baseQuery).sort({ date: -1 });
+        const expenses = await Expense.find({ ...baseQuery, expenseType: { $ne: 'Ahorros' } }).sort({ date: -1 });
 
         res.json({ payments, expenses });
     } catch (err) {
@@ -394,7 +440,7 @@ router.get('/cash-summary', async (req, res) => {
         const payments = await Payment.find(query);
         const cashIn = payments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
-        const expenses = await Expense.find(query);
+        const expenses = await Expense.find({ ...query, expenseType: { $ne: 'Ahorros' } });
         const cashOut = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
         res.json({ cashIn, cashOut });

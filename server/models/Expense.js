@@ -7,6 +7,7 @@ const ExpenseSchema = new mongoose.Schema({
     category: { type: String, default: 'Otros' },
     description: { type: String },
     paymentMethod: { type: String, enum: ['Efectivo', 'Digital'], default: 'Efectivo' },
+    expenseType: { type: String, enum: ['Normal', 'Ahorros'], default: 'Normal' },
     createdAt: { type: Date, default: Date.now }
 });
 

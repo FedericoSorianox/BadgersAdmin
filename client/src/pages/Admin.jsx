@@ -53,7 +53,7 @@ const Admin = () => {
                 const payments = paymentsRes.data;
                 const expenses = expensesRes.data.filter(e => {
                     const eDate = new Date(e.date);
-                    return (eDate.getMonth() + 1) === currentMonth && eDate.getFullYear() === currentYear;
+                    return (eDate.getMonth() + 1) === currentMonth && eDate.getFullYear() === currentYear && e.expenseType !== 'Ahorros';
                 });
 
                 const totalCuotas = payments.filter(p => p.type === 'Cuota' || p.category === 'Cuota').reduce((acc, p) => acc + p.amount, 0);
