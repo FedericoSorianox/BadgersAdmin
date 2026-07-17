@@ -9,7 +9,7 @@ const MemberSchema = new mongoose.Schema({
         phone: { type: String }
     },
     birthDate: { type: Date },
-    joinDate: { type: Date, default: Date.now },
+    joinDate: { type: Date },
     planType: { type: String, default: 'Libre' },
     planCost: { type: Number, default: 2000 }, // Stored snapshot of cost
     active: { type: Boolean, default: true },

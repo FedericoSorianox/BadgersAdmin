@@ -30,7 +30,12 @@ const Admin = () => {
         hourlyPaymentGonza: 0,
         utilityGonza: 0,
         gonzaAmount: 0,
-        academySavings: 0
+        academySavingsAdded: 0,
+        academySavingsTaken: 0,
+        academySavingsNet: 0,
+        academySavingsBoxUpdated: 0,
+        savingsStatus: 'complete', // 'complete', 'partial', 'taken'
+        paymentStatus: 'complete'   // 'complete', 'proportional'
     });
 
     const [loading, setLoading] = useState(true);
@@ -109,47 +114,77 @@ const Admin = () => {
 
         if (totalEffectiveHours <= 0) return;
 
-        // A la Ganancia bruta mensual se le calcula el 10 % para Ahorros Academia
-        const academySavings = grossProfit > 0 ? grossProfit * 0.10 : 0;
-        const availableProfit = grossProfit - academySavings;
-
         // 1. Pago por horas de cada uno (Horas * 1000)
-        let hourlyPaymentFede = effectiveFedeHours * hourlyRate;
-        let hourlyPaymentGonza = effectiveGonzaHours * hourlyRate;
+        const baseHourlyPaymentFede = effectiveFedeHours * hourlyRate;
+        const baseHourlyPaymentGonza = effectiveGonzaHours * hourlyRate;
+        const totalHourlyPayment = baseHourlyPaymentFede + baseHourlyPaymentGonza;
 
-        const totalHourlyPayment = hourlyPaymentFede + hourlyPaymentGonza;
-        let utility = 0;
+        const initialSavingsBox = Number(config.academySavingsBox) || 0;
+
+        let academySavingsAdded = 0;
+        let academySavingsTaken = 0;
+        let hourlyPaymentFede = 0;
+        let hourlyPaymentGonza = 0;
         let utilityPerPartner = 0;
-        let fedeAmount = 0;
-        let gonzaAmount = 0;
+        let savingsStatus = 'complete'; // 'complete', 'partial', 'taken'
+        let paymentStatus = 'complete';  // 'complete', 'proportional'
 
-        if (availableProfit >= totalHourlyPayment) {
-            // Caso 1: Alcanza para pagar las horas
-            // 2. Restar suma de pagos y ahorros a Ganancia Bruta para Utilidad
-            utility = availableProfit - totalHourlyPayment;
+        if (grossProfit >= totalHourlyPayment) {
+            // Caso 1: Alcanza para pagar las horas de forma directa de la ganancia
+            hourlyPaymentFede = baseHourlyPaymentFede;
+            hourlyPaymentGonza = baseHourlyPaymentGonza;
+            paymentStatus = 'complete';
 
-            // 3. Dividir Utilidad en dos partes iguales (50% a cada socio)
-            utilityPerPartner = utility / 2;
+            const remainderAfterSalaries = grossProfit - totalHourlyPayment;
+            const targetSavings = grossProfit * 0.10;
 
-            // 4. Pago Final = Pago por Horas + Utilidad (50%)
-            fedeAmount = hourlyPaymentFede + utilityPerPartner;
-            gonzaAmount = hourlyPaymentGonza + utilityPerPartner;
+            if (remainderAfterSalaries >= targetSavings) {
+                // Alcanza para el 10% de ahorro completo
+                academySavingsAdded = targetSavings;
+                savingsStatus = 'complete';
+
+                const utility = remainderAfterSalaries - targetSavings;
+                utilityPerPartner = utility / 2;
+            } else {
+                // Se guarda como ahorro solo el remanente disponible
+                academySavingsAdded = remainderAfterSalaries;
+                savingsStatus = 'partial';
+                utilityPerPartner = 0;
+            }
+            academySavingsTaken = 0;
         } else {
-            // Caso 2: No alcanza. Reparto proporcional.
-            // La utilidad es 0 porque se distribuye toda la ganancia disponible
+            // Caso 2: No alcanza para pagar las horas de forma directa
+            academySavingsAdded = 0;
+            const deficit = totalHourlyPayment - grossProfit;
+
+            // Tomamos lo necesario del fondo de ahorro
+            academySavingsTaken = Math.min(initialSavingsBox, deficit);
+            const totalAvailable = grossProfit + academySavingsTaken;
+
+            if (totalAvailable >= totalHourlyPayment) {
+                // Alcanza para pagar los sueldos en su totalidad (gracias al ahorro)
+                hourlyPaymentFede = baseHourlyPaymentFede;
+                hourlyPaymentGonza = baseHourlyPaymentGonza;
+                paymentStatus = 'complete';
+                savingsStatus = 'taken';
+            } else {
+                // Aún con el ahorro, no se llega a cubrir todo (Reparto proporcional)
+                const percentageFede = effectiveFedeHours / totalEffectiveHours;
+                const percentageGonza = effectiveGonzaHours / totalEffectiveHours;
+
+                hourlyPaymentFede = totalAvailable * percentageFede;
+                hourlyPaymentGonza = totalAvailable * percentageGonza;
+                paymentStatus = 'proportional';
+                savingsStatus = 'taken';
+            }
             utilityPerPartner = 0;
-            
-            // Calculamos el porcentaje de horas de cada uno
-            const percentageFede = effectiveFedeHours / totalEffectiveHours;
-            const percentageGonza = effectiveGonzaHours / totalEffectiveHours;
-
-            // Su "pago por horas" ahora es directamente su porcentaje de la ganancia disponible
-            hourlyPaymentFede = availableProfit * percentageFede;
-            hourlyPaymentGonza = availableProfit * percentageGonza;
-
-            fedeAmount = hourlyPaymentFede;
-            gonzaAmount = hourlyPaymentGonza;
         }
+
+        const academySavingsNet = academySavingsAdded - academySavingsTaken;
+        const academySavingsBoxUpdated = initialSavingsBox + academySavingsNet;
+
+        const fedeAmount = hourlyPaymentFede + utilityPerPartner;
+        const gonzaAmount = hourlyPaymentGonza + utilityPerPartner;
 
         setResults({
             hourlyPaymentFede,
@@ -158,7 +193,12 @@ const Admin = () => {
             hourlyPaymentGonza,
             utilityGonza: utilityPerPartner,
             gonzaAmount,
-            academySavings
+            academySavingsAdded,
+            academySavingsTaken,
+            academySavingsNet,
+            academySavingsBoxUpdated,
+            savingsStatus,
+            paymentStatus
         });
     }, [config]);
 
@@ -170,6 +210,7 @@ const Admin = () => {
     const handleSave = async () => {
         try {
             setSaving(true);
+            const updatedSavingsBox = results.academySavingsBoxUpdated !== undefined ? results.academySavingsBoxUpdated : config.academySavingsBox;
             await axios.post(`${API_URL}/api/settings`, {
                 fedeHours: config.fedeHours,
                 gonzaHours: config.gonzaHours,
@@ -177,8 +218,12 @@ const Admin = () => {
                 gonzaDaysOff: config.gonzaDaysOff,
                 instructors: config.instructors,
                 plans: config.plans,
-                academySavingsBox: config.academySavingsBox
+                academySavingsBox: updatedSavingsBox
             });
+            setConfig(prev => ({
+                ...prev,
+                academySavingsBox: updatedSavingsBox
+            }));
             alert('Configuración guardada exitosamente');
         } catch (error) {
             console.error('Error saving settings:', error);
@@ -273,8 +318,6 @@ const Admin = () => {
                     </div>
                 </div>
 
-                {/* Hidden formula info as requested */}
-
                 <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex-1">
                         <h3 className="text-lg font-bold text-slate-700 mb-4">Horas Base Mensuales</h3>
@@ -334,24 +377,55 @@ const Admin = () => {
                                 <PiggyBank size={16} className="text-blue-500" />
                                 Ahorros Academia
                             </p>
-                            <span className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-700 font-semibold">
-                                10% Fijo
-                            </span>
+                            {results.savingsStatus === 'complete' && (
+                                <span className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-700 font-semibold">
+                                    10% Completo
+                                </span>
+                            )}
+                            {results.savingsStatus === 'partial' && (
+                                <span className="text-xs bg-amber-100 px-2 py-1 rounded text-amber-700 font-semibold">
+                                    Ahorro Parcial
+                                </span>
+                            )}
+                            {results.savingsStatus === 'taken' && results.academySavingsTaken > 0 && (
+                                <span className="text-xs bg-red-100 px-2 py-1 rounded text-red-700 font-semibold">
+                                    Tomado de Ahorros
+                                </span>
+                            )}
+                            {results.savingsStatus === 'taken' && results.academySavingsTaken === 0 && (
+                                <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 font-semibold">
+                                    Sin Ahorro
+                                </span>
+                            )}
                         </div>
-                        <p className="text-4xl font-bold text-blue-900 mb-4">{formatCurrency(results.academySavings)}</p>
+                        <p className={`text-4xl font-bold mb-4 ${results.academySavingsNet < 0 ? 'text-red-700' : 'text-blue-900'}`}>
+                            {results.academySavingsNet >= 0 ? '+' : ''}{formatCurrency(results.academySavingsNet)}
+                        </p>
                     </div>
                     <div className="space-y-1 text-sm text-blue-700/80 border-t border-blue-200/60 pt-3 mt-auto">
                         <div className="flex justify-between">
                             <span>Ganancia Bruta:</span>
                             <span className="font-medium text-blue-950">{formatCurrency(config.grossProfit)}</span>
                         </div>
-                        <div className="flex justify-between">
-                            <span>Porcentaje Ahorro:</span>
-                            <span className="font-medium text-blue-950">10.0%</span>
-                        </div>
+                        {results.academySavingsAdded > 0 && (
+                            <div className="flex justify-between">
+                                <span>Ahorro del Mes:</span>
+                                <span className="font-medium text-blue-950">{formatCurrency(results.academySavingsAdded)}</span>
+                            </div>
+                        )}
+                        {results.academySavingsTaken > 0 && (
+                            <div className="flex justify-between text-red-700 font-semibold">
+                                <span>Tomado de Caja:</span>
+                                <span>{formatCurrency(results.academySavingsTaken)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between border-t border-blue-200/30 pt-1 mt-1">
-                            <span>Total Caja Ahorros:</span>
-                            <span className="font-bold text-blue-950">{formatCurrency(config.academySavingsBox)}</span>
+                            <span>Caja Inicial:</span>
+                            <span className="font-medium text-blue-950">{formatCurrency(config.academySavingsBox)}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-blue-200/50 pt-1 mt-1 font-bold">
+                            <span>Caja Actualizada:</span>
+                            <span className="text-blue-950">{formatCurrency(results.academySavingsBoxUpdated)}</span>
                         </div>
                     </div>
                 </div>
@@ -359,9 +433,24 @@ const Admin = () => {
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-center mb-2">
                         <p className="text-sm font-bold text-slate-400 uppercase">{partner1Name}</p>
-                        <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
-                            Neto: {(Number(config.fedeHours) * ((26 - Number(config.fedeDaysOff)) / 26)).toFixed(1)}h
-                        </span>
+                        <div className="flex gap-2">
+                            {results.paymentStatus === 'proportional' ? (
+                                <span className="text-xs bg-amber-100 px-2 py-1 rounded text-amber-700 font-semibold">
+                                    Proporcional
+                                </span>
+                            ) : results.academySavingsTaken > 0 ? (
+                                <span className="text-xs bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-semibold">
+                                    Completo (Ahorros)
+                                </span>
+                            ) : (
+                                <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
+                                    Completo
+                                </span>
+                            )}
+                            <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
+                                Neto: {(Number(config.fedeHours) * ((26 - Number(config.fedeDaysOff)) / 26)).toFixed(1)}h
+                            </span>
+                        </div>
                     </div>
                     <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.fedeAmount)}</p>
                     <div className="space-y-1 text-sm text-slate-500 border-t border-slate-100 pt-3">
@@ -379,9 +468,24 @@ const Admin = () => {
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-center mb-2">
                         <p className="text-sm font-bold text-slate-400 uppercase">{partner2Name}</p>
-                        <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
-                            Neto: {(Number(config.gonzaHours) * ((26 - Number(config.gonzaDaysOff)) / 26)).toFixed(1)}h
-                        </span>
+                        <div className="flex gap-2">
+                            {results.paymentStatus === 'proportional' ? (
+                                <span className="text-xs bg-amber-100 px-2 py-1 rounded text-amber-700 font-semibold">
+                                    Proporcional
+                                </span>
+                            ) : results.academySavingsTaken > 0 ? (
+                                <span className="text-xs bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-semibold">
+                                    Completo (Ahorros)
+                                </span>
+                            ) : (
+                                <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
+                                    Completo
+                                </span>
+                            )}
+                            <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
+                                Neto: {(Number(config.gonzaHours) * ((26 - Number(config.gonzaDaysOff)) / 26)).toFixed(1)}h
+                            </span>
+                        </div>
                     </div>
                     <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.gonzaAmount)}</p>
                     <div className="space-y-1 text-sm text-slate-500 border-t border-slate-100 pt-3">
@@ -407,7 +511,7 @@ const Admin = () => {
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bgslate-50 text-slate-500 font-bold text-sm uppercase">
+                        <thead className="bg-slate-50 text-slate-500 font-bold text-sm uppercase">
                             <tr>
                                 <th className="px-6 py-3 rounded-l-lg">Nombre del Plan</th>
                                 <th className="px-6 py-3">Costo Mensual</th>
