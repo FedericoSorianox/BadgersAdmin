@@ -107,13 +107,14 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
                 const paidIds = new Set(detailedPayments.map(p => String(p.memberId || '')));
                 const paidCis = new Set(detailedPayments.map(p => String(p.memberCi || '')));
                 const activeMembers = members.filter(m => m.active && !m.isExempt);
+                const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
 
-                const paidList = activeMembers.filter(m =>
+                const paidList = billableMembers.filter(m =>
                     (m._id && paidIds.has(String(m._id))) ||
                     (m.ci && paidCis.has(String(m.ci)))
                 );
 
-                const pendingList = activeMembers.filter(m =>
+                const pendingList = billableMembers.filter(m =>
                     !((m._id && paidIds.has(String(m._id))) ||
                         (m.ci && paidCis.has(String(m.ci))))
                 );
@@ -129,6 +130,16 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
                     return null;
                 };
 
+                const getFamilyInfo = (member) => {
+                    if (member.isFamilyHead) {
+                        const dependents = members.filter(d => d.active && String(d.familyId) === String(member._id));
+                        if (dependents.length > 0) {
+                            return `(Fam: ${dependents.map(d => d.fullName.split(' ')[0]).join(', ')})`;
+                        }
+                    }
+                    return '';
+                };
+
                 return (
                     <div className="space-y-6">
                         <div>
@@ -139,10 +150,12 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
                             <div className="bg-green-50 rounded-xl p-4 max-h-[250px] overflow-y-auto divide-y divide-green-100">
                                 {paidList.map(m => {
                                     const statusText = getMemberStatusText(m);
+                                    const familyInfo = getFamilyInfo(m);
                                     return (
                                         <div key={m._id} className="py-2 flex justify-between items-center gap-4">
-                                            <span className="text-sm font-medium text-slate-700 truncate flex-1 flex items-center gap-2">
-                                                {m.fullName}
+                                            <span className="text-sm font-medium text-slate-700 truncate flex-1 flex items-center gap-1.5 flex-wrap">
+                                                <span>{m.fullName}</span>
+                                                {familyInfo && <span className="text-xs text-slate-400 italic font-normal">{familyInfo}</span>}
                                                 {statusText && (
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
                                                         statusText === 'Licencia' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
@@ -165,12 +178,18 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
                                 Pendientes ({pendingList.length})
                             </h4>
                             <div className="bg-red-50 rounded-xl p-4 max-h-[250px] overflow-y-auto divide-y divide-red-100">
-                                {pendingList.map(m => (
-                                    <div key={m._id} className="py-2 flex justify-between items-center gap-4">
-                                        <span className="text-sm font-medium text-slate-700 truncate flex-1">{m.fullName}</span>
-                                        <span className="text-xs text-slate-500 font-mono shrink-0">CI: {m.ci}</span>
-                                    </div>
-                                ))}
+                                {pendingList.map(m => {
+                                    const familyInfo = getFamilyInfo(m);
+                                    return (
+                                        <div key={m._id} className="py-2 flex justify-between items-center gap-4">
+                                            <span className="text-sm font-medium text-slate-700 truncate flex-1 flex items-center gap-1.5 flex-wrap">
+                                                <span>{m.fullName}</span>
+                                                {familyInfo && <span className="text-xs text-slate-400 italic font-normal">{familyInfo}</span>}
+                                            </span>
+                                            <span className="text-xs text-slate-500 font-mono shrink-0">CI: {m.ci}</span>
+                                        </div>
+                                    );
+                                })}
                                 {pendingList.length === 0 && <p className="text-sm text-slate-400 italic">Todos al día.</p>}
                             </div>
                         </div>
