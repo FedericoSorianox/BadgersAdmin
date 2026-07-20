@@ -36,8 +36,8 @@ router.get('/', async (req, res) => {
     try {
         const { month, year } = req.query;
         let query = { tenantId: req.tenantId || null };
-        if (month) query.month = month;
-        if (year) query.year = year;
+        if (month) query.month = Number(month);
+        if (year) query.year = Number(year);
 
         const payments = await Payment.find(query).sort({ date: -1 });
         res.json(payments);
@@ -70,19 +70,41 @@ router.get('/analytics/annual', async (req, res) => {
             {
                 $match: {
                     tenantId: tenantId,
-                    $or: [
-                        { year: targetYear },
+                    $and: [
                         {
-                            date: {
-                                $gte: new Date(`${targetYear}-01-01`),
-                                $lte: new Date(`${targetYear}-12-31`)
-                            }
+                            $or: [
+                                { year: targetYear },
+                                {
+                                    $and: [
+                                        { year: { $exists: false } },
+                                        {
+                                            date: {
+                                                $gte: new Date(`${targetYear}-01-01T00:00:00.000Z`),
+                                                $lte: new Date(`${targetYear}-12-31T23:59:59.999Z`)
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    $and: [
+                                        { year: null },
+                                        {
+                                            date: {
+                                                $gte: new Date(`${targetYear}-01-01T00:00:00.000Z`),
+                                                $lte: new Date(`${targetYear}-12-31T23:59:59.999Z`)
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            $or: [
+                                { type: 'Cuota' },
+                                { type: { $exists: false } },
+                                { type: null }
+                            ]
                         }
-                    ],
-                    $or: [
-                        { type: 'Cuota' },
-                        { type: { $exists: false } },
-                        { type: null }
                     ]
                 }
             },

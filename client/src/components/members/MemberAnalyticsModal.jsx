@@ -9,6 +9,17 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
     const [analyticsData, setAnalyticsData] = useState([]);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
+    // Generate years dynamically from 2023 to currentYear + 1
+    const years = React.useMemo(() => {
+        const startYear = 2023;
+        const currentYear = new Date().getFullYear();
+        const list = [];
+        for (let y = startYear; y <= currentYear + 1; y++) {
+            list.push(y);
+        }
+        return list;
+    }, []);
+
     // History Detail State
     const [detailedPayments, setDetailedPayments] = useState([]);
     const [loadingDetails, setLoadingDetails] = useState(false);
@@ -65,7 +76,12 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
             const response = await axios.get(`${API_URL}/api/finance`, {
                 params: { month, year: selectedYear }
             });
-            setDetailedPayments(response.data);
+            // Filter to only include membership payments (Cuota, Licencia, Condonado, or type not specified)
+            const payments = response.data || [];
+            const filteredPayments = payments.filter(p =>
+                p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type
+            );
+            setDetailedPayments(filteredPayments);
         } catch (error) {
             console.error("Error fetching month details", error);
             setDetailedPayments([]);
@@ -102,6 +118,17 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
                         (m.ci && paidCis.has(String(m.ci))))
                 );
 
+                const getMemberStatusText = (member) => {
+                    const payment = detailedPayments.find(p =>
+                        (p.memberId && String(p.memberId) === String(member._id)) ||
+                        (p.memberCi && String(p.memberCi) === String(member.ci))
+                    );
+                    if (!payment) return null;
+                    if (payment.type === 'Licencia') return 'Licencia';
+                    if (payment.type === 'Condonado') return 'Condonado';
+                    return null;
+                };
+
                 return (
                     <div className="space-y-6">
                         <div>
@@ -110,12 +137,24 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
                                 Pagados ({paidList.length})
                             </h4>
                             <div className="bg-green-50 rounded-xl p-4 max-h-[250px] overflow-y-auto divide-y divide-green-100">
-                                {paidList.map(m => (
-                                    <div key={m._id} className="py-2 flex justify-between items-center gap-4">
-                                        <span className="text-sm font-medium text-slate-700 truncate flex-1">{m.fullName}</span>
-                                        <span className="text-xs text-slate-500 font-mono shrink-0">CI: {m.ci}</span>
-                                    </div>
-                                ))}
+                                {paidList.map(m => {
+                                    const statusText = getMemberStatusText(m);
+                                    return (
+                                        <div key={m._id} className="py-2 flex justify-between items-center gap-4">
+                                            <span className="text-sm font-medium text-slate-700 truncate flex-1 flex items-center gap-2">
+                                                {m.fullName}
+                                                {statusText && (
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                                                        statusText === 'Licencia' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                                                    }`}>
+                                                        {statusText}
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span className="text-xs text-slate-500 font-mono shrink-0">CI: {m.ci}</span>
+                                        </div>
+                                    );
+                                })}
                                 {paidList.length === 0 && <p className="text-sm text-slate-400 italic">Ningún pago registrado.</p>}
                             </div>
                         </div>
@@ -155,10 +194,9 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(Number(e.target.value))}
                         >
-                            <option value={2023}>2023</option>
-                            <option value={2024}>2024</option>
-                            <option value={2025}>2025</option>
-                            <option value={2026}>2026</option>
+                            {years.map(y => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
                         </select>
                     </div>
 
