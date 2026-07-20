@@ -805,8 +805,8 @@ const Dashboard = () => {
 
             const isResend = stats.fiadoRemindersSent.has(group.id);
             const confirmMsg = isResend
-                ? `Ya se envió un recordatorio de productos a ${group.name} este mes. ¿Desea enviarlo de nuevo?`
-                : `¿Enviar recordatorio de deudas de productos a ${group.name} por WhatsApp?`;
+                ? `Ya se envió un recordatorio de pago a ${group.name} este mes. ¿Desea enviarlo de nuevo?`
+                : `¿Enviar recordatorio de pago a ${group.name} por WhatsApp?`;
 
             if (!confirm(confirmMsg)) {
                 return;
@@ -816,7 +816,7 @@ const Dashboard = () => {
                 phone: group.phone,
                 memberName: group.name,
                 type: 'fiado',
-                message: `Hola ${group.name}, te recordamos que tienes productos pendiente de pago. Puedes ver tu ficha de socio ${window.location.origin}/public/profile/${group.id}`,
+                message: `Hola ${group.name}, te recordamos que tienes pendiente de pago tu cuota mensual o consumos de cantina (fiados). Te solicitamos amablemente ponerte al día. Puedes ver los detalles y realizar el pago desde tu ficha de socio aquí: ${window.location.origin}/public/profile/${group.id}`,
                 link: `${window.location.origin}/public/profile/${group.id}`
             };
 
@@ -834,11 +834,11 @@ const Dashboard = () => {
                 type: 'fiado_reminder'
             });
 
-            alert(`Recordatorio de productos enviado a ${group.name}`);
+            alert(`Recordatorio de pago enviado a ${group.name}`);
             fetchData();
         } catch (error) {
             console.error('Error sending fiado reminder:', error);
-            alert('Error al enviar el recordatorio de fiado.');
+            alert('Error al enviar el recordatorio de pago.');
         }
     };
 
@@ -860,11 +860,28 @@ const Dashboard = () => {
 
         if (modalType === 'active') {
             const list = stats.membersList.filter(m => m.active);
+            const filteredList = list.filter(m =>
+                m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (m.ci && m.ci.includes(searchTerm))
+            );
             return (
                 <div className="space-y-4">
-                    <p className="text-sm text-slate-500">Total: {list.length} socios activos</p>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Buscar socio por nombre o cédula..."
+                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <p className="text-sm text-slate-500">
+                        {searchTerm ? `Resultados: ${filteredList.length} de ` : 'Total: '}
+                        {list.length} socios activos
+                    </p>
                     <div className="divide-y divide-slate-100">
-                        {list.map(m => (
+                        {filteredList.map(m => (
                             <div key={m._id} className="py-3 flex justify-between items-center group">
                                 <div>
                                     <div className="flex items-center gap-2">
@@ -891,6 +908,11 @@ const Dashboard = () => {
                                 </div>
                             </div>
                         ))}
+                        {filteredList.length === 0 && (
+                            <div className="px-4 py-8 text-slate-400 text-sm text-center">
+                                No se encontraron socios activos
+                            </div>
+                        )}
                     </div>
                 </div>
             );
@@ -898,11 +920,28 @@ const Dashboard = () => {
 
         if (modalType === 'inactive') {
             const list = stats.membersList.filter(m => !m.active);
+            const filteredList = list.filter(m =>
+                m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (m.ci && m.ci.includes(searchTerm))
+            );
             return (
                 <div className="space-y-4">
-                    <p className="text-sm text-slate-500">Total: {list.length} socios inactivos</p>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Buscar socio por nombre o cédula..."
+                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <p className="text-sm text-slate-500">
+                        {searchTerm ? `Resultados: ${filteredList.length} de ` : 'Total: '}
+                        {list.length} socios inactivos
+                    </p>
                     <div className="divide-y divide-slate-100">
-                        {list.map(m => (
+                        {filteredList.map(m => (
                             <div key={m._id} className="py-3 flex justify-between items-center group">
                                 <div>
                                     <div className="flex items-center gap-2">
@@ -929,6 +968,11 @@ const Dashboard = () => {
                                 </div>
                             </div>
                         ))}
+                        {filteredList.length === 0 && (
+                            <div className="px-4 py-8 text-slate-400 text-sm text-center">
+                                No se encontraron socios inactivos
+                            </div>
+                        )}
                     </div>
                 </div>
             );
@@ -1305,7 +1349,7 @@ const Dashboard = () => {
                 (m.ci && m.ci.includes(searchTerm))
             );
 
-            const getMessage = (m) => `Hola ${m.fullName}, te recordamos que tienes tu cuota de este mes pendiente de pago. Puedes ver tu ficha de socio y pagar desde aquí: ${window.location.origin}/public/profile/${m._id}`;
+            const getMessage = (m) => `Hola ${m.fullName}, te recordamos que tienes pendiente de pago tu cuota mensual o consumos de cantina (fiados). Te solicitamos amablemente ponerte al día. Puedes ver los detalles y realizar el pago desde tu ficha de socio aquí: ${window.location.origin}/public/profile/${m._id}`;
 
             const sendToN8n = async (m) => {
                 if (!m.phone) {
@@ -1314,6 +1358,7 @@ const Dashboard = () => {
                 const payload = {
                     phone: m.phone,
                     memberName: m.fullName,
+                    message: getMessage(m),
                     link: `${window.location.origin}/public/profile/${m._id}`
                 };
 
@@ -1359,7 +1404,7 @@ const Dashboard = () => {
                 <div className="space-y-6">
                     <div className="bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100">
                         <p className="text-sm text-blue-800 font-medium mb-1">Plantilla de Mensaje:</p>
-                        <p className="text-xs text-blue-700 italic">"Hola [Nombre], te recordamos que tienes tu cuota de este mes pendiente de pago. Puedes ver tu ficha de socio y pagar desde aquí: [Link]"</p>
+                        <p className="text-xs text-blue-700 italic">"Hola [Nombre], te recordamos que tienes pendiente de pago tu cuota mensual o consumos de cantina (fiados). Te solicitamos amablemente ponerte al día. Puedes ver los detalles y realizar el pago desde tu ficha de socio aquí: [Link]"</p>
                     </div>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
