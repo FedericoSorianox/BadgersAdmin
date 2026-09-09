@@ -45,6 +45,7 @@ module.exports = function tenantPlugin(schema) {
     schema.pre('findOne', injectTenant);
     schema.pre('countDocuments', injectTenant);
     schema.pre('findOneAndUpdate', injectTenant);
+    schema.pre('updateOne', injectTenant);
     schema.pre('updateMany', injectTenant);
     schema.pre('deleteOne', injectTenant);
     schema.pre('deleteMany', injectTenant);

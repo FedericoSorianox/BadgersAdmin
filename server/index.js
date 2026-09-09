@@ -66,22 +66,6 @@ app.get('/health', (req, res) => {
     });
 });
 
-// TEMPORARY: Promote 'admin' to superadmin (Remove after use)
-app.get('/fix-promote-admin', async (req, res) => {
-    try {
-        const User = require('./models/User');
-        const user = await User.findOne({ username: 'admin' });
-        if (!user) return res.send("User 'admin' not found.");
-
-        user.role = 'superadmin';
-        user.tenantId = null; // Global access
-        await user.save();
-
-        res.send("✅ Success! User 'admin' is now a Super Admin. You can login now.");
-    } catch (err) {
-        res.status(500).send('Error: ' + err.message);
-    }
-});
 
 // Routes placeholders
 app.use(require('./middleware/tenant'));

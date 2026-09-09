@@ -3,9 +3,10 @@ const router = express.Router();
 const Debt = require('../models/Debt');
 const Product = require('../models/Product');
 const Payment = require('../models/Payment');
+const auth = require('../middleware/auth');
 
-// Get pending debts
-router.get('/', async (req, res) => {
+// Get pending debts (Protected)
+router.get('/', auth, async (req, res) => {
     try {
         const query = { status: 'pending', tenantId: req.tenantId || null };
         const debts = await Debt.find(query)
@@ -17,8 +18,8 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Create new debt (Fiado)
-router.post('/', async (req, res) => {
+// Create new debt (Fiado) (Protected)
+router.post('/', auth, async (req, res) => {
     try {
         const { memberId, memberName, products, totalAmount } = req.body;
 
@@ -41,7 +42,6 @@ router.post('/', async (req, res) => {
             memberName,
             products,
             totalAmount,
-            totalAmount,
             status: 'pending',
             tenantId: req.tenantId || null
         });
@@ -53,8 +53,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Pay debt (Full)
-router.put('/:id/pay', async (req, res) => {
+// Pay debt (Full) (Protected)
+router.put('/:id/pay', auth, async (req, res) => {
     try {
         const debt = await Debt.findById(req.params.id);
         if (!debt) return res.status(404).json({ message: 'Deuda no encontrada' });
@@ -79,7 +79,8 @@ router.put('/:id/pay', async (req, res) => {
             amount: debt.totalAmount,
             type: 'Producto', // Classify as sale
             paymentMethod: req.body.paymentMethod || 'Efectivo',
-            date: new Date()
+            date: new Date(),
+            tenantId: debt.tenantId || req.tenantId || null
         });
 
         await payment.save();
@@ -91,8 +92,8 @@ router.put('/:id/pay', async (req, res) => {
     }
 });
 
-// Partial Batch Payment with Specific Adjustments support
-router.post('/pay-partial', async (req, res) => {
+// Partial Batch Payment with Specific Adjustments support (Protected)
+router.post('/pay-partial', auth, async (req, res) => {
     try {
         const { memberId, amount, adjustments } = req.body;
         const payAmount = Number(amount);
@@ -182,7 +183,8 @@ router.post('/pay-partial', async (req, res) => {
                 amount: effectivePaid,
                 type: 'Producto',
                 paymentMethod: req.body.paymentMethod || 'Efectivo',
-                date: new Date()
+                date: new Date(),
+                tenantId: debts[0].tenantId || req.tenantId || null
             });
 
             await payment.save();
@@ -198,13 +200,15 @@ router.post('/pay-partial', async (req, res) => {
     }
 });
 
-// Public route to get pending debts for a specific member (Unprotected)
+// Public route to get pending debts for a specific member (Safe projection for member card)
 router.get('/public/member/:memberId', async (req, res) => {
     try {
         const debts = await Debt.find({ 
             memberId: req.params.memberId, 
             status: 'pending' 
-        }).sort({ date: -1 });
+        })
+        .select('products totalAmount paidAmount status date')
+        .sort({ date: -1 });
         res.json(debts);
     } catch (err) {
         res.status(500).json({ message: err.message });

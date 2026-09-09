@@ -6,7 +6,17 @@ const tenantMiddleware = async (req, res, next) => {
     let tenantId = null;
     let isSuper = false;
 
-    // 1. Check User Token FIRST (Strongest identifier)
+    // Paths that DON'T require a tenant context
+    const publicPaths = [
+        '/api/auth/login',
+        '/api/auth/register',
+        '/api/tenants/public'
+    ];
+    const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
+    // Public member profile routes don't require tenant resolution
+    const isPublicMemberPath = req.path.match(/^\/api\/members\/public\//);
+
+    // 1. Extract tenantId from JWT (authoritative source for authenticated requests)
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.split(' ')[1];
@@ -15,26 +25,31 @@ const tenantMiddleware = async (req, res, next) => {
             if (decoded.user) {
                 if (decoded.user.role === 'superadmin') {
                     isSuper = true;
-                } else if (decoded.user.tenantId) {
+                }
+                // tenantId from JWT is the single source of truth for non-superadmin users
+                if (decoded.user.tenantId) {
                     tenantId = decoded.user.tenantId;
                 }
             }
         } catch (e) {
-            // Token invalid, let auth middleware handle later
+            // Token invalid — auth middleware will reject later if route requires auth
         }
     }
 
-    // 2. Check Header (Secondary identifier or for public access)
+    // 2. x-tenant-slug header: only used for public/unauthenticated routes (login, register)
+    //    OR by superadmin to explicitly select a tenant context
     const tenantSlug = req.headers['x-tenant-slug'];
-    if (tenantSlug) {
+    if (tenantSlug && (isPublicPath || isSuper)) {
         try {
             const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${tenantSlug}$`, 'i') } });
             if (tenant) {
-                // If token already has a tenantId, they MUST match (unless SuperAdmin)
-                if (tenantId && tenantId.toString() !== tenant._id.toString() && !isSuper) {
-                    return res.status(403).json({ message: 'Acceso denegado: El gimnasio no coincide con su sesión.' });
+                if (isSuper) {
+                    // SuperAdmin can switch context via header
+                    tenantId = tenant._id;
+                } else {
+                    // Public route: use the slug to resolve tenant
+                    tenantId = tenant._id;
                 }
-                tenantId = tenant._id;
             } else {
                 return res.status(404).json({ message: `Gimnasio "${tenantSlug}" no encontrado.` });
             }
@@ -43,36 +58,32 @@ const tenantMiddleware = async (req, res, next) => {
         }
     }
 
-    // Paths that DON'T require a tenant context
-    const publicPaths = [
-        '/api/auth/login',
-        '/api/auth/register',
-        '/api/tenants/public',
-        '/fix-promote-admin'
-    ];
-
-    const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
-
-    // Enforcement Logic
-    // Enforcement Logic - RELAXED for Legacy Support
-    // We allow requests without a tenantId to proceed, which will result in req.tenantId usually being undefined/null.
-    // Controllers will then query { tenantId: null }, accessing the legacy/global data.
-    /* 
-    if (!isPublicPath) {
-        if (!tenantId && !isSuper) {
-            return res.status(401).json({ message: 'Identificación de gimnasio requerida. Use el subdominio correcto.' });
+    // 3. For non-superadmin authenticated requests, IGNORE x-tenant-slug header
+    //    The tenantId from JWT is canonical and cannot be overridden by the client.
+    if (tenantSlug && !isPublicPath && !isSuper && authHeader) {
+        // Validate that slug matches JWT tenantId (prevent cross-tenant spoofing)
+        try {
+            const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${tenantSlug}$`, 'i') } });
+            if (tenant && tenantId && tenantId.toString() !== tenant._id.toString()) {
+                return res.status(403).json({ message: 'Acceso denegado: El gimnasio no coincide con su sesión.' });
+            }
+        } catch (error) {
+            console.error('Tenant validation error:', error);
         }
     }
-    */
+
+    // Set tenantId on request and run within AsyncLocalStorage context
+    req.tenantId = tenantId || null;
 
     if (tenantId) {
         tenantStorage.run(new Map([['tenantId', tenantId]]), () => {
-            req.tenantId = tenantId;
             next();
         });
     } else {
+        // Legacy mode: no tenant context (The Badgers legacy data has tenantId: null)
         next();
     }
 };
 
 module.exports = tenantMiddleware;
+

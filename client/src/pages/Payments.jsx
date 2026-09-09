@@ -30,7 +30,8 @@ const Payments = () => {
                 axios.get(`${API_URL}/api/members`),
                 axios.get(`${API_URL}/api/finance`)
             ]);
-            setMembers(membersRes.data.filter(m => m.active && !m.isExempt));
+            // Filter out inactive, exempt, and family dependents (only family heads or individuals should be billed directly)
+            setMembers(membersRes.data.filter(m => m.active && !m.isExempt && (!m.familyId || m.isFamilyHead)));
             setPayments(paymentsRes.data);
         } catch (error) {
             console.error("Error fetching data", error);

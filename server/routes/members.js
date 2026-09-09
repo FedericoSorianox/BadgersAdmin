@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Member = require('../models/Member');
 const { upload } = require('../config/cloudinary');
+const auth = require('../middleware/auth');
 
-// Get all members
-router.get('/', async (req, res) => {
+// Get all members (Protected)
+router.get('/', auth, async (req, res) => {
     try {
         const query = { tenantId: req.tenantId || null };
         const members = await Member.find(query).sort({ fullName: 1 });
@@ -14,6 +15,11 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 });
+
+const normalizePhone = (phone) => {
+    if (!phone) return '';
+    return phone.replace(/[^\d+]/g, '');
+};
 
 // Helper to apply 3x2 logic for family heads
 const applyFamilyDiscount = async (familyHeadId, tenantId) => {
@@ -76,14 +82,14 @@ const parseFamilyFields = (body) => {
     };
 };
 
-// Add member
-router.post('/', upload.single('image'), async (req, res) => {
+// Add member (Protected)
+router.post('/', auth, upload.single('image'), async (req, res) => {
     try {
         const familyFields = parseFamilyFields(req.body);
         const memberData = {
             ci: req.body.ci,
             fullName: req.body.fullName,
-            phone: req.body.phone,
+            phone: normalizePhone(req.body.phone),
             planType: req.body.planType,
             planCost: Number(req.body.planCost),
             birthDate: req.body.birthDate,
@@ -125,8 +131,8 @@ router.post('/', upload.single('image'), async (req, res) => {
     }
 });
 
-// Bulk update members' plan
-router.put('/bulk/plan', async (req, res) => {
+// Bulk update members' plan (Protected)
+router.put('/bulk/plan', auth, async (req, res) => {
     try {
         const { memberIds, planType, planCost } = req.body;
         if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
@@ -148,8 +154,8 @@ router.put('/bulk/plan', async (req, res) => {
     }
 });
 
-// Update member
-router.put('/:id', upload.single('image'), async (req, res) => {
+// Update member (Protected)
+router.put('/:id', auth, upload.single('image'), async (req, res) => {
     try {
         const existingMember = await Member.findById(req.params.id);
         const oldFamilyId = existingMember ? existingMember.familyId : null;
@@ -158,7 +164,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
         const familyFields = parseFamilyFields(req.body);
         const memberData = {
             fullName: req.body.fullName,
-            phone: req.body.phone,
+            phone: normalizePhone(req.body.phone),
             planType: req.body.planType,
             planCost: Number(req.body.planCost),
             birthDate: req.body.birthDate,
@@ -192,7 +198,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
             );
         }
 
-        // Update previous family head an new family head (or self if head)
+        // Update previous family head and new family head (or self if head)
         if (oldFamilyId && oldFamilyId.toString() !== (familyFields.familyId || '').toString()) {
             await applyFamilyDiscount(oldFamilyId, req.tenantId);
         }
@@ -215,10 +221,11 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     }
 });
 
-// Get public member info
+// Get public member info (Read-only, minimum data exposure, no internal comments)
 router.get("/public/:id", async (req, res) => {
     try {
-        const member = await Member.findById(req.params.id).select("fullName photoUrl planType planCost active ci phone birthDate joinDate comments createdAt");
+        const member = await Member.findById(req.params.id)
+            .select("fullName photoUrl planType planCost active joinDate createdAt");
         if (!member) return res.status(404).json({ message: "Socio no encontrado" });
         res.json(member);
     } catch (err) {
@@ -226,25 +233,31 @@ router.get("/public/:id", async (req, res) => {
     }
 });
 
-// Update specific member fields from public profile
-router.put("/public/:id", async (req, res) => {
+// Update specific member fields from public profile (Protected: requires authorized session)
+router.put("/public/:id", auth, async (req, res) => {
     try {
-        const { ci, phone, birthDate, comments } = req.body;
+        const { ci, phone, birthDate } = req.body;
         
-        // Prevent empty CI or other critical fields
         if (!ci) return res.status(400).json({ message: "La cédula es obligatoria" });
 
-        // Security check: ensure CI is unique if changed
-        const existingWithCI = await Member.findOne({ ci, _id: { $ne: req.params.id } });
+        const existingWithCI = await Member.findOne({ 
+            ci, 
+            tenantId: req.tenantId || null, 
+            _id: { $ne: req.params.id } 
+        });
         if (existingWithCI) {
             return res.status(400).json({ message: "La cédula ya está registrada por otro socio" });
         }
 
+        const updateFields = { ci };
+        if (phone !== undefined) updateFields.phone = normalizePhone(phone);
+        if (birthDate !== undefined) updateFields.birthDate = birthDate;
+
         const updatedMember = await Member.findByIdAndUpdate(
             req.params.id, 
-            { ci, phone, birthDate, comments }, 
+            updateFields, 
             { new: true }
-        ).select("ci phone birthDate comments");
+        ).select("ci phone birthDate");
 
         if (!updatedMember) {
             return res.status(404).json({ message: "Socio no encontrado" });
@@ -256,8 +269,8 @@ router.put("/public/:id", async (req, res) => {
     }
 });
 
-// Update member photo from public profile
-router.post("/public/:id/photo", upload.single('image'), async (req, res) => {
+// Update member photo from public profile (Protected: requires authorized session)
+router.post("/public/:id/photo", auth, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: "No se subió ninguna imagen" });
@@ -279,8 +292,8 @@ router.post("/public/:id/photo", upload.single('image'), async (req, res) => {
     }
 });
 
-// Toggle member status (active/inactive)
-router.put('/:id/toggle-status', async (req, res) => {
+// Toggle member status (active/inactive) (Protected)
+router.put('/:id/toggle-status', auth, async (req, res) => {
     try {
         const member = await Member.findById(req.params.id);
         if (!member) {
@@ -300,14 +313,12 @@ router.put('/:id/toggle-status', async (req, res) => {
     }
 });
 
-// Delete member
-router.delete('/:id', async (req, res) => {
+// Delete member (Protected)
+router.delete('/:id', auth, async (req, res) => {
     try {
         const member = await Member.findById(req.params.id);
         const familyIdToRecalculate = member ? member.familyId : null;
 
-        // If this member is a head, maybe unassign its dependents or delete them?
-        // Right now, if head is deleted, dependents stay stranded. Let's unassign them.
         if (member && member.isFamilyHead) {
             await Member.updateMany({ familyId: member._id }, { $set: { familyId: null, planCost: 0, planType: 'Libre' } });
         }

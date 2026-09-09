@@ -3,6 +3,7 @@ import { Users, CreditCard, Package, UserX, Loader2, Search, Plus, DollarSign, T
 import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
+import { useTenant } from '../context/TenantContext';
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, iconClass, onClick }) => (
     <div
@@ -40,6 +41,7 @@ const PaymentMethodToggle = ({ value, onChange }) => (
 );
 
 const Dashboard = () => {
+    const { buildMessage } = useTenant();
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [modalType, setModalType] = useState(null); // 'active', 'inactive', 'stock', 'payments'
@@ -861,26 +863,19 @@ const Dashboard = () => {
                 return;
             }
 
-            const payload = {
+            const profileLink = `${window.location.origin}/public/profile/${group.id}`;
+            const message = buildMessage('fiadoReminderTemplate', {
+                name: group.name,
+                link: profileLink
+            });
+
+            // Route through backend proxy (handles webhook URL resolution per-tenant)
+            await axios.post(`${API_URL}/api/notifications/send-fiado-reminder`, {
                 phone: group.phone,
                 memberName: group.name,
-                type: 'fiado',
-                message: `Hola ${group.name}, te recordamos que tienes pendiente de pago tu cuota mensual o consumos de cantina (fiados). Te solicitamos amablemente ponerte al día. Puedes ver los detalles y realizar el pago desde tu ficha de socio aquí: ${window.location.origin}/public/profile/${group.id}`,
-                link: `${window.location.origin}/public/profile/${group.id}`
-            };
-
-            try {
-                await axios.post('https://n8n.vanguardlab.cloud/webhook/webhook-pagos', payload);
-            } catch (error) {
-                if (error.message !== 'Network Error') {
-                    throw error;
-                }
-                console.warn('Ignorando Network Error de N8N por posible falta de CORS headers.');
-            }
-
-            await axios.post(`${API_URL}/api/notifications/log-reminder`, { 
                 memberId: group.id,
-                type: 'fiado_reminder'
+                message,
+                link: profileLink
             });
 
             alert(`Recordatorio de pago enviado a ${group.name}`);
@@ -1398,30 +1393,25 @@ const Dashboard = () => {
                 (m.ci && m.ci.includes(searchTerm))
             );
 
-            const getMessage = (m) => `Hola ${m.fullName}, te recordamos que tienes pendiente de pago tu cuota mensual o consumos de cantina (fiados). Te solicitamos amablemente ponerte al día. Puedes ver los detalles y realizar el pago desde tu ficha de socio aquí: ${window.location.origin}/public/profile/${m._id}`;
+            const getMessage = (m) => buildMessage('paymentReminderTemplate', {
+                name: m.fullName,
+                link: `${window.location.origin}/public/profile/${m._id}`
+            });
 
-            const sendToN8n = async (m) => {
+            const sendViaBackend = async (m) => {
                 if (!m.phone) {
                     throw new Error(`El socio ${m.fullName} no tiene teléfono registrado.`);
                 }
-                const payload = {
+                // Route through backend proxy (handles webhook URL resolution per-tenant)
+                await axios.post(`${API_URL}/api/notifications/send-reminder`, {
                     phone: m.phone,
                     memberName: m.fullName,
-                    message: getMessage(m),
-                    link: `${window.location.origin}/public/profile/${m._id}`
-                };
-
-                try {
-                    await axios.post('https://n8n.vanguardlab.cloud/webhook/webhook-pagos', payload);
-                } catch (error) {
-                    // N8N webhooks often don't return CORS headers.
-                    // This causes the browser to throw a 'Network Error' even if the POST succeeded.
-                    if (error.message === 'Network Error') {
-                        console.warn('Ignorando Network Error de N8N por posible falta de CORS headers.');
-                        return; // Asumimos que llegó bien
-                    }
-                    throw error;
-                }
+                    memberId: m._id,
+                    amount: m.planCost || 0,
+                    type: 'payment_reminder',
+                    link: `${window.location.origin}/public/profile/${m._id}`,
+                    message: getMessage(m)
+                });
             };
 
             const handleWhatsAppIndividual = async (m) => {
@@ -1431,10 +1421,7 @@ const Dashboard = () => {
                 }
 
                 try {
-                    await sendToN8n(m);
-
-                    // Log it to the backend so it persists across reloads for the current month
-                    await axios.post(`${API_URL}/api/notifications/log-reminder`, { memberId: m._id });
+                    await sendViaBackend(m);
 
                     // Update local state immediately
                     setStats(prev => {
@@ -1444,8 +1431,8 @@ const Dashboard = () => {
                     });
 
                 } catch (error) {
-                    console.error("Error sending to N8N:", error);
-                    alert(error.message || 'Error al enviar el mensaje.');
+                    console.error('Error sending reminder:', error);
+                    alert(error.response?.data?.message || error.message || 'Error al enviar el mensaje.');
                 }
             };
 
@@ -1453,7 +1440,7 @@ const Dashboard = () => {
                 <div className="space-y-6">
                     <div className="bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100">
                         <p className="text-sm text-blue-800 font-medium mb-1">Plantilla de Mensaje:</p>
-                        <p className="text-xs text-blue-700 italic">"Hola [Nombre], te recordamos que tienes pendiente de pago tu cuota mensual o consumos de cantina (fiados). Te solicitamos amablemente ponerte al día. Puedes ver los detalles y realizar el pago desde tu ficha de socio aquí: [Link]"</p>
+                        <p className="text-xs text-blue-700 italic">"{getMessage({ fullName: '[Nombre]', _id: '[Link]' })}"</p>
                     </div>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -1693,7 +1680,7 @@ const Dashboard = () => {
                 <StatCard
                     title="SOCIOS ACTIVOS"
                     value={stats.activeMembers}
-                    subtext="(Excluyendo libres)"
+                    subtext="(Excl. becados/exentos)"
                     icon={Users}
                     iconClass="bg-slate-800 text-white"
                     onClick={() => openModal('active')}
@@ -1707,9 +1694,9 @@ const Dashboard = () => {
                     onClick={() => openModal('inactive')}
                 />
                 <StatCard
-                    title="PRODUCTOS"
+                    title="PRODUCTOS CON STOCK"
                     value={stats.stockCount}
-                    subtext="En Inventario"
+                    subtext="Disponibles"
                     icon={Package}
                     iconClass="bg-emerald-500 text-white"
                     onClick={() => openModal('stock')}

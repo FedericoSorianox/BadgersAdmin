@@ -6,6 +6,10 @@ const Member = require('../models/Member');
 const Product = require('../models/Product');
 const CashRegister = require('../models/CashRegister');
 const Settings = require('../models/Settings');
+const auth = require('../middleware/auth');
+
+// Protect all finance routes: only authenticated staff/admin can access
+router.use(auth);
 
 async function adjustAcademySavingsBox(tenantId, oldType, oldAmount, newType, newAmount) {
     try {

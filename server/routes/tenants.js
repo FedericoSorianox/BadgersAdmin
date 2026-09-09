@@ -26,11 +26,12 @@ router.get('/', auth, isSuperAdmin, async (req, res) => {
 });
 
 // @route   GET api/tenants/public/:slug
-// @desc    Get tenant branding (Public)
+// @desc    Get tenant branding, locale, and notifications config (Public)
 // @access  Public
 router.get('/public/:slug', async (req, res) => {
     try {
-        const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${req.params.slug}$`, 'i') } }).select('name slug branding partners');
+        const tenant = await Tenant.findOne({ slug: { $regex: new RegExp(`^${req.params.slug}$`, 'i') } })
+            .select('name slug branding partners locale notifications lowStockThreshold');
         if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
         res.json(tenant);
     } catch (err) {
@@ -42,7 +43,7 @@ router.get('/public/:slug', async (req, res) => {
 // @desc    Create a new tenant
 // @access  Super Admin
 router.post('/', auth, isSuperAdmin, async (req, res) => {
-    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor, partners, instructorHourlyRate, adminUsername, adminPassword } = req.body;
+    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor, partners, instructorHourlyRate, locale, notifications, lowStockThreshold, adminUsername, adminPassword } = req.body;
 
     try {
         let tenant = await Tenant.findOne({ slug });
@@ -65,14 +66,17 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
                 primaryColor: primaryColor || '#3498db',
                 secondaryColor: secondaryColor || '#2c3e50',
                 logoUrl,
-                sidebarText, // Let's use schema default if undefined
+                sidebarText,
                 textColor: textColor || '#ffffff',
                 menuHoverColor,
                 menuActiveColor,
                 dashboardTitleColor
             },
             partners: partners || [],
-            instructorHourlyRate: instructorHourlyRate || 0
+            instructorHourlyRate: instructorHourlyRate || 0,
+            ...(locale && { locale }),
+            ...(notifications && { notifications }),
+            ...(lowStockThreshold != null && { lowStockThreshold })
         });
 
         const savedTenant = await tenant.save();
@@ -101,15 +105,15 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
 // @desc    Update tenant
 // @access  Super Admin
 router.put('/:id', auth, isSuperAdmin, async (req, res) => {
-    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor, partners, instructorHourlyRate } = req.body;
+    const { name, slug, primaryColor, secondaryColor, logoUrl, sidebarText, textColor, menuHoverColor, menuActiveColor, dashboardTitleColor, partners, instructorHourlyRate, locale, notifications, lowStockThreshold } = req.body;
 
     // Construct update object
     const updateFields = {};
     if (name) updateFields.name = name;
-    if (name) updateFields.name = name;
     if (slug) updateFields.slug = slug;
     if (partners) updateFields.partners = partners;
     if (instructorHourlyRate !== undefined) updateFields.instructorHourlyRate = instructorHourlyRate;
+    if (lowStockThreshold != null) updateFields.lowStockThreshold = lowStockThreshold;
 
     // For branding, we want to update specific fields but keep others if not provided? 
     // Or just overwrite branding? Let's assume we send the full branding state or merge it.
@@ -130,13 +134,31 @@ router.put('/:id', auth, isSuperAdmin, async (req, res) => {
     if (menuActiveColor !== undefined) brandingUpdate['branding.menuActiveColor'] = menuActiveColor;
     if (dashboardTitleColor !== undefined) brandingUpdate['branding.dashboardTitleColor'] = dashboardTitleColor;
 
+    // Locale fields (deep merge via $set)
+    const localeUpdate = {};
+    if (locale) {
+        for (const [key, val] of Object.entries(locale)) {
+            if (val !== undefined) localeUpdate[`locale.${key}`] = val;
+        }
+    }
+
+    // Notification fields (deep merge via $set)
+    const notifUpdate = {};
+    if (notifications) {
+        for (const [key, val] of Object.entries(notifications)) {
+            if (val !== undefined) notifUpdate[`notifications.${key}`] = val;
+        }
+    }
+
     try {
         const tenant = await Tenant.findByIdAndUpdate(
             req.params.id,
             {
                 $set: {
                     ...updateFields,
-                    ...brandingUpdate
+                    ...brandingUpdate,
+                    ...localeUpdate,
+                    ...notifUpdate
                 }
             },
             { new: true }

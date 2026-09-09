@@ -57,7 +57,7 @@ const Finances = () => {
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [transactions, setTransactions] = useState([]);
     const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [editingTransaction, setEditingTransaction] = useState(null);
     const [filterType, setFilterType] = useState('all'); // 'all', 'cuotas', 'ventas', 'gastos'
     const [newSaleModalOpen, setNewSaleModalOpen] = useState(false);

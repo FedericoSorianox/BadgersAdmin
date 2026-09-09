@@ -25,4 +25,6 @@ const NotificationSchema = new mongoose.Schema({
     }
 });
 
+NotificationSchema.plugin(require('../plugins/tenantPlugin'));
+
 module.exports = mongoose.model('Notification', NotificationSchema);

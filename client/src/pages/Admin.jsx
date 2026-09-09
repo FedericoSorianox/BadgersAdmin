@@ -1,41 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Save, Calculator, PiggyBank } from 'lucide-react';
+import { Save, Calculator, PiggyBank, Plus, Trash2, Users } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { useTenant } from '../context/TenantContext';
+import { calculatePartnerDistribution } from '../utils/financeCalc';
 
 const Admin = () => {
-    const { partners } = useTenant();
-    const partner1Name = partners && partners[0]?.name ? partners[0].name : 'Fede';
-    const partner2Name = partners && partners[1]?.name ? partners[1].name : 'Gonza';
+    const { formatCurrency } = useTenant();
 
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
 
     const [config, setConfig] = useState({
         grossProfit: 0,
-        fedeHours: 40,
-        gonzaHours: 16,
-        fedeDaysOff: 0,
-        gonzaDaysOff: 0,
+        partners: [],
+        partnerHourlyRate: 1000,
         instructors: [],
+        instructorHourlyRate: 500,
         plans: [],
-        academySavingsBox: 0
+        academySavingsBox: 0,
+        savingsPercentage: 10
     });
 
     const [results, setResults] = useState({
-        hourlyPaymentFede: 0,
-        utilityFede: 0,
-        fedeAmount: 0,
-        hourlyPaymentGonza: 0,
-        utilityGonza: 0,
-        gonzaAmount: 0,
+        partnerResults: [],        // Array of { name, hourlyPayment, utility, total, effectiveHours }
         academySavingsAdded: 0,
         academySavingsTaken: 0,
         academySavingsNet: 0,
         academySavingsBoxUpdated: 0,
-        savingsStatus: 'complete', // 'complete', 'partial', 'taken'
-        paymentStatus: 'complete'   // 'complete', 'proportional'
+        savingsStatus: 'complete',
+        paymentStatus: 'complete'
     });
 
     const [loading, setLoading] = useState(true);
@@ -78,17 +72,16 @@ const Admin = () => {
 
                 setConfig(prev => ({
                     ...prev,
-                    fedeHours: settings.fedeHours !== undefined ? settings.fedeHours : 40,
-                    gonzaHours: settings.gonzaHours !== undefined ? settings.gonzaHours : 16,
-                    fedeDaysOff: settings.fedeDaysOff,
-                    gonzaDaysOff: settings.gonzaDaysOff,
+                    partners: settings.partners || [],
+                    partnerHourlyRate: settings.partnerHourlyRate ?? 1000,
                     instructors: settings.instructors || [],
+                    instructorHourlyRate: settings.instructorHourlyRate ?? 500,
                     plans: settings.plans || [],
-                    academySavingsBox: settings.academySavingsBox !== undefined ? settings.academySavingsBox : 0
+                    academySavingsBox: settings.academySavingsBox ?? 0,
+                    savingsPercentage: settings.savingsPercentage ?? 10
                 }));
             } catch (error) {
                 console.error('Error fetching settings:', error);
-                // Keep defaults if settings fail (e.g. route not ready)
             } finally {
                 setLoading(false);
             }
@@ -98,108 +91,8 @@ const Admin = () => {
     }, [currentMonth, currentYear]);
 
     const handleCalculate = useCallback(() => {
-        const workingDays = 26;
-        const hourlyRate = 1000;
-
-        // Effective hours calculation:
-        // Adjust hours based on days worked vs max working days
-        // Logic: If you engage for 40 hours (approx 1.5h/day), and miss 10 days
-        // Effective = 40 * ((26 - 10) / 26)
-
-        const effectiveFedeHours = Number(config.fedeHours) * ((workingDays - Number(config.fedeDaysOff)) / workingDays);
-        const effectiveGonzaHours = Number(config.gonzaHours) * ((workingDays - Number(config.gonzaDaysOff)) / workingDays);
-
-        const grossProfit = Number(config.grossProfit);
-        const totalEffectiveHours = effectiveFedeHours + effectiveGonzaHours;
-
-        if (totalEffectiveHours <= 0) return;
-
-        // 1. Pago por horas de cada uno (Horas * 1000)
-        const baseHourlyPaymentFede = effectiveFedeHours * hourlyRate;
-        const baseHourlyPaymentGonza = effectiveGonzaHours * hourlyRate;
-        const totalHourlyPayment = baseHourlyPaymentFede + baseHourlyPaymentGonza;
-
-        const initialSavingsBox = Number(config.academySavingsBox) || 0;
-
-        let academySavingsAdded = 0;
-        let academySavingsTaken = 0;
-        let hourlyPaymentFede = 0;
-        let hourlyPaymentGonza = 0;
-        let utilityPerPartner = 0;
-        let savingsStatus = 'complete'; // 'complete', 'partial', 'taken'
-        let paymentStatus = 'complete';  // 'complete', 'proportional'
-
-        if (grossProfit >= totalHourlyPayment) {
-            // Caso 1: Alcanza para pagar las horas de forma directa de la ganancia
-            hourlyPaymentFede = baseHourlyPaymentFede;
-            hourlyPaymentGonza = baseHourlyPaymentGonza;
-            paymentStatus = 'complete';
-
-            const remainderAfterSalaries = grossProfit - totalHourlyPayment;
-            const targetSavings = grossProfit * 0.10;
-
-            if (remainderAfterSalaries >= targetSavings) {
-                // Alcanza para el 10% de ahorro completo
-                academySavingsAdded = targetSavings;
-                savingsStatus = 'complete';
-
-                const utility = remainderAfterSalaries - targetSavings;
-                utilityPerPartner = utility / 2;
-            } else {
-                // Se guarda como ahorro solo el remanente disponible
-                academySavingsAdded = remainderAfterSalaries;
-                savingsStatus = 'partial';
-                utilityPerPartner = 0;
-            }
-            academySavingsTaken = 0;
-        } else {
-            // Caso 2: No alcanza para pagar las horas de forma directa
-            academySavingsAdded = 0;
-            const deficit = totalHourlyPayment - grossProfit;
-
-            // Tomamos lo necesario del fondo de ahorro
-            academySavingsTaken = Math.min(initialSavingsBox, deficit);
-            const totalAvailable = grossProfit + academySavingsTaken;
-
-            if (totalAvailable >= totalHourlyPayment) {
-                // Alcanza para pagar los sueldos en su totalidad (gracias al ahorro)
-                hourlyPaymentFede = baseHourlyPaymentFede;
-                hourlyPaymentGonza = baseHourlyPaymentGonza;
-                paymentStatus = 'complete';
-                savingsStatus = 'taken';
-            } else {
-                // Aún con el ahorro, no se llega a cubrir todo (Reparto proporcional)
-                const percentageFede = effectiveFedeHours / totalEffectiveHours;
-                const percentageGonza = effectiveGonzaHours / totalEffectiveHours;
-
-                hourlyPaymentFede = totalAvailable * percentageFede;
-                hourlyPaymentGonza = totalAvailable * percentageGonza;
-                paymentStatus = 'proportional';
-                savingsStatus = 'taken';
-            }
-            utilityPerPartner = 0;
-        }
-
-        const academySavingsNet = academySavingsAdded - academySavingsTaken;
-        const academySavingsBoxUpdated = initialSavingsBox + academySavingsNet;
-
-        const fedeAmount = hourlyPaymentFede + utilityPerPartner;
-        const gonzaAmount = hourlyPaymentGonza + utilityPerPartner;
-
-        setResults({
-            hourlyPaymentFede,
-            utilityFede: utilityPerPartner,
-            fedeAmount,
-            hourlyPaymentGonza,
-            utilityGonza: utilityPerPartner,
-            gonzaAmount,
-            academySavingsAdded,
-            academySavingsTaken,
-            academySavingsNet,
-            academySavingsBoxUpdated,
-            savingsStatus,
-            paymentStatus
-        });
+        const results = calculatePartnerDistribution(config);
+        setResults(results);
     }, [config]);
 
     // Calculate automatically when inputs change
@@ -212,13 +105,13 @@ const Admin = () => {
             setSaving(true);
             const updatedSavingsBox = results.academySavingsBoxUpdated !== undefined ? results.academySavingsBoxUpdated : config.academySavingsBox;
             await axios.post(`${API_URL}/api/settings`, {
-                fedeHours: config.fedeHours,
-                gonzaHours: config.gonzaHours,
-                fedeDaysOff: config.fedeDaysOff,
-                gonzaDaysOff: config.gonzaDaysOff,
+                partners: config.partners,
+                partnerHourlyRate: config.partnerHourlyRate,
                 instructors: config.instructors,
+                instructorHourlyRate: config.instructorHourlyRate,
                 plans: config.plans,
-                academySavingsBox: updatedSavingsBox
+                academySavingsBox: updatedSavingsBox,
+                savingsPercentage: config.savingsPercentage
             });
             setConfig(prev => ({
                 ...prev,
@@ -233,6 +126,26 @@ const Admin = () => {
         }
     };
 
+    // --- PARTNER MANAGEMENT ---
+    const handlePartnerChange = (index, field, value) => {
+        const newPartners = [...config.partners];
+        newPartners[index] = { ...newPartners[index], [field]: value };
+        setConfig({ ...config, partners: newPartners });
+    };
+
+    const addPartner = () => {
+        setConfig({
+            ...config,
+            partners: [...config.partners, { name: '', hours: 0, daysOff: 0 }]
+        });
+    };
+
+    const removePartner = (index) => {
+        const newPartners = config.partners.filter((_, i) => i !== index);
+        setConfig({ ...config, partners: newPartners });
+    };
+
+    // --- INSTRUCTOR MANAGEMENT ---
     const handleInstructorChange = (index, field, value) => {
         const newInstructors = [...config.instructors];
         newInstructors[index][field] = value;
@@ -270,10 +183,6 @@ const Admin = () => {
         setConfig({ ...config, plans: newPlans });
     };
 
-    const formatCurrency = (value) => {
-        return new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'UYU' }).format(value);
-    };
-
     return (
         <div className="space-y-6 pb-20">
             <div className="text-center flex justify-between items-center">
@@ -282,6 +191,7 @@ const Admin = () => {
                     onClick={handleSave}
                     disabled={saving}
                     className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
+                    aria-label="Guardar configuración"
                 >
                     <Save size={20} />
                     {saving ? 'Guardando...' : 'Guardar Cambios'}
@@ -289,9 +199,9 @@ const Admin = () => {
             </div>
 
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Ganancia Bruta Mensual</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Resultado Operativo Neto</label>
                         <div className="relative">
                             <span className="absolute left-3 top-2.5 text-slate-400">$</span>
                             <input
@@ -316,60 +226,102 @@ const Admin = () => {
                             />
                         </div>
                     </div>
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex-1">
-                        <h3 className="text-lg font-bold text-slate-700 mb-4">Horas Base Mensuales</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">Horas {partner1Name}</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={config.fedeHours}
-                                    onChange={(e) => setConfig({ ...config, fedeHours: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">Horas {partner2Name}</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={config.gonzaHours}
-                                    onChange={(e) => setConfig({ ...config, gonzaHours: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-lg font-bold text-slate-700 mb-4">Días Libres (Reducen pago)</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres {partner1Name}</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={config.fedeDaysOff}
-                                    onChange={(e) => setConfig({ ...config, fedeDaysOff: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">Días Libres {partner2Name}</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={config.gonzaDaysOff}
-                                    onChange={(e) => setConfig({ ...config, gonzaDaysOff: e.target.value })}
-                                />
-                            </div>
-                        </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Ahorro ({config.savingsPercentage}%)</label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={config.savingsPercentage}
+                            onChange={(e) => setConfig({ ...config, savingsPercentage: Number(e.target.value) })}
+                        />
                     </div>
                 </div>
 
+                {/* Dynamic Partners Section */}
+                <div className="border-t border-slate-100 pt-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                            <Users size={20} />
+                            Socios / Dueños
+                        </h3>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm text-slate-600">Tarifa/hora:</label>
+                                <div className="relative">
+                                    <span className="absolute left-2 top-1.5 text-slate-400 text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        className="w-24 pl-6 pr-2 py-1 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={config.partnerHourlyRate}
+                                        onChange={(e) => setConfig({ ...config, partnerHourlyRate: Number(e.target.value) })}
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                onClick={addPartner}
+                                className="flex items-center gap-1 text-sm text-blue-600 font-bold hover:underline"
+                                aria-label="Agregar socio"
+                            >
+                                <Plus size={16} /> Agregar Socio
+                            </button>
+                        </div>
+                    </div>
+
+                    {config.partners.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400">
+                            <Users size={32} className="mx-auto mb-2 opacity-50" />
+                            <p>No hay socios configurados. Agregue al menos un socio para calcular el reparto.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {config.partners.map((partner, index) => (
+                                <div key={index} className="bg-slate-50 rounded-xl p-4 space-y-3 relative group">
+                                    <button
+                                        onClick={() => removePartner(index)}
+                                        className="absolute top-2 right-2 text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        aria-label={`Eliminar socio ${partner.name || index + 1}`}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre del socio"
+                                        className="w-full bg-white px-3 py-2 rounded-lg border border-slate-200 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={partner.name}
+                                        onChange={(e) => handlePartnerChange(index, 'name', e.target.value)}
+                                    />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">Horas Base</label>
+                                            <input
+                                                type="number"
+                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                value={partner.hours}
+                                                onChange={(e) => handlePartnerChange(index, 'hours', Number(e.target.value))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">Días Libres</label>
+                                            <input
+                                                type="number"
+                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                value={partner.daysOff}
+                                                onChange={(e) => handlePartnerChange(index, 'daysOff', Number(e.target.value))}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Results Cards */}
+            <div className={`grid grid-cols-1 gap-6 ${results.partnerResults.length > 0 ? `md:grid-cols-${Math.min(results.partnerResults.length + 1, 4)}` : 'md:grid-cols-1'}`} style={{ gridTemplateColumns: `repeat(${Math.min(results.partnerResults.length + 1, 4)}, minmax(0, 1fr))` }}>
+                {/* Savings Card */}
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl shadow-sm border border-blue-100 flex flex-col justify-between">
                     <div>
                         <div className="flex justify-between items-center mb-2">
@@ -379,7 +331,7 @@ const Admin = () => {
                             </p>
                             {results.savingsStatus === 'complete' && (
                                 <span className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-700 font-semibold">
-                                    10% Completo
+                                    {config.savingsPercentage}% Completo
                                 </span>
                             )}
                             {results.savingsStatus === 'partial' && (
@@ -404,7 +356,7 @@ const Admin = () => {
                     </div>
                     <div className="space-y-1 text-sm text-blue-700/80 border-t border-blue-200/60 pt-3 mt-auto">
                         <div className="flex justify-between">
-                            <span>Ganancia Bruta:</span>
+                            <span>Resultado Operativo:</span>
                             <span className="font-medium text-blue-950">{formatCurrency(config.grossProfit)}</span>
                         </div>
                         {results.academySavingsAdded > 0 && (
@@ -430,75 +382,43 @@ const Admin = () => {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex justify-between items-center mb-2">
-                        <p className="text-sm font-bold text-slate-400 uppercase">{partner1Name}</p>
-                        <div className="flex gap-2">
-                            {results.paymentStatus === 'proportional' ? (
-                                <span className="text-xs bg-amber-100 px-2 py-1 rounded text-amber-700 font-semibold">
-                                    Proporcional
-                                </span>
-                            ) : results.academySavingsTaken > 0 ? (
-                                <span className="text-xs bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-semibold">
-                                    Completo (Ahorros)
-                                </span>
-                            ) : (
+                {/* Dynamic Partner Cards */}
+                {results.partnerResults.map((partner, index) => (
+                    <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <div className="flex justify-between items-center mb-2">
+                            <p className="text-sm font-bold text-slate-400 uppercase">{partner.name || `Socio ${index + 1}`}</p>
+                            <div className="flex gap-2">
+                                {results.paymentStatus === 'proportional' ? (
+                                    <span className="text-xs bg-amber-100 px-2 py-1 rounded text-amber-700 font-semibold">
+                                        Proporcional
+                                    </span>
+                                ) : results.academySavingsTaken > 0 ? (
+                                    <span className="text-xs bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-semibold">
+                                        Completo (Ahorros)
+                                    </span>
+                                ) : (
+                                    <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
+                                        Completo
+                                    </span>
+                                )}
                                 <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
-                                    Completo
+                                    Neto: {partner.effectiveHours.toFixed(1)}h
                                 </span>
-                            )}
-                            <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
-                                Neto: {(Number(config.fedeHours) * ((26 - Number(config.fedeDaysOff)) / 26)).toFixed(1)}h
-                            </span>
+                            </div>
+                        </div>
+                        <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(partner.total)}</p>
+                        <div className="space-y-1 text-sm text-slate-500 border-t border-slate-100 pt-3">
+                            <div className="flex justify-between">
+                                <span>Pago por horas ({formatCurrency(config.partnerHourlyRate)}/h):</span>
+                                <span className="font-medium text-slate-700">{formatCurrency(partner.hourlyPayment)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Utilidad ({config.partners.length > 0 ? Math.round(100 / config.partners.length) : 0}%):</span>
+                                <span className="font-medium text-slate-700">{formatCurrency(partner.utility)}</span>
+                            </div>
                         </div>
                     </div>
-                    <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.fedeAmount)}</p>
-                    <div className="space-y-1 text-sm text-slate-500 border-t border-slate-100 pt-3">
-                        <div className="flex justify-between">
-                            <span>Pago por horas ($1000/h):</span>
-                            <span className="font-medium text-slate-700">{formatCurrency(results.hourlyPaymentFede)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Utilidad (50%):</span>
-                            <span className="font-medium text-slate-700">{formatCurrency(results.utilityFede)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex justify-between items-center mb-2">
-                        <p className="text-sm font-bold text-slate-400 uppercase">{partner2Name}</p>
-                        <div className="flex gap-2">
-                            {results.paymentStatus === 'proportional' ? (
-                                <span className="text-xs bg-amber-100 px-2 py-1 rounded text-amber-700 font-semibold">
-                                    Proporcional
-                                </span>
-                            ) : results.academySavingsTaken > 0 ? (
-                                <span className="text-xs bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-semibold">
-                                    Completo (Ahorros)
-                                </span>
-                            ) : (
-                                <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
-                                    Completo
-                                </span>
-                            )}
-                            <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
-                                Neto: {(Number(config.gonzaHours) * ((26 - Number(config.gonzaDaysOff)) / 26)).toFixed(1)}h
-                            </span>
-                        </div>
-                    </div>
-                    <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(results.gonzaAmount)}</p>
-                    <div className="space-y-1 text-sm text-slate-500 border-t border-slate-100 pt-3">
-                        <div className="flex justify-between">
-                            <span>Pago por horas ($1000/h):</span>
-                            <span className="font-medium text-slate-700">{formatCurrency(results.hourlyPaymentGonza)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Utilidad (50%):</span>
-                            <span className="font-medium text-slate-700">{formatCurrency(results.utilityGonza)}</span>
-                        </div>
-                    </div>
-                </div>
+                ))}
             </div>
 
             {/* Plans Management Section */}
@@ -556,6 +476,7 @@ const Admin = () => {
                                         <button
                                             onClick={() => removePlan(index)}
                                             className="text-red-400 hover:text-red-600 text-sm font-bold"
+                                            aria-label={`Eliminar plan ${plan.name}`}
                                         >
                                             Eliminar
                                         </button>
@@ -578,9 +499,23 @@ const Admin = () => {
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mt-8">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl font-bold text-slate-700">Pago a Instructores (Externos)</h3>
-                    <button onClick={addInstructor} className="text-sm text-blue-600 font-bold hover:underline">
-                        + Agregar Instructor
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <label className="text-sm text-slate-600">Tarifa/hora:</label>
+                            <div className="relative">
+                                <span className="absolute left-2 top-1.5 text-slate-400 text-sm">$</span>
+                                <input
+                                    type="number"
+                                    className="w-24 pl-6 pr-2 py-1 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={config.instructorHourlyRate}
+                                    onChange={(e) => setConfig({ ...config, instructorHourlyRate: Number(e.target.value) })}
+                                />
+                            </div>
+                        </div>
+                        <button onClick={addInstructor} className="text-sm text-blue-600 font-bold hover:underline">
+                            + Agregar Instructor
+                        </button>
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -613,12 +548,13 @@ const Admin = () => {
                                         />
                                     </td>
                                     <td className="px-6 py-4 font-bold text-green-600">
-                                        {formatCurrency(instructor.hours * 500)}
+                                        {formatCurrency(instructor.hours * config.instructorHourlyRate)}
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <button
                                             onClick={() => removeInstructor(index)}
                                             className="text-red-400 hover:text-red-600 text-sm font-bold"
+                                            aria-label={`Eliminar instructor ${instructor.name}`}
                                         >
                                             Eliminar
                                         </button>
@@ -637,7 +573,7 @@ const Admin = () => {
                             <tr>
                                 <td colSpan="2" className="px-6 py-4 text-right font-bold text-slate-700">Total Instructores:</td>
                                 <td className="px-6 py-4 font-bold text-xl text-green-600">
-                                    {formatCurrency(config.instructors.reduce((acc, curr) => acc + (curr.hours * 500), 0))}
+                                    {formatCurrency(config.instructors.reduce((acc, curr) => acc + (curr.hours * config.instructorHourlyRate), 0))}
                                 </td>
                                 <td></td>
                             </tr>

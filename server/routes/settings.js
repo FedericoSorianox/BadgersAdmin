@@ -1,6 +1,10 @@
 const express = require('express');
 const router  = express.Router();
 const Settings = require('../models/Settings');
+const auth = require('../middleware/auth');
+
+// Protect all settings routes
+router.use(auth);
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -46,19 +50,31 @@ router.get('/', async (req, res) => {
         let settings = await Settings.findOne({ key: 'admin_config' });
 
         if (!settings) {
-            // Seed defaults on first run
+            // Seed defaults on first run — use dynamic partners array
             settings = new Settings({
-                fedeHours: 40,
-                gonzaHours: 8,
-                fedeDaysOff: 0,
-                gonzaDaysOff: 0,
-                instructors: [
-                    { name: 'Guille', hours: 8 },
-                    { name: 'Uiller', hours: 4 }
-                ],
+                partners: [],
+                partnerHourlyRate: 1000,
+                instructors: [],
+                instructorHourlyRate: 500,
+                savingsPercentage: 10,
                 tasks: []
             });
             await settings.save();
+        }
+
+        // Auto-migrate legacy fields to dynamic partners array (one-time)
+        if (settings.partners.length === 0 && (settings.fedeHours != null || settings.gonzaHours != null)) {
+            const legacyPartners = [];
+            if (settings.fedeHours != null) {
+                legacyPartners.push({ name: 'Fede', hours: settings.fedeHours || 0, daysOff: settings.fedeDaysOff || 0 });
+            }
+            if (settings.gonzaHours != null) {
+                legacyPartners.push({ name: 'Gonza', hours: settings.gonzaHours || 0, daysOff: settings.gonzaDaysOff || 0 });
+            }
+            if (legacyPartners.length > 0) {
+                settings.partners = legacyPartners;
+                await settings.save();
+            }
         }
 
         // Auto-reset stale completions server-side before returning
@@ -80,19 +96,50 @@ router.get('/', async (req, res) => {
 /* ─── POST /api/settings ─────────────────────────────────────────────────── */
 router.post('/', async (req, res) => {
     try {
-        const { fedeHours, gonzaHours, fedeDaysOff, gonzaDaysOff, instructors, plans, tasks, academySavingsBox } = req.body;
+        const {
+            partners, partnerHourlyRate,
+            instructors, instructorHourlyRate,
+            plans, tasks,
+            academySavingsBox, savingsPercentage,
+            // Legacy fields accepted for backward compatibility
+            fedeHours, gonzaHours, fedeDaysOff, gonzaDaysOff
+        } = req.body;
 
         let settings = await Settings.findOne({ key: 'admin_config' });
         if (!settings) settings = new Settings({ key: 'admin_config' });
 
-        if (fedeHours          !== undefined) settings.fedeHours          = fedeHours;
-        if (gonzaHours         !== undefined) settings.gonzaHours         = gonzaHours;
-        if (fedeDaysOff        !== undefined) settings.fedeDaysOff        = fedeDaysOff;
-        if (gonzaDaysOff       !== undefined) settings.gonzaDaysOff       = gonzaDaysOff;
-        if (instructors        !== undefined) settings.instructors        = instructors;
-        if (plans              !== undefined) settings.plans              = plans;
-        if (tasks              !== undefined) settings.tasks              = tasks;
-        if (academySavingsBox  !== undefined) settings.academySavingsBox  = academySavingsBox;
+        // Prefer new partners array; fall back to legacy fields
+        if (partners !== undefined) {
+            settings.partners = partners;
+        } else if (fedeHours !== undefined || gonzaHours !== undefined) {
+            // Legacy compatibility: convert flat fields to partners array
+            const p = settings.partners?.length ? [...settings.partners] : [];
+            const updateOrAdd = (name, hours, daysOff) => {
+                const idx = p.findIndex(x => x.name === name);
+                if (idx >= 0) {
+                    if (hours !== undefined) p[idx].hours = hours;
+                    if (daysOff !== undefined) p[idx].daysOff = daysOff;
+                } else {
+                    p.push({ name, hours: hours || 0, daysOff: daysOff || 0 });
+                }
+            };
+            if (fedeHours !== undefined || fedeDaysOff !== undefined) updateOrAdd('Fede', fedeHours, fedeDaysOff);
+            if (gonzaHours !== undefined || gonzaDaysOff !== undefined) updateOrAdd('Gonza', gonzaHours, gonzaDaysOff);
+            settings.partners = p;
+            // Also save to legacy fields for any external consumers
+            if (fedeHours !== undefined) settings.fedeHours = fedeHours;
+            if (gonzaHours !== undefined) settings.gonzaHours = gonzaHours;
+            if (fedeDaysOff !== undefined) settings.fedeDaysOff = fedeDaysOff;
+            if (gonzaDaysOff !== undefined) settings.gonzaDaysOff = gonzaDaysOff;
+        }
+
+        if (partnerHourlyRate    !== undefined) settings.partnerHourlyRate    = partnerHourlyRate;
+        if (instructors          !== undefined) settings.instructors          = instructors;
+        if (instructorHourlyRate !== undefined) settings.instructorHourlyRate = instructorHourlyRate;
+        if (plans                !== undefined) settings.plans                = plans;
+        if (tasks                !== undefined) settings.tasks                = tasks;
+        if (academySavingsBox    !== undefined) settings.academySavingsBox    = academySavingsBox;
+        if (savingsPercentage    !== undefined) settings.savingsPercentage    = savingsPercentage;
 
         const updated = await settings.save();
         res.json(updated);

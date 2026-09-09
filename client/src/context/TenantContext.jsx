@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import API_URL from '../config';
 
@@ -6,6 +6,22 @@ const TenantContext = createContext();
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useTenant = () => useContext(TenantContext);
+
+// Default locale settings (Uruguay)
+const DEFAULT_LOCALE = {
+    country: 'UY',
+    currency: 'UYU',
+    currencySymbol: '$',
+    locale: 'es-UY',
+    timezone: 'America/Montevideo',
+    phonePrefix: '598'
+};
+
+const DEFAULT_NOTIFICATIONS = {
+    webhookUrl: '',
+    paymentReminderTemplate: 'Hola {name}, te recordamos que tenés pendiente de pago tu cuota mensual. Podés consultar el estado de tu cuenta aquí: {link}',
+    fiadoReminderTemplate: 'Hola {name}, te recordamos que tenés consumos pendientes de pago. Podés consultar el detalle aquí: {link}'
+};
 
 export const TenantProvider = ({ children }) => {
     const [branding, setBranding] = useState({
@@ -18,8 +34,33 @@ export const TenantProvider = ({ children }) => {
     });
 
     const [partners, setPartners] = useState([]);
+    const [locale, setLocale] = useState(DEFAULT_LOCALE);
+    const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATIONS);
+    const [lowStockThreshold, setLowStockThreshold] = useState(5);
     const [tenantId, setTenantId] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Currency formatter using tenant locale config
+    const formatCurrency = useCallback((value) => {
+        try {
+            return new Intl.NumberFormat(locale.locale, {
+                style: 'currency',
+                currency: locale.currency
+            }).format(value);
+        } catch {
+            // Fallback if locale/currency is invalid
+            return `${locale.currencySymbol || '$'} ${Number(value).toLocaleString()}`;
+        }
+    }, [locale]);
+
+    // Build a WhatsApp message from a template with variable substitution
+    const buildMessage = useCallback((templateKey, variables = {}) => {
+        const template = notifications[templateKey] || '';
+        return Object.entries(variables).reduce(
+            (msg, [key, val]) => msg.replace(new RegExp(`\\{${key}\\}`, 'g'), val),
+            template
+        );
+    }, [notifications]);
 
     useEffect(() => {
         const root = document.documentElement;
@@ -88,6 +129,11 @@ export const TenantProvider = ({ children }) => {
                             setPartners(data.partners || []);
                             setTenantId(data._id);
 
+                            // Apply locale config
+                            if (data.locale) setLocale({ ...DEFAULT_LOCALE, ...data.locale });
+                            if (data.notifications) setNotifications({ ...DEFAULT_NOTIFICATIONS, ...data.notifications });
+                            if (data.lowStockThreshold != null) setLowStockThreshold(data.lowStockThreshold);
+
                             // Apply dynamic colors
                             root.style.setProperty('--primary', data.branding.primaryColor);
                             root.style.setProperty('--secondary', data.branding.secondaryColor);
@@ -125,7 +171,11 @@ export const TenantProvider = ({ children }) => {
         resolveTenant();
     }, []);
 
-    const value = { branding, partners, tenantId };
+    const value = {
+        branding, partners, tenantId,
+        locale, notifications, lowStockThreshold,
+        formatCurrency, buildMessage
+    };
 
     if (loading) {
         return (
@@ -141,3 +191,4 @@ export const TenantProvider = ({ children }) => {
         </TenantContext.Provider>
     );
 };
+

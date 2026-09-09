@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const MemberSchema = new mongoose.Schema({
-    ci: { type: String, required: true, unique: true },
+    ci: { type: String, required: true }, // Uniqueness enforced per-tenant via compound index below
     fullName: { type: String, required: true },
     phone: { type: String },
     emergencyContact: {
@@ -24,5 +24,8 @@ const MemberSchema = new mongoose.Schema({
 });
 
 MemberSchema.plugin(require('../plugins/tenantPlugin'));
+
+// Compound unique index: same document number allowed across different academies
+MemberSchema.index({ tenantId: 1, ci: 1 }, { unique: true });
 
 module.exports = mongoose.model('Member', MemberSchema);
