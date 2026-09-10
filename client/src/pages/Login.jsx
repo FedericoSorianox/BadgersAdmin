@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
+import axios from 'axios';
 import { useTenant } from '../context/TenantContext';
 import API_URL from '../config';
 
@@ -16,29 +17,21 @@ const Login = () => {
         setError('');
 
         try {
-            // Determine API URL (Hardcoded for dev, normally env or relative)
-            // const API_URL_LOCAL = 'http://localhost:5001/api/auth/login'; // Renamed to avoid shadow
-
-            const res = await fetch(`${API_URL}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+            const res = await axios.post(`${API_URL}/api/auth/login`, {
+                username,
+                password
             });
 
-            const data = await res.json();
+            const data = res.data;
 
-            if (res.ok) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('role', data.user.role);
-                localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('role', data.user.role);
+            localStorage.setItem('isAuthenticated', 'true');
 
-                navigate('/');
-            } else {
-                setError(data.message || 'Error de autenticación');
-            }
+            navigate('/');
         } catch (err) {
             console.error(err);
-            setError('Error de conexión con el servidor');
+            setError(err.response?.data?.message || 'Error de autenticación');
         }
     };
 

@@ -12,15 +12,26 @@ router.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
     try {
-        // Check for user
-        const user = await User.findOne({ username });
+        // Build query: filter by tenantId if present (from x-tenant-slug header),
+        // otherwise look for legacy users (tenantId: null) or superadmins
+        const tenantId = req.tenantId || null;
+        console.log(`[AUTH] Login attempt for user: '${username}', tenantId: ${tenantId}`);
+
+        let user;
+        if (tenantId) {
+            // Tenant-specific login: find user belonging to this academy
+            user = await User.findOne({ username, tenantId });
+        } else {
+            // Legacy / root domain login: find user with no tenant (The Badgers or superadmin)
+            user = await User.findOne({ username, $or: [{ tenantId: null }, { tenantId: { $exists: false } }] });
+        }
+
         if (!user) {
-            console.log(`Login failed: User '${username}' not found`);
+            console.log(`Login failed: User '${username}' not found for tenant ${tenantId || 'legacy'}`);
             return res.status(400).json({ message: 'User not found' });
         }
 
         // Validate password
-        console.log(`Verifying password for '${username}'...`);
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             console.log(`Login failed: Password mismatch for '${username}'`);
@@ -40,7 +51,7 @@ router.post('/login', async (req, res) => {
         jwt.sign(
             payload,
             process.env.JWT_SECRET || 'secret',
-            { expiresIn: '7d' }, // Longer session for convenience
+            { expiresIn: '7d' },
             (err, token) => {
                 if (err) throw err;
                 res.json({
@@ -58,6 +69,18 @@ router.post('/login', async (req, res) => {
         console.error(err.message);
         res.status(500).send('Server error');
     }
+});
+
+router.get('/debug', async (req, res) => {
+    const tenantId = req.tenantId || null;
+    const username = 'admin';
+    let user;
+    if (tenantId) {
+        user = await User.findOne({ username, tenantId });
+    } else {
+        user = await User.findOne({ username, $or: [{ tenantId: null }, { tenantId: { $exists: false } }] });
+    }
+    res.json({ tenantId, userFound: user ? user._id : null });
 });
 
 // @route   GET api/auth/user
