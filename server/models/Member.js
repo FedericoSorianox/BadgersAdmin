@@ -24,7 +24,10 @@ const MemberSchema = new mongoose.Schema({
     statusHistory: [{
         status: { type: Boolean, required: true },
         date: { type: Date, default: Date.now }
-    }]
+    }],
+    manualActiveMonths: { type: Number, default: 0 },
+    manualInactiveMonths: { type: Number, default: 0 },
+    manualOverrideDate: { type: Date }
 });
 
 MemberSchema.plugin(require('../plugins/tenantPlugin'));

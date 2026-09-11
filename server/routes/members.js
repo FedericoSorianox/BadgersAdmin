@@ -233,6 +233,38 @@ router.put('/:id', auth, upload.single('image'), async (req, res) => {
     }
 });
 
+// Update training time and manual overrides (Protected)
+router.put('/:id/training-time', auth, async (req, res) => {
+    try {
+        const { joinDate, manualActiveMonths, manualInactiveMonths } = req.body;
+        const updateData = {};
+        
+        if (joinDate !== undefined) {
+            updateData.joinDate = joinDate;
+        }
+        
+        if (manualActiveMonths !== undefined && manualInactiveMonths !== undefined) {
+            updateData.manualActiveMonths = Number(manualActiveMonths);
+            updateData.manualInactiveMonths = Number(manualInactiveMonths);
+            updateData.manualOverrideDate = new Date();
+        }
+
+        const updatedMember = await Member.findByIdAndUpdate(
+            req.params.id, 
+            { $set: updateData }, 
+            { new: true }
+        );
+
+        if (!updatedMember) {
+            return res.status(404).json({ message: "Socio no encontrado" });
+        }
+
+        res.json(updatedMember);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // Get public member info (Read-only, minimum data exposure, no internal comments)
 router.get("/public/:id", async (req, res) => {
     try {

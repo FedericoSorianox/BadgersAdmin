@@ -8,11 +8,18 @@ import { toast } from 'sonner';
 const MemberDetailModal = ({ isOpen, onClose, member, onEdit, onUpdateLocalMember }) => {
     const [isEditingJoinDate, setIsEditingJoinDate] = useState(false);
     const [tempJoinDate, setTempJoinDate] = useState('');
+    const [tempActiveMonths, setTempActiveMonths] = useState(0);
+    const [tempInactiveMonths, setTempInactiveMonths] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (member) {
             setTempJoinDate(member.joinDate ? new Date(member.joinDate).toISOString().split('T')[0] : (member.createdAt ? new Date(member.createdAt).toISOString().split('T')[0] : ''));
+            
+            // Si el componente se abre, inicializar los temp con lo que tiene el socio o un pre-calculo
+            setTempActiveMonths(member.manualActiveMonths || 0);
+            setTempInactiveMonths(member.manualInactiveMonths || 0);
+            
             setIsEditingJoinDate(false);
         }
     }, [member, isOpen]);
@@ -20,12 +27,17 @@ const MemberDetailModal = ({ isOpen, onClose, member, onEdit, onUpdateLocalMembe
     const handleSaveJoinDate = async () => {
         try {
             setIsSaving(true);
-            const res = await axios.put(`${API_URL}/api/members/${member._id}`, { joinDate: tempJoinDate });
+            const payload = {
+                joinDate: tempJoinDate,
+                manualActiveMonths: tempActiveMonths,
+                manualInactiveMonths: tempInactiveMonths
+            };
+            const res = await axios.put(`${API_URL}/api/members/${member._id}/training-time`, payload);
             if (onUpdateLocalMember) {
                 onUpdateLocalMember(res.data);
             }
             setIsEditingJoinDate(false);
-            toast.success('Fecha de ingreso actualizada');
+            toast.success('Tiempo entrenando actualizado');
         } catch (error) {
             console.error("Error updating join date", error);
             toast.error("Error al actualizar la fecha");
@@ -48,23 +60,34 @@ const MemberDetailModal = ({ isOpen, onClose, member, onEdit, onUpdateLocalMembe
         const joinDate = new Date(memberData.joinDate || memberData.createdAt);
         const now = new Date();
         
-        // If no statusHistory, fallback to simple total time
-        if (!memberData.statusHistory || memberData.statusHistory.length === 0) {
-            let totalMonths = (now.getFullYear() - joinDate.getFullYear()) * 12 + (now.getMonth() - joinDate.getMonth());
-            if (now.getDate() < joinDate.getDate()) totalMonths--;
-            
-            if (totalMonths <= 0) return 'Menos de 1 mes';
-            return formatDuration(totalMonths) + " en total";
+        let activeMonths = memberData.manualActiveMonths || 0;
+        let inactiveMonths = memberData.manualInactiveMonths || 0;
+        
+        let baselineDate = memberData.manualOverrideDate ? new Date(memberData.manualOverrideDate) : joinDate;
+        
+        const hasHistory = memberData.statusHistory && memberData.statusHistory.length > 0;
+        let history = hasHistory ? [...memberData.statusHistory].sort((a, b) => new Date(a.date) - new Date(b.date)) : [];
+        
+        if (memberData.manualOverrideDate) {
+            history = history.filter(entry => new Date(entry.date) > baselineDate);
         }
-
-        // Sort history by date ascending
-        const history = [...memberData.statusHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
         
-        let activeMonths = 0;
-        let inactiveMonths = 0;
+        let currentStatus = memberData.active;
+        if (hasHistory) {
+            const pastEvents = [...memberData.statusHistory]
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .filter(entry => new Date(entry.date) <= baselineDate);
+            
+            if (pastEvents.length > 0) {
+                currentStatus = pastEvents[pastEvents.length - 1].status;
+            } else {
+                currentStatus = true;
+            }
+        } else {
+            currentStatus = true; // Socio antiguo siempre empieza asumiendo que entró activo en base a las reglas solicitadas
+        }
         
-        let lastDate = joinDate;
-        let currentStatus = true; // Assumes they were active when they joined
+        let lastDate = baselineDate;
         
         for (const entry of history) {
             const entryDate = new Date(entry.date);
@@ -176,28 +199,57 @@ const MemberDetailModal = ({ isOpen, onClose, member, onEdit, onUpdateLocalMembe
                                 )}
                             </p>
                             {isEditingJoinDate ? (
-                                <div className="flex items-center gap-2 mt-1">
-                                    <input 
-                                        type="date"
-                                        className="text-sm px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-blue-500"
-                                        value={tempJoinDate}
-                                        onChange={(e) => setTempJoinDate(e.target.value)}
-                                        disabled={isSaving}
-                                    />
-                                    <button 
-                                        onClick={handleSaveJoinDate}
-                                        disabled={isSaving}
-                                        className="p-1 bg-green-100 text-green-700 hover:bg-green-200 rounded transition-colors"
-                                    >
-                                        <Check size={14} />
-                                    </button>
-                                    <button 
-                                        onClick={() => setIsEditingJoinDate(false)}
-                                        disabled={isSaving}
-                                        className="p-1 bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors"
-                                    >
-                                        <X size={14} />
-                                    </button>
+                                <div className="mt-2 space-y-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-inner">
+                                    <div>
+                                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Fecha de Ingreso</label>
+                                        <input 
+                                            type="date"
+                                            className="w-full text-sm px-2 py-1.5 border border-slate-200 rounded focus:outline-none focus:border-blue-500 bg-white"
+                                            value={tempJoinDate}
+                                            onChange={(e) => setTempJoinDate(e.target.value)}
+                                            disabled={isSaving}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Meses Activos</label>
+                                            <input 
+                                                type="number"
+                                                min="0"
+                                                className="w-full text-sm px-2 py-1.5 border border-slate-200 rounded focus:outline-none focus:border-blue-500 bg-white"
+                                                value={tempActiveMonths}
+                                                onChange={(e) => setTempActiveMonths(Number(e.target.value))}
+                                                disabled={isSaving}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Meses Inactivos</label>
+                                            <input 
+                                                type="number"
+                                                min="0"
+                                                className="w-full text-sm px-2 py-1.5 border border-slate-200 rounded focus:outline-none focus:border-blue-500 bg-white"
+                                                value={tempInactiveMonths}
+                                                onChange={(e) => setTempInactiveMonths(Number(e.target.value))}
+                                                disabled={isSaving}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 justify-end pt-1">
+                                        <button 
+                                            onClick={() => setIsEditingJoinDate(false)}
+                                            disabled={isSaving}
+                                            className="px-3 py-1.5 text-xs bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 rounded font-bold transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button 
+                                            onClick={handleSaveJoinDate}
+                                            disabled={isSaving}
+                                            className="px-3 py-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 rounded font-bold transition-colors flex items-center gap-1"
+                                        >
+                                            <Check size={14} /> Guardar
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="text-slate-700 font-medium">
