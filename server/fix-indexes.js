@@ -1,22 +1,41 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
-require('dotenv').config({ path: './.env' });
 
 async function fix() {
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/BadgersAdminDev');
-  console.log('Connected to DB');
-  
-  const collections = await mongoose.connection.db.collections();
-  for (let collection of collections) {
-    const indexes = await collection.indexes();
-    for (let index of indexes) {
-      // Check if it's an old unique index that doesn't include tenantId
-      if (index.unique && index.name !== '_id_' && !index.key.tenantId) {
-        console.log(`Dropping index ${index.name} from ${collection.collectionName}`);
-        await collection.dropIndex(index.name);
-      }
+    try {
+        await mongoose.connect(process.env.MONGODB_URI);
+        console.log("Connected to MongoDB for fixing indexes");
+        const db = mongoose.connection.db;
+
+        // Drop ci_1 from members
+        try {
+            await db.collection('members').dropIndex('ci_1');
+            console.log("Dropped ci_1 from members");
+        } catch (e) {
+            console.log("ci_1 not found or error:", e.message);
+        }
+
+        // Drop username_1 from users
+        try {
+            await db.collection('users').dropIndex('username_1');
+            console.log("Dropped username_1 from users");
+        } catch (e) {
+            console.log("username_1 not found or error:", e.message);
+        }
+
+        // Drop key_1 from settings
+        try {
+            await db.collection('settings').dropIndex('key_1');
+            console.log("Dropped key_1 from settings");
+        } catch (e) {
+            console.log("key_1 not found or error:", e.message);
+        }
+
+    } catch (err) {
+        console.error("Connection error:", err);
+    } finally {
+        await mongoose.disconnect();
+        console.log("Done.");
     }
-  }
-  console.log('Done');
-  process.exit(0);
 }
 fix();

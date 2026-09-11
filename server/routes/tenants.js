@@ -51,13 +51,7 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
             return res.status(400).json({ message: 'Tenant already exists with that slug' });
         }
 
-        // Validate User if provided
-        if (adminUsername) {
-            const existingUser = await User.findOne({ username: adminUsername });
-            if (existingUser) {
-                return res.status(400).json({ message: `User '${adminUsername}' already exists. Please choose another username.` });
-            }
-        }
+        // Tenant handles compound unique index { tenantId, username }
 
         tenant = new Tenant({
             name,

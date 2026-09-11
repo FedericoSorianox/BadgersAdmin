@@ -41,7 +41,7 @@ const PaymentMethodToggle = ({ value, onChange }) => (
 );
 
 const Dashboard = () => {
-    const { buildMessage } = useTenant();
+    const { tenantId, buildMessage } = useTenant();
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [modalType, setModalType] = useState(null); // 'active', 'inactive', 'stock', 'payments'
@@ -1781,7 +1781,7 @@ const Dashboard = () => {
                 )}
 
                 {/* ─────────────── GUARDIA SEMANAL ──────────────── */}
-                {(() => {
+                {!tenantId && (() => {
                     const now = new Date();
                     now.setHours(0, 0, 0, 0);
                     const monthName = now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
