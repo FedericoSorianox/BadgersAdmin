@@ -20,7 +20,11 @@ const MemberSchema = new mongoose.Schema({
     comments: { type: String },
     familyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
     isFamilyHead: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    statusHistory: [{
+        status: { type: Boolean, required: true },
+        date: { type: Date, default: Date.now }
+    }]
 });
 
 MemberSchema.plugin(require('../plugins/tenantPlugin'));

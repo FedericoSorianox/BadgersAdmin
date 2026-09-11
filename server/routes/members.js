@@ -86,6 +86,8 @@ const parseFamilyFields = (body) => {
 router.post('/', auth, upload.single('image'), async (req, res) => {
     try {
         const familyFields = parseFamilyFields(req.body);
+        const isActive = req.body.active === 'true' || req.body.active === true;
+        const joinDate = req.body.joinDate || Date.now();
         const memberData = {
             ci: req.body.ci,
             fullName: req.body.fullName,
@@ -94,10 +96,11 @@ router.post('/', auth, upload.single('image'), async (req, res) => {
             planCost: Number(req.body.planCost),
             birthDate: req.body.birthDate,
             comments: req.body.comments,
-            active: req.body.active === 'true' || req.body.active === true,
+            active: isActive,
             isExempt: req.body.isExempt === 'true' || req.body.isExempt === true,
             isInWhatsappGroup: req.body.isInWhatsappGroup === 'true' || req.body.isInWhatsappGroup === true,
-            joinDate: req.body.joinDate || Date.now(),
+            joinDate: joinDate,
+            statusHistory: [{ status: isActive, date: joinDate }],
             ...familyFields
         };
 
@@ -162,6 +165,8 @@ router.put('/:id', auth, upload.single('image'), async (req, res) => {
         const wasFamilyHead = existingMember ? existingMember.isFamilyHead : false;
 
         const familyFields = parseFamilyFields(req.body);
+        const newActiveStatus = req.body.active === 'true' || req.body.active === true;
+        
         const memberData = {
             fullName: req.body.fullName,
             phone: normalizePhone(req.body.phone),
@@ -169,12 +174,19 @@ router.put('/:id', auth, upload.single('image'), async (req, res) => {
             planCost: Number(req.body.planCost),
             birthDate: req.body.birthDate,
             comments: req.body.comments,
-            active: req.body.active === 'true' || req.body.active === true,
+            active: newActiveStatus,
             isExempt: req.body.isExempt === 'true' || req.body.isExempt === true,
             isInWhatsappGroup: req.body.isInWhatsappGroup === 'true' || req.body.isInWhatsappGroup === true,
             ...(req.body.joinDate ? { joinDate: req.body.joinDate } : {}),
             ...familyFields
         };
+
+        if (existingMember && existingMember.active !== newActiveStatus) {
+            // Push new status to history
+            const updateHistory = existingMember.statusHistory || [];
+            updateHistory.push({ status: newActiveStatus, date: new Date() });
+            memberData.statusHistory = updateHistory;
+        }
 
         if (req.file) {
             memberData.photoUrl = req.file.path;
@@ -299,7 +311,12 @@ router.put('/:id/toggle-status', auth, async (req, res) => {
         if (!member) {
             return res.status(404).json({ message: 'Socio no encontrado' });
         }
-        member.active = !member.active;
+        const newStatus = !member.active;
+        member.active = newStatus;
+        if (!member.statusHistory) {
+            member.statusHistory = [];
+        }
+        member.statusHistory.push({ status: newStatus, date: new Date() });
         await member.save();
         
         // If status changed and they are part of a family plan, recalculate

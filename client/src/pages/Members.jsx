@@ -216,6 +216,10 @@ const Members = () => {
                 onEdit={(member) => {
                     handleOpenModal(member);
                 }}
+                onUpdateLocalMember={(updatedMember) => {
+                    setViewMember(updatedMember);
+                    setMembers(prev => prev.map(m => m._id === updatedMember._id ? updatedMember : m));
+                }}
             />
 
             <BulkPlanUpdateModal

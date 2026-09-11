@@ -1,27 +1,105 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../Modal';
-import { Edit2, Share2 } from 'lucide-react';
+import { Edit2, Share2, Check, X, Calendar } from 'lucide-react';
 import { API_URL } from '../../config';
+import axios from 'axios';
+import { toast } from 'sonner';
 
-const MemberDetailModal = ({ isOpen, onClose, member, onEdit }) => {
-    const calculateTrainingTime = (dateString) => {
-        if (!dateString) return 'Desconocido';
-        const start = new Date(dateString);
+const MemberDetailModal = ({ isOpen, onClose, member, onEdit, onUpdateLocalMember }) => {
+    const [isEditingJoinDate, setIsEditingJoinDate] = useState(false);
+    const [tempJoinDate, setTempJoinDate] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (member) {
+            setTempJoinDate(member.joinDate ? new Date(member.joinDate).toISOString().split('T')[0] : (member.createdAt ? new Date(member.createdAt).toISOString().split('T')[0] : ''));
+            setIsEditingJoinDate(false);
+        }
+    }, [member, isOpen]);
+
+    const handleSaveJoinDate = async () => {
+        try {
+            setIsSaving(true);
+            const res = await axios.put(`${API_URL}/api/members/${member._id}`, { joinDate: tempJoinDate });
+            if (onUpdateLocalMember) {
+                onUpdateLocalMember(res.data);
+            }
+            setIsEditingJoinDate(false);
+            toast.success('Fecha de ingreso actualizada');
+        } catch (error) {
+            console.error("Error updating join date", error);
+            toast.error("Error al actualizar la fecha");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    const formatDuration = (months) => {
+        if (months <= 0) return '0 meses';
+        const y = Math.floor(months / 12);
+        const m = Math.floor(months % 12);
+        if (y === 0) return `${m} ${m === 1 ? 'mes' : 'meses'}`;
+        if (m === 0) return `${y} ${y === 1 ? 'año' : 'años'}`;
+        return `${y} ${y === 1 ? 'año' : 'años'} y ${m} ${m === 1 ? 'mes' : 'meses'}`;
+    };
+
+    const calculateTrainingTime = (memberData) => {
+        if (!memberData || (!memberData.joinDate && !memberData.createdAt)) return 'Desconocido';
+        
+        const joinDate = new Date(memberData.joinDate || memberData.createdAt);
         const now = new Date();
         
-        let years = now.getFullYear() - start.getFullYear();
-        let months = now.getMonth() - start.getMonth();
+        // If no statusHistory, fallback to simple total time
+        if (!memberData.statusHistory || memberData.statusHistory.length === 0) {
+            let totalMonths = (now.getFullYear() - joinDate.getFullYear()) * 12 + (now.getMonth() - joinDate.getMonth());
+            if (now.getDate() < joinDate.getDate()) totalMonths--;
+            
+            if (totalMonths <= 0) return 'Menos de 1 mes';
+            return formatDuration(totalMonths) + " en total";
+        }
+
+        // Sort history by date ascending
+        const history = [...memberData.statusHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
         
-        if (months < 0) {
-            years--;
-            months += 12;
+        let activeMonths = 0;
+        let inactiveMonths = 0;
+        
+        let lastDate = joinDate;
+        let currentStatus = true; // Assumes they were active when they joined
+        
+        for (const entry of history) {
+            const entryDate = new Date(entry.date);
+            let monthsDiff = (entryDate.getFullYear() - lastDate.getFullYear()) * 12 + (entryDate.getMonth() - lastDate.getMonth());
+            if (entryDate.getDate() < lastDate.getDate()) monthsDiff--;
+            monthsDiff = Math.max(0, monthsDiff);
+            
+            if (currentStatus) {
+                activeMonths += monthsDiff;
+            } else {
+                inactiveMonths += monthsDiff;
+            }
+            
+            currentStatus = entry.status;
+            lastDate = entryDate;
         }
         
-        if (years === 0 && months === 0) return 'Menos de 1 mes';
-        if (years === 0) return `${months} ${months === 1 ? 'mes' : 'meses'}`;
-        if (months === 0) return `${years} ${years === 1 ? 'año' : 'años'}`;
+        // Add remaining time from the last event to now
+        let remainingMonths = (now.getFullYear() - lastDate.getFullYear()) * 12 + (now.getMonth() - lastDate.getMonth());
+        if (now.getDate() < lastDate.getDate()) remainingMonths--;
+        remainingMonths = Math.max(0, remainingMonths);
         
-        return `${years} ${years === 1 ? 'año' : 'años'} y ${months} ${months === 1 ? 'mes' : 'meses'}`;
+        if (currentStatus) {
+            activeMonths += remainingMonths;
+        } else {
+            inactiveMonths += remainingMonths;
+        }
+        
+        if (activeMonths === 0 && inactiveMonths === 0) return 'Menos de 1 mes';
+        
+        const activeStr = activeMonths > 0 ? `${formatDuration(activeMonths)} activo` : '';
+        const inactiveStr = inactiveMonths > 0 ? `${formatDuration(inactiveMonths)} inactivo` : '';
+        
+        if (activeStr && inactiveStr) return `${activeStr}, ${inactiveStr}`;
+        return activeStr || inactiveStr || 'Menos de 1 mes';
     };
     return (
         <Modal
@@ -85,10 +163,51 @@ const MemberDetailModal = ({ isOpen, onClose, member, onEdit }) => {
                             </p>
                         </div>
                         <div>
-                            <p className="text-xs font-bold text-slate-400 uppercase mb-1">Tiempo Entrenando</p>
-                            <p className="text-slate-700 font-medium">
-                                {calculateTrainingTime(member.joinDate || member.createdAt)}
+                            <p className="text-xs font-bold text-slate-400 uppercase mb-1 flex items-center gap-2">
+                                Tiempo Entrenando
+                                {!isEditingJoinDate && (
+                                    <button 
+                                        onClick={() => setIsEditingJoinDate(true)}
+                                        className="text-blue-500 hover:text-blue-700 p-0.5 rounded transition-colors"
+                                        title="Editar fecha de ingreso"
+                                    >
+                                        <Edit2 size={12} />
+                                    </button>
+                                )}
                             </p>
+                            {isEditingJoinDate ? (
+                                <div className="flex items-center gap-2 mt-1">
+                                    <input 
+                                        type="date"
+                                        className="text-sm px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-blue-500"
+                                        value={tempJoinDate}
+                                        onChange={(e) => setTempJoinDate(e.target.value)}
+                                        disabled={isSaving}
+                                    />
+                                    <button 
+                                        onClick={handleSaveJoinDate}
+                                        disabled={isSaving}
+                                        className="p-1 bg-green-100 text-green-700 hover:bg-green-200 rounded transition-colors"
+                                    >
+                                        <Check size={14} />
+                                    </button>
+                                    <button 
+                                        onClick={() => setIsEditingJoinDate(false)}
+                                        disabled={isSaving}
+                                        className="p-1 bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-slate-700 font-medium">
+                                    {calculateTrainingTime(member)}
+                                    <span className="text-[10px] text-slate-400 font-normal mt-0.5 flex items-center gap-1">
+                                        <Calendar size={10} />
+                                        Ingresó: {new Date(member.joinDate || member.createdAt).toLocaleDateString('es-UY', { timeZone: 'UTC' })}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                         <div>
                             <p className="text-xs font-bold text-slate-400 uppercase mb-1">Comentarios</p>
