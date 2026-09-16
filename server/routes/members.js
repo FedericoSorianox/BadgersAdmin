@@ -277,16 +277,19 @@ router.get("/public/:id", async (req, res) => {
     }
 });
 
-// Update specific member fields from public profile (Protected: requires authorized session)
-router.put("/public/:id", auth, async (req, res) => {
+// Update specific member fields from public profile
+router.put("/public/:id", async (req, res) => {
     try {
         const { ci, phone, birthDate } = req.body;
         
         if (!ci) return res.status(400).json({ message: "La cédula es obligatoria" });
 
+        const currentMember = await Member.findById(req.params.id).select('tenantId');
+        if (!currentMember) return res.status(404).json({ message: "Socio no encontrado" });
+
         const existingWithCI = await Member.findOne({ 
             ci, 
-            tenantId: req.tenantId || null, 
+            tenantId: currentMember.tenantId, 
             _id: { $ne: req.params.id } 
         });
         if (existingWithCI) {
@@ -313,8 +316,8 @@ router.put("/public/:id", auth, async (req, res) => {
     }
 });
 
-// Update member photo from public profile (Protected: requires authorized session)
-router.post("/public/:id/photo", auth, upload.single('image'), async (req, res) => {
+// Update member photo from public profile
+router.post("/public/:id/photo", upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: "No se subió ninguna imagen" });

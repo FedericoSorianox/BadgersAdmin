@@ -8,6 +8,19 @@ const CashRegister = require('../models/CashRegister');
 const Settings = require('../models/Settings');
 const auth = require('../middleware/auth');
 
+// Public route to get member payments for their public profile
+router.get('/public/member/:memberId', async (req, res) => {
+    try {
+        const query = { memberId: req.params.memberId };
+        const payments = await Payment.find(query)
+            .select('amount type date month year category')
+            .sort({ date: -1 });
+        res.json(payments);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // Protect all finance routes: only authenticated staff/admin can access
 router.use(auth);
 

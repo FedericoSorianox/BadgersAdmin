@@ -21,7 +21,7 @@ const PublicMemberProfile = () => {
         try {
             const [memberRes, financeRes, debtsRes] = await Promise.all([
                 axios.get(`${API_URL}/api/members/public/${id}`),
-                axios.get(`${API_URL}/api/finance/member/${id}`),
+                axios.get(`${API_URL}/api/finance/public/member/${id}`),
                 axios.get(`${API_URL}/api/debts/public/member/${id}`)
             ]);
             setMember(memberRes.data);

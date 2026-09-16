@@ -82,7 +82,10 @@ const SuperAdminDashboard = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(newTenant)
+                body: JSON.stringify({
+                ...newTenant,
+                notifications: { webhookUrl: newTenant.webhookUrl }
+            })
             });
 
             if (res.status === 401) {
@@ -116,7 +119,8 @@ const SuperAdminDashboard = () => {
                     partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
                     instructorHourlyRate: 0,
                     adminUsername: '',
-                    adminPassword: ''
+                    adminPassword: '',
+                    webhookUrl: ''
                 });
                 fetchTenants();
             } else {
@@ -149,7 +153,8 @@ const SuperAdminDashboard = () => {
             newProductButtonColor: branding.newProductButtonColor || '',
             saveButtonColor: branding.saveButtonColor || '',
             partners: tenant.partners && tenant.partners.length >= 2 ? tenant.partners : [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
-            instructorHourlyRate: tenant.instructorHourlyRate || 0
+            instructorHourlyRate: tenant.instructorHourlyRate || 0,
+            webhookUrl: tenant.notifications?.webhookUrl || ''
         });
         setShowModal(true);
     };
@@ -586,6 +591,21 @@ const SuperAdminDashboard = () => {
                                                             <input type="text" className="w-full p-2 border border-slate-200 rounded-lg" value={newTenant.saveButtonColor || ''} onChange={e => setNewTenant({ ...newTenant, saveButtonColor: e.target.value })} />
                                                         </div>
                                                     </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="space-y-4">
+                                                <h4 className="font-bold text-slate-900 border-b pb-2 mt-6">Configuración de Notificaciones (WhatsApp)</h4>
+                                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Webhook URL de N8N</label>
+                                                    <input
+                                                        type="url"
+                                                        className="w-full p-2 border border-slate-200 rounded-lg"
+                                                        value={newTenant.webhookUrl || ''}
+                                                        onChange={e => setNewTenant({ ...newTenant, webhookUrl: e.target.value })}
+                                                        placeholder="https://n8n.tu-servidor.com/webhook/..."
+                                                    />
+                                                    <p className="text-xs text-slate-500 mt-1">Dejar en blanco para usar la variable de entorno global N8N_WEBHOOK_URL del servidor.</p>
                                                 </div>
                                             </div>
 
