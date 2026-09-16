@@ -1,7 +1,7 @@
 export const calculatePartnerDistribution = (config) => {
     const workingDays = 26;
-    const hourlyRate = Number(config.partnerHourlyRate) || 1000;
-    const savingsPct = Number(config.savingsPercentage) || 10;
+    const hourlyRate = config.partnerHourlyRate !== undefined && config.partnerHourlyRate !== null ? Number(config.partnerHourlyRate) : 1000;
+    const savingsPct = config.savingsPercentage !== undefined && config.savingsPercentage !== null ? Number(config.savingsPercentage) : 10;
     const grossProfit = Number(config.grossProfit) || 0;
 
     // Calculate effective hours for each partner
