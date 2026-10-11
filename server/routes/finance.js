@@ -363,12 +363,21 @@ router.get('/stats', async (req, res) => {
         const expenses = await Expense.find({ ...query, expenseType: { $ne: 'Ahorros' } });
         const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
+        // Calculate paid members for the current month
+        const currentMonth = new Date().getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+        const monthlyPayments = payments.filter(p => p.month === currentMonth && p.year === currentYear && (p.type === 'Cuota' || p.type === 'Condonado'));
+        // Filter out any empty memberIds
+        const validMonthlyPayments = monthlyPayments.filter(p => p.memberId);
+        const uniquePaidMembers = new Set(validMonthlyPayments.map(p => p.memberId.toString())).size;
+
         res.json({
             activeMembers,
             inactiveMembers,
             totalIncome,
             totalExpenses,
-            netProfit: totalIncome - totalExpenses
+            netProfit: totalIncome - totalExpenses,
+            paidMembersThisMonth: uniquePaidMembers
         });
     } catch (err) {
         res.status(500).json({ message: err.message });

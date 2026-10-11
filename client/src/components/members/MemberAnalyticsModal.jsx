@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../Modal';
 import { API_URL } from '../../config';
+import { isMemberActiveInMonth } from '../../utils/debtCalc';
 
 const MemberAnalyticsModal = ({ isOpen, onClose }) => {
     const [analyticsData, setAnalyticsData] = useState([]);
@@ -106,7 +107,7 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
 
                 const paidIds = new Set(detailedPayments.map(p => String(p.memberId || '')));
                 const paidCis = new Set(detailedPayments.map(p => String(p.memberCi || '')));
-                const activeMembers = members.filter(m => m.active && !m.isExempt);
+                const activeMembers = members.filter(m => !m.isExempt && isMemberActiveInMonth(m, selectedHistoryMonth, selectedYear, 15));
                 const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
 
                 const paidList = billableMembers.filter(m =>

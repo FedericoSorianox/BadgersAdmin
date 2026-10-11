@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { getMemberPastDebts } from '../utils/debtCalc';
 import { Loader2, CheckCircle2, XCircle, Calendar, User, Phone, CreditCard, AlertCircle, Plane, Camera } from 'lucide-react';
 
 const PublicMemberProfile = () => {
@@ -117,84 +118,47 @@ const PublicMemberProfile = () => {
     const joinMonth = joinDate.getUTCMonth() + 1;
     const joinYear = joinDate.getUTCFullYear();
 
-    // Calculate Past Debt (last 3 months)
-    let pastDebtAmount = 0;
-    const pastMonthsPending = [];
-    for (let i = 1; i <= 3; i++) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        const m = d.getMonth() + 1;
-        const y = d.getFullYear();
-
-        // Skip months prior to the member's join date
-        if (y < joinYear || (y === joinYear && m < joinMonth)) {
-            continue;
-        }
-
-        const hasRecord = payments.some(p => 
-            p.month === m && p.year === y && 
-            (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
-        );
-
-        if (!hasRecord) {
-            pastDebtAmount += (member.planCost || 2000);
-            pastMonthsPending.push(d.toLocaleString('es-ES', { month: 'long' }));
-        }
-    }
+    // Calculate Past Debts using unified debtCalc logic (active >= 15 days, no payment/license/forgiven)
+    const memberPrice = member.planCost || 2000;
+    const pastDebtsList = getMemberPastDebts(member, payments, currentMonth, currentYear, 3, 15);
+    const pastDebtAmount = pastDebtsList.reduce((acc, d) => acc + (d.amount || memberPrice), 0);
+    const pastMonthsPending = pastDebtsList.map(d => d.fullLabel);
 
     const totalFiadoDebt = debts.reduce((acc, d) => acc + (d.totalAmount - (d.paidAmount || 0)), 0);
-    const memberPrice = member.planCost || 2000;
-    const currentMonthPending = (isPaid || isLicensed || isCondoned) ? 0 : memberPrice;
+    // Current month is only pending if member is active, not exempt, and hasn't settled
+    const isCurrentBillable = member.active && !member.isExempt && !isPaid && !isLicensed && !isCondoned &&
+        (currentYear > joinYear || (currentYear === joinYear && currentMonth >= joinMonth));
+    const currentMonthPending = isCurrentBillable ? memberPrice : 0;
     const totalPendingAmount = currentMonthPending + pastDebtAmount + totalFiadoDebt;
 
     // Create Virtual History for missing months
     const virtualDebts = [];
-    if (!isPaid && !isLicensed && !isCondoned) {
-        // Only if current month is on or after join date
-        if (currentYear > joinYear || (currentYear === joinYear && currentMonth >= joinMonth)) {
-            virtualDebts.push({
-                _id: `v-current`,
-                month: currentMonth,
-                year: currentYear,
-                amount: memberPrice,
-                type: 'Cuota',
-                isDebt: true,
-                isVirtual: true,
-                date: new Date()
-            });
-        }
+    if (isCurrentBillable) {
+        virtualDebts.push({
+            _id: `v-current`,
+            month: currentMonth,
+            year: currentYear,
+            amount: memberPrice,
+            type: 'Cuota',
+            isDebt: true,
+            isVirtual: true,
+            date: new Date()
+        });
     }
 
     // Add virtual records for past unpaid months
-    for (let i = 1; i <= 3; i++) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        const m = d.getMonth() + 1;
-        const y = d.getFullYear();
-
-        // Skip months prior to the member's join date
-        if (y < joinYear || (y === joinYear && m < joinMonth)) {
-            continue;
-        }
-
-        const hasRecord = payments.some(p => 
-            p.month === m && p.year === y && 
-            (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
-        );
-
-        if (!hasRecord) {
-            virtualDebts.push({
-                _id: `v-past-${i}`,
-                month: m,
-                year: y,
-                amount: memberPrice,
-                type: 'Cuota',
-                isDebt: true,
-                isVirtual: true,
-                date: d
-            });
-        }
-    }
+    pastDebtsList.forEach((d) => {
+        virtualDebts.push({
+            _id: `v-past-${d.month}-${d.year}`,
+            month: d.month,
+            year: d.year,
+            amount: d.amount || memberPrice,
+            type: 'Cuota',
+            isDebt: true,
+            isVirtual: true,
+            date: new Date(d.year, d.month - 1, 1)
+        });
+    });
 
     // Combine and sort history
     const history = [

@@ -4,6 +4,7 @@ import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
 import { useTenant } from '../context/TenantContext';
+import { getMemberPastDebts } from '../utils/debtCalc';
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, iconClass, onClick }) => (
     <div
@@ -1095,35 +1096,10 @@ const Dashboard = () => {
                     .map(p => String(p.memberId))
             );
 
-            // Helper to check past debts (unpaid months without license)
+            // Helper to check past debts (unpaid months where member was active >= 15 days, without license/forgiveness)
             const getPastDebts = (member) => {
-                const pastMonths = [];
-                const joinDate = new Date(member.joinDate || member.createdAt || new Date());
-                const joinMonth = joinDate.getUTCMonth() + 1;
-                const joinYear = joinDate.getUTCFullYear();
-
-                // Check last 3 months for simplicity
-                for (let i = 1; i <= 3; i++) {
-                    const date = new Date();
-                    date.setMonth(date.getMonth() - i);
-                    const m = date.getMonth() + 1;
-                    const y = date.getFullYear();
-
-                    if (y < joinYear || (y === joinYear && m < joinMonth)) {
-                        continue;
-                    }
-
-                    const hasPayment = stats.paymentsList.some(p =>
-                        String(p.memberId) === String(member._id) &&
-                        p.month === m && p.year === y &&
-                        (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
-                    );
-
-                    if (!hasPayment) {
-                        pastMonths.push(date.toLocaleString('es-ES', { month: 'short' }));
-                    }
-                }
-                return pastMonths;
+                const debts = getMemberPastDebts(member, stats.paymentsList, currentMonth, currentYear, 3, 15);
+                return debts.map(d => d.label);
             };
 
             const pendingList = billableMembers.filter(m => !paidThisMonthIds.has(String(m._id)) && !licensedThisMonthIds.has(String(m._id)));
