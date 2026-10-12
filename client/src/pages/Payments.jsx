@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Search, CheckCircle, XCircle, Calendar, Loader2, DollarSign,
     BarChart2, AlertCircle, MessageSquare, Trash2, Eye, ExternalLink,
-    User, Phone, ChevronRight, Check
+    User, Phone, Check, CheckSquare, Square, X
 } from 'lucide-react';
+import { toast } from 'sonner';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Modal from '../components/Modal';
@@ -34,6 +35,10 @@ const Payments = () => {
     const [debtorDetailModalOpen, setDebtorDetailModalOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
 
+    // Bulk Selection State
+    const [selectedDebtKeys, setSelectedDebtKeys] = useState(new Set()); // Set of `${memberId}_${month}_${year}`
+    const [bulkConfirmModalOpen, setBulkConfirmModalOpen] = useState(false);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
@@ -48,6 +53,7 @@ const Payments = () => {
             setPayments(paymentsRes.data || []);
         } catch (error) {
             console.error("Error fetching data", error);
+            toast.error("Error al cargar los datos de pagos");
         } finally {
             setLoading(false);
         }
@@ -62,6 +68,8 @@ const Payments = () => {
         const currentYear = new Date().getFullYear();
         return [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
     }, []);
+
+    const getMonthName = (m) => ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][m - 1];
 
     // --- Core Data Processing for Monthly Tab ---
     const memberStatusList = useMemo(() => {
@@ -161,6 +169,102 @@ const Payments = () => {
         return allDebtors.reduce((sum, d) => sum + d.totalDebt, 0);
     }, [allDebtors]);
 
+    // --- Bulk Selection Calculations & Helpers ---
+    const selectedDebtsList = useMemo(() => {
+        const list = [];
+        allDebtors.forEach(member => {
+            (member.debts || []).forEach(d => {
+                const key = `${member._id}_${d.month}_${d.year}`;
+                if (selectedDebtKeys.has(key)) {
+                    list.push({
+                        key,
+                        memberId: member._id,
+                        memberName: member.fullName,
+                        memberCi: member.ci,
+                        month: d.month,
+                        year: d.year,
+                        label: d.label || d.fullLabel || getMonthName(d.month),
+                        amount: d.amount || member.planCost || 2000
+                    });
+                }
+            });
+        });
+        return list;
+    }, [allDebtors, selectedDebtKeys]);
+
+    const selectedTotalAmount = useMemo(() => {
+        return selectedDebtsList.reduce((sum, d) => sum + d.amount, 0);
+    }, [selectedDebtsList]);
+
+    const selectedMembersCount = useMemo(() => {
+        return new Set(selectedDebtsList.map(d => d.memberId)).size;
+    }, [selectedDebtsList]);
+
+    const allVisibleDebtsCount = useMemo(() => {
+        return filteredDebtors.reduce((acc, m) => acc + (m.debts ? m.debts.length : 0), 0);
+    }, [filteredDebtors]);
+
+    const isDebtSelected = useCallback((memberId, month, year) => {
+        return selectedDebtKeys.has(`${memberId}_${month}_${year}`);
+    }, [selectedDebtKeys]);
+
+    const toggleDebtSelection = useCallback((member, debtItem) => {
+        const key = `${member._id}_${debtItem.month}_${debtItem.year}`;
+        setSelectedDebtKeys(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) {
+                next.delete(key);
+            } else {
+                next.add(key);
+            }
+            return next;
+        });
+    }, []);
+
+    const isMemberFullySelected = useCallback((member) => {
+        if (!member.debts || member.debts.length === 0) return false;
+        return member.debts.every(d => selectedDebtKeys.has(`${member._id}_${d.month}_${d.year}`));
+    }, [selectedDebtKeys]);
+
+    const isMemberPartiallySelected = useCallback((member) => {
+        if (!member.debts || member.debts.length === 0) return false;
+        const count = member.debts.filter(d => selectedDebtKeys.has(`${member._id}_${d.month}_${d.year}`)).length;
+        return count > 0 && count < member.debts.length;
+    }, [selectedDebtKeys]);
+
+    const toggleMemberSelection = useCallback((member) => {
+        const fullySelected = isMemberFullySelected(member);
+        setSelectedDebtKeys(prev => {
+            const next = new Set(prev);
+            member.debts.forEach(d => {
+                const key = `${member._id}_${d.month}_${d.year}`;
+                if (fullySelected) {
+                    next.delete(key);
+                } else {
+                    next.add(key);
+                }
+            });
+            return next;
+        });
+    }, [isMemberFullySelected]);
+
+    const selectAllVisible = useCallback(() => {
+        setSelectedDebtKeys(prev => {
+            const next = new Set(prev);
+            filteredDebtors.forEach(member => {
+                member.debts.forEach(d => {
+                    next.add(`${member._id}_${d.month}_${d.year}`);
+                });
+            });
+            return next;
+        });
+    }, [filteredDebtors]);
+
+    const clearAllSelection = useCallback(() => {
+        setSelectedDebtKeys(new Set());
+    }, []);
+
+    // --- Analytics Fetcher ---
     const fetchAnalytics = useCallback(() => {
         const allPayments = payments.filter(p => (p.type === 'Cuota' || !p.type) && p.type !== 'Condonado' && p.type !== 'Licencia');
         const monthlyData = Array(12).fill(0).map((_, i) => ({
@@ -210,10 +314,10 @@ const Payments = () => {
 
             await axios.post(`${API_URL}/api/finance`, paymentData);
             await fetchData();
-            alert('Deuda condonada exitosamente');
+            toast.success(`Deuda de ${getMonthName(targetMonth)} condonada exitosamente`);
         } catch (error) {
             console.error("Error dismissing debt", error);
-            alert('Error al condonar la deuda');
+            toast.error('Error al condonar la deuda');
         } finally {
             setActionLoading(false);
         }
@@ -247,14 +351,22 @@ const Payments = () => {
             }));
             await Promise.all(promises);
             await fetchData();
+
+            // Clear selected keys for this member if any
+            setSelectedDebtKeys(prev => {
+                const next = new Set(prev);
+                list.forEach(d => next.delete(`${member._id}_${d.month}_${d.year}`));
+                return next;
+            });
+
             if (selectedDebtor && selectedDebtor._id === member._id) {
                 setDebtorDetailModalOpen(false);
                 setSelectedDebtor(null);
             }
-            alert(`Deuda completa de ${member.fullName} borrada (condonada) exitosamente.`);
+            toast.success(`Deuda completa de ${member.fullName} borrada (condonada) exitosamente.`);
         } catch (error) {
             console.error("Error al condonar deuda total:", error);
-            alert("Error al intentar borrar la deuda.");
+            toast.error("Error al intentar borrar la deuda.");
         } finally {
             setActionLoading(false);
         }
@@ -281,6 +393,13 @@ const Payments = () => {
             });
             await fetchData();
 
+            // Clear selected key if present
+            setSelectedDebtKeys(prev => {
+                const next = new Set(prev);
+                next.delete(`${member._id}_${debtItem.month}_${debtItem.year}`);
+                return next;
+            });
+
             if (selectedDebtor && selectedDebtor._id === member._id) {
                 const remaining = selectedDebtor.debts.filter(d => !(d.month === debtItem.month && d.year === debtItem.year));
                 if (remaining.length === 0) {
@@ -294,10 +413,45 @@ const Payments = () => {
                     });
                 }
             }
-            alert(`Mes ${monthLabel} ${debtItem.year} condonado exitosamente.`);
+            toast.success(`Mes ${monthLabel} ${debtItem.year} condonado exitosamente.`);
         } catch (error) {
             console.error("Error al condonar mes:", error);
-            alert("Error al condonar este mes.");
+            toast.error("Error al condonar este mes.");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // --- Bulk Dismissal Handler (Single Confirmation) ---
+    const handleDismissBulkDebts = async () => {
+        if (selectedDebtsList.length === 0) return;
+
+        try {
+            setActionLoading(true);
+            const count = selectedDebtsList.length;
+            const total = selectedTotalAmount;
+
+            const promises = selectedDebtsList.map(item => axios.post(`${API_URL}/api/finance`, {
+                memberId: item.memberId,
+                memberName: item.memberName,
+                memberCi: item.memberCi,
+                month: item.month,
+                year: item.year,
+                amount: 0,
+                type: 'Condonado',
+                date: new Date()
+            }));
+
+            await Promise.all(promises);
+            await fetchData();
+
+            clearAllSelection();
+            setBulkConfirmModalOpen(false);
+
+            toast.success(`Se borraron (condonaron) ${count} deudas por $${total.toLocaleString()} exitosamente.`);
+        } catch (error) {
+            console.error("Error al condonar deudas en bloque:", error);
+            toast.error("Ocurrió un error al condonar las deudas en bloque.");
         } finally {
             setActionLoading(false);
         }
@@ -325,6 +479,12 @@ const Payments = () => {
             });
             await fetchData();
 
+            setSelectedDebtKeys(prev => {
+                const next = new Set(prev);
+                next.delete(`${member._id}_${debtItem.month}_${debtItem.year}`);
+                return next;
+            });
+
             if (selectedDebtor && selectedDebtor._id === member._id) {
                 const remaining = selectedDebtor.debts.filter(d => !(d.month === debtItem.month && d.year === debtItem.year));
                 if (remaining.length === 0) {
@@ -338,10 +498,10 @@ const Payments = () => {
                     });
                 }
             }
-            alert('Pago registrado correctamente');
+            toast.success('Pago registrado correctamente');
         } catch (error) {
             console.error('Error al registrar pago:', error);
-            alert('Error al registrar pago');
+            toast.error('Error al registrar pago');
         } finally {
             setActionLoading(false);
         }
@@ -371,10 +531,10 @@ const Payments = () => {
 
             await axios.post(`${API_URL}/api/finance`, paymentData);
             await fetchData();
-            alert('Pago registrado exitosamente');
+            toast.success('Pago registrado exitosamente');
         } catch (error) {
             console.error("Error registering payment", error);
-            alert('Error al registrar el pago');
+            toast.error('Error al registrar el pago');
         } finally {
             setActionLoading(false);
         }
@@ -387,15 +547,14 @@ const Payments = () => {
             setActionLoading(true);
             await axios.delete(`${API_URL}/api/finance/${paymentId}`);
             await fetchData();
+            toast.success('Estado revertido correctamente');
         } catch (error) {
             console.error('Error al deshacer estado:', error);
-            alert('Hubo un error al deshacer el estado');
+            toast.error('Hubo un error al deshacer el estado');
         } finally {
             setActionLoading(false);
         }
     };
-
-    const getMonthName = (m) => ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][m - 1];
 
     if (loading) {
         return (
@@ -410,7 +569,7 @@ const Payments = () => {
     const pendingList = memberStatusList.filter(m => !m.paid && !m.isForgiven && !m.isLicensed);
 
     return (
-        <div className="space-y-6 pb-20">
+        <div className="space-y-6 pb-28">
             {/* Header & Main Title */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                 <div>
@@ -704,7 +863,7 @@ const Payments = () => {
                 </div>
             )}
 
-            {/* TAB 2: ALL DEBTORS VIEW */}
+            {/* TAB 2: ALL DEBTORS VIEW WITH BULK ACTIONS */}
             {activeTab === 'debts' && (
                 <div className="space-y-6">
                     {/* Summary Cards */}
@@ -745,61 +904,100 @@ const Payments = () => {
                         </div>
                     </div>
 
-                    {/* Filter & Search Bar */}
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Buscar deudor por nombre o CI..."
-                                value={debtSearchTerm}
-                                onChange={e => setDebtSearchTerm(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-red-400 bg-slate-50/50"
-                            />
+                    {/* Filter, Search & Bulk Select Toolbar */}
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+                            <div className="relative flex-1 max-w-md">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar deudor por nombre o CI..."
+                                    value={debtSearchTerm}
+                                    onChange={e => setDebtSearchTerm(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-red-400 bg-slate-50/50"
+                                />
+                            </div>
+
+                            {/* Filter Badges */}
+                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                                <button
+                                    onClick={() => setDebtFilter('all')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                        debtFilter === 'all'
+                                            ? 'bg-slate-800 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    Todos ({allDebtors.length})
+                                </button>
+                                <button
+                                    onClick={() => setDebtFilter('multiple')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                        debtFilter === 'multiple'
+                                            ? 'bg-red-600 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    &gt; 1 mes ({allDebtors.filter(d => d.debts.length > 1).length})
+                                </button>
+                                <button
+                                    onClick={() => setDebtFilter('active')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                        debtFilter === 'active'
+                                            ? 'bg-emerald-600 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    Activos ({allDebtors.filter(d => d.active).length})
+                                </button>
+                                <button
+                                    onClick={() => setDebtFilter('inactive')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                        debtFilter === 'inactive'
+                                            ? 'bg-amber-600 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    Inactivos ({allDebtors.filter(d => !d.active).length})
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Filter Badges */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-                            <button
-                                onClick={() => setDebtFilter('all')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                                    debtFilter === 'all'
-                                        ? 'bg-slate-800 text-white'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                }`}
-                            >
-                                Todos ({allDebtors.length})
-                            </button>
-                            <button
-                                onClick={() => setDebtFilter('multiple')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                                    debtFilter === 'multiple'
-                                        ? 'bg-red-600 text-white'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                }`}
-                            >
-                                &gt; 1 mes ({allDebtors.filter(d => d.debts.length > 1).length})
-                            </button>
-                            <button
-                                onClick={() => setDebtFilter('active')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                                    debtFilter === 'active'
-                                        ? 'bg-emerald-600 text-white'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                }`}
-                            >
-                                Activos ({allDebtors.filter(d => d.active).length})
-                            </button>
-                            <button
-                                onClick={() => setDebtFilter('inactive')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                                    debtFilter === 'inactive'
-                                        ? 'bg-amber-600 text-white'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                }`}
-                            >
-                                Inactivos ({allDebtors.filter(d => !d.active).length})
-                            </button>
+                        {/* Bulk Selection Quick Bar */}
+                        <div className="flex items-center justify-between text-xs text-slate-600 pt-2 border-t border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={selectedDebtKeys.size > 0 && selectedDebtKeys.size === allVisibleDebtsCount ? clearAllSelection : selectAllVisible}
+                                    className="font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 cursor-pointer bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                    {selectedDebtKeys.size > 0 && selectedDebtKeys.size === allVisibleDebtsCount ? (
+                                        <>
+                                            <CheckSquare size={15} />
+                                            <span>Deseleccionar todos ({filteredDebtors.length} socios)</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Square size={15} />
+                                            <span>Seleccionar todos ({filteredDebtors.length} socios, {allVisibleDebtsCount} deudas)</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                {selectedDebtKeys.size > 0 && (
+                                    <span className="text-slate-500 font-medium">
+                                        • <strong className="text-red-600 font-bold">{selectedDebtKeys.size}</strong> deudas seleccionadas de <strong className="text-slate-800 font-bold">{selectedMembersCount}</strong> socios
+                                    </span>
+                                )}
+                            </div>
+
+                            {selectedDebtKeys.size > 0 && (
+                                <button
+                                    onClick={clearAllSelection}
+                                    className="text-slate-500 hover:text-slate-800 font-semibold cursor-pointer underline decoration-dotted"
+                                >
+                                    Limpiar selección
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -816,115 +1014,198 @@ const Payments = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-4">
-                            {filteredDebtors.map(member => (
-                                <div
-                                    key={member._id}
-                                    className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group"
-                                >
-                                    {/* Member Info */}
-                                    <div className="flex items-start gap-4 flex-1">
-                                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 font-bold overflow-hidden border border-slate-200">
-                                            {member.photoUrl ? (
-                                                <img
-                                                    src={member.photoUrl.startsWith('http') ? member.photoUrl : `${API_URL}${member.photoUrl}`}
-                                                    alt={member.fullName}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <User size={24} />
-                                            )}
-                                        </div>
+                            {filteredDebtors.map(member => {
+                                const isMemberFull = isMemberFullySelected(member);
+                                const isMemberPartial = isMemberPartiallySelected(member);
 
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h3 className="font-bold text-slate-800 text-base">{member.fullName}</h3>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                                    member.active
-                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                                }`}>
-                                                    {member.active ? 'Activo' : 'Inactivo'}
-                                                </span>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                                                    {member.planType || 'Libre'} (${(member.planCost || 2000).toLocaleString()})
-                                                </span>
+                                return (
+                                    <div
+                                        key={member._id}
+                                        className={`bg-white rounded-2xl p-5 border transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group shadow-sm hover:shadow-md ${
+                                            isMemberFull
+                                                ? 'border-red-400 bg-red-50/15 ring-1 ring-red-300'
+                                                : isMemberPartial
+                                                ? 'border-amber-300 bg-amber-50/10'
+                                                : 'border-slate-200'
+                                        }`}
+                                    >
+                                        {/* Member Info & Selection Checkbox */}
+                                        <div className="flex items-start gap-3.5 flex-1 w-full md:w-auto">
+                                            {/* Member Checkbox */}
+                                            <div className="pt-2 shrink-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isMemberFull}
+                                                    ref={el => {
+                                                        if (el) el.indeterminate = isMemberPartial;
+                                                    }}
+                                                    onChange={() => toggleMemberSelection(member)}
+                                                    className="w-5 h-5 rounded text-red-600 focus:ring-red-500 border-slate-300 cursor-pointer accent-red-600 transition-transform hover:scale-110"
+                                                    title="Seleccionar / deseleccionar todas las deudas de este socio"
+                                                />
                                             </div>
 
-                                            <div className="flex items-center gap-3 text-xs text-slate-400">
-                                                <span>CI: <strong className="text-slate-600 font-mono">{member.ci || 'N/A'}</strong></span>
-                                                {member.phone && (
-                                                    <span className="flex items-center gap-1">
-                                                        <Phone size={12} />
-                                                        {member.phone}
-                                                    </span>
+                                            {/* Avatar */}
+                                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 font-bold overflow-hidden border border-slate-200">
+                                                {member.photoUrl ? (
+                                                    <img
+                                                        src={member.photoUrl.startsWith('http') ? member.photoUrl : `${API_URL}${member.photoUrl}`}
+                                                        alt={member.fullName}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <User size={24} />
                                                 )}
                                             </div>
 
-                                            {/* Owed Months Badges with Quick Single-Month Condone */}
-                                            <div className="flex flex-wrap gap-1.5 pt-2">
-                                                {member.debts.map(d => (
-                                                    <span
-                                                        key={`${d.month}-${d.year}`}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-red-50 text-red-700 border border-red-200 text-xs font-bold rounded-lg"
-                                                    >
-                                                        <span>{d.label || getMonthName(d.month)} {d.year}</span>
-                                                        <span className="text-[10px] text-red-400 font-normal">(${(d.amount || member.planCost || 2000).toLocaleString()})</span>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDismissSingleDebt(member, d);
-                                                            }}
-                                                            disabled={actionLoading}
-                                                            title="Borrar (condonar) este mes"
-                                                            className="ml-1 text-red-400 hover:text-red-700 font-black cursor-pointer hover:scale-110 transition-transform"
-                                                        >
-                                                            ✕
-                                                        </button>
+                                            <div className="space-y-1 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h3 className="font-bold text-slate-800 text-base">{member.fullName}</h3>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                        member.active
+                                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                    }`}>
+                                                        {member.active ? 'Activo' : 'Inactivo'}
                                                     </span>
-                                                ))}
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                                                        {member.planType || 'Libre'} (${(member.planCost || 2000).toLocaleString()})
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
+                                                    <span>CI: <strong className="text-slate-600 font-mono">{member.ci || 'N/A'}</strong></span>
+                                                    {member.phone && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Phone size={12} />
+                                                            {member.phone}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Selectable Month Chips */}
+                                                <div className="flex flex-wrap gap-1.5 pt-2">
+                                                    {member.debts.map(d => {
+                                                        const isSelected = isDebtSelected(member._id, d.month, d.year);
+                                                        return (
+                                                            <div
+                                                                key={`${d.month}-${d.year}`}
+                                                                onClick={() => toggleDebtSelection(member, d)}
+                                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer select-none group/chip ${
+                                                                    isSelected
+                                                                        ? 'bg-red-600 text-white border-red-600 shadow-sm ring-2 ring-red-300 scale-102'
+                                                                        : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300'
+                                                                }`}
+                                                                title="Clic para seleccionar/deseleccionar para borrar en bloque"
+                                                            >
+                                                                <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] transition-colors ${
+                                                                    isSelected ? 'bg-white text-red-600 font-black' : 'border border-red-300 text-transparent'
+                                                                }`}>
+                                                                    ✓
+                                                                </span>
+                                                                <span>{d.label || getMonthName(d.month)} {d.year}</span>
+                                                                <span className={`text-[10px] font-normal ${isSelected ? 'text-red-100' : 'text-red-400'}`}>
+                                                                    (${(d.amount || member.planCost || 2000).toLocaleString()})
+                                                                </span>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDismissSingleDebt(member, d);
+                                                                    }}
+                                                                    disabled={actionLoading}
+                                                                    title="Borrar solo este mes ahora"
+                                                                    className={`ml-1 font-black cursor-pointer hover:scale-125 transition-transform ${
+                                                                        isSelected ? 'text-white/80 hover:text-white' : 'text-red-400 hover:text-red-700'
+                                                                    }`}
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Debt Amount & Actions */}
+                                        <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100 shrink-0">
+                                            <div className="text-left md:text-right">
+                                                <span className="text-xs text-slate-400 font-semibold block uppercase tracking-wider">
+                                                    Deuda Total
+                                                </span>
+                                                <span className="text-2xl font-black text-red-600 block">
+                                                    ${member.totalDebt.toLocaleString()}
+                                                </span>
+                                                <span className="text-[11px] text-slate-400">
+                                                    {member.debts.length} {member.debts.length === 1 ? 'mes adeudado' : 'meses adeudados'}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {/* SOLO VERLA: Ver Detalle */}
+                                                <button
+                                                    onClick={() => handleViewDebtor(member)}
+                                                    className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                                                    title="Solo ver el detalle de la deuda"
+                                                >
+                                                    <Eye size={14} />
+                                                    <span>Ver Detalle</span>
+                                                </button>
+
+                                                {/* BORRAR ESA DEUDA: Condonar toda la deuda */}
+                                                <button
+                                                    onClick={() => handleDismissAllDebts(member)}
+                                                    disabled={actionLoading}
+                                                    className="px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                                    title="Borrar (condonar) toda la deuda de este socio"
+                                                >
+                                                    <Trash2 size={14} />
+                                                    <span>Borrar Deuda</span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
+                                );
+                            })}
+                        </div>
+                    )}
 
-                                    {/* Debt Amount & Actions */}
-                                    <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
-                                        <div className="text-left md:text-right">
-                                            <span className="text-xs text-slate-400 font-semibold block uppercase tracking-wider">
-                                                Deuda Total
-                                            </span>
-                                            <span className="text-2xl font-black text-red-600 block">
-                                                ${member.totalDebt.toLocaleString()}
-                                            </span>
-                                            <span className="text-[11px] text-slate-400">
-                                                {member.debts.length} {member.debts.length === 1 ? 'mes adeudado' : 'meses adeudados'}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            {/* SOLO VERLA: Ver Detalle */}
-                                            <button
-                                                onClick={() => handleViewDebtor(member)}
-                                                className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-                                                title="Solo ver el detalle de la deuda"
-                                            >
-                                                <Eye size={14} />
-                                                <span>Ver Detalle</span>
-                                            </button>
-
-                                            {/* BORRAR ESA DEUDA: Condonar toda la deuda */}
-                                            <button
-                                                onClick={() => handleDismissAllDebts(member)}
-                                                disabled={actionLoading}
-                                                className="px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                                title="Borrar (condonar) toda la deuda de este socio"
-                                            >
-                                                <Trash2 size={14} />
-                                                <span>Borrar Deuda</span>
-                                            </button>
-                                        </div>
-                                    </div>
+                    {/* FLOATING BULK ACTIONS BAR */}
+                    {selectedDebtKeys.size > 0 && (
+                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex flex-col sm:flex-row items-center gap-4 sm:gap-6 border border-slate-700/80 backdrop-blur-md animate-in fade-in slide-in-from-bottom-5">
+                            <div className="flex items-center gap-3">
+                                <span className="w-8 h-8 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-black text-sm border border-red-500/30">
+                                    {selectedDebtsList.length}
+                                </span>
+                                <div>
+                                    <p className="font-bold text-sm text-white flex items-center gap-1.5">
+                                        <span>{selectedDebtsList.length} {selectedDebtsList.length === 1 ? 'deuda seleccionada' : 'deudas seleccionadas'}</span>
+                                        <span className="text-slate-400 text-xs font-normal">({selectedMembersCount} {selectedMembersCount === 1 ? 'socio' : 'socios'})</span>
+                                    </p>
+                                    <p className="text-xs text-red-300 font-semibold">
+                                        Total a condonar: ${selectedTotalAmount.toLocaleString()}
+                                    </p>
                                 </div>
-                            ))}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={clearAllSelection}
+                                    disabled={actionLoading}
+                                    className="px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+
+                                <button
+                                    onClick={() => setBulkConfirmModalOpen(true)}
+                                    disabled={actionLoading}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                    <Trash2 size={14} />
+                                    <span>Borrar Seleccionadas ({selectedDebtsList.length})</span>
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1053,7 +1334,66 @@ const Payments = () => {
                 )}
             </Modal>
 
-            {/* MODAL 2: HISTÓRICO ANUAL (Métricas) */}
+            {/* MODAL 2: CONFIRMACIÓN DE BORRADO EN BLOQUE (Bulk Confirmation) */}
+            <Modal
+                isOpen={bulkConfirmModalOpen}
+                onClose={() => setBulkConfirmModalOpen(false)}
+                title="Confirmar Borrado de Deudas en Bloque"
+            >
+                <div className="space-y-4">
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                        <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={22} />
+                        <div>
+                            <h4 className="font-bold text-red-800 text-sm">¿Confirmar condonación de deudas seleccionadas?</h4>
+                            <p className="text-xs text-red-700 mt-1">
+                                Estás a punto de perdonar <strong>{selectedDebtsList.length} cuotas</strong> de <strong>{selectedMembersCount} socios</strong> por un total de <strong>${selectedTotalAmount.toLocaleString()}</strong>.
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Esta acción registrará las cuotas como Condonadas ($0) en una sola confirmación. No se computará ingreso de caja.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Breakdown list */}
+                    <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            Detalle de deudas a borrar ({selectedDebtsList.length})
+                        </p>
+                        <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                            {selectedDebtsList.map(item => (
+                                <div key={item.key} className="p-2.5 px-3 flex justify-between items-center text-xs hover:bg-slate-50">
+                                    <div>
+                                        <strong className="text-slate-800">{item.memberName}</strong>
+                                        <span className="text-slate-400 font-mono ml-1.5">(CI: {item.memberCi || 'N/A'})</span>
+                                        <span className="block text-[11px] text-slate-500 font-medium">{item.label} {item.year}</span>
+                                    </div>
+                                    <span className="font-black text-red-600">${item.amount.toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            onClick={() => setBulkConfirmModalOpen(false)}
+                            disabled={actionLoading}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleDismissBulkDebts}
+                            disabled={actionLoading}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                            {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            <span>Confirmar y Borrar {selectedDebtsList.length} Deudas</span>
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* MODAL 3: HISTÓRICO ANUAL (Métricas) */}
             <Modal
                 isOpen={analyticsModalOpen}
                 onClose={() => setAnalyticsModalOpen(false)}
