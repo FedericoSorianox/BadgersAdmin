@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const Settings = require('../models/Settings');
+const Tenant = require('../models/Tenant');
 const auth = require('../middleware/auth');
 
 // Protect all settings routes
@@ -50,9 +51,23 @@ router.get('/', async (req, res) => {
         let settings = await Settings.findOne({ key: 'admin_config' });
 
         if (!settings) {
+            let initialPartners = [];
+            if (req.tenantId) {
+                const tenant = await Tenant.findById(req.tenantId);
+                if (tenant && tenant.partners && tenant.partners.length > 0) {
+                    initialPartners = tenant.partners.map(p => ({
+                        name: p.name,
+                        percentage: Number(p.percentage) || 0,
+                        hours: 0,
+                        daysOff: 0
+                    }));
+                }
+            }
             // Seed defaults on first run — use dynamic partners array
             settings = new Settings({
-                partners: [],
+                key: 'admin_config',
+                tenantId: req.tenantId || null,
+                partners: initialPartners,
                 partnerHourlyRate: 1000,
                 instructors: [],
                 instructorHourlyRate: 500,
@@ -60,21 +75,47 @@ router.get('/', async (req, res) => {
                 tasks: []
             });
             await settings.save();
+        } else if (settings.partners.length === 0 && req.tenantId) {
+            const tenant = await Tenant.findById(req.tenantId);
+            if (tenant && tenant.partners && tenant.partners.length > 0) {
+                settings.partners = tenant.partners.map(p => ({
+                    name: p.name,
+                    percentage: Number(p.percentage) || 0,
+                    hours: 0,
+                    daysOff: 0
+                }));
+                await settings.save();
+            }
         }
 
-        // Auto-migrate legacy fields to dynamic partners array (one-time)
-        if (settings.partners.length === 0 && (settings.fedeHours != null || settings.gonzaHours != null)) {
+        // Auto-migrate legacy fields to dynamic partners array (one-time, for main gym)
+        if (!req.tenantId && settings.partners.length === 0 && (settings.fedeHours != null || settings.gonzaHours != null)) {
             const legacyPartners = [];
             if (settings.fedeHours != null) {
-                legacyPartners.push({ name: 'Fede', hours: settings.fedeHours || 0, daysOff: settings.fedeDaysOff || 0 });
+                legacyPartners.push({ name: 'Fede', percentage: 70, hours: settings.fedeHours || 0, daysOff: settings.fedeDaysOff || 0 });
             }
             if (settings.gonzaHours != null) {
-                legacyPartners.push({ name: 'Gonza', hours: settings.gonzaHours || 0, daysOff: settings.gonzaDaysOff || 0 });
+                legacyPartners.push({ name: 'Gonza / Andy', percentage: 30, hours: settings.gonzaHours || 0, daysOff: settings.gonzaDaysOff || 0 });
             }
             if (legacyPartners.length > 0) {
                 settings.partners = legacyPartners;
                 await settings.save();
             }
+        } else if (!req.tenantId && settings.partners.length > 0) {
+            let needsSave = false;
+            settings.partners.forEach(p => {
+                if (p.percentage === undefined || p.percentage === null) {
+                    if (/fede/i.test(p.name)) p.percentage = 70;
+                    else if (/gonza|andy/i.test(p.name)) p.percentage = 30;
+                    else p.percentage = 50;
+                    needsSave = true;
+                }
+                if (/^gonza$/i.test(p.name.trim())) {
+                    p.name = 'Gonza / Andy';
+                    needsSave = true;
+                }
+            });
+            if (needsSave) await settings.save();
         }
 
         // Auto-reset stale completions server-side before returning
@@ -110,7 +151,14 @@ router.post('/', async (req, res) => {
 
         // Prefer new partners array; fall back to legacy fields
         if (partners !== undefined) {
-            settings.partners = partners;
+            settings.partners = partners.map(p => ({
+                name: p.name,
+                percentage: p.percentage !== undefined && p.percentage !== null
+                    ? Number(p.percentage)
+                    : (/fede/i.test(p.name) ? 70 : (/gonza|andy/i.test(p.name) ? 30 : 50)),
+                hours: Number(p.hours) || 0,
+                daysOff: Number(p.daysOff) || 0
+            }));
         } else if (fedeHours !== undefined || gonzaHours !== undefined) {
             // Legacy compatibility: convert flat fields to partners array
             const p = settings.partners?.length ? [...settings.partners] : [];

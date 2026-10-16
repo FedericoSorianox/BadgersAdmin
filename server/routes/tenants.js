@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const Tenant = require('../models/Tenant');
 const User = require('../models/User');
+const Settings = require('../models/Settings');
 const bcrypt = require('bcryptjs');
 
 // Middleware to ensure Super Admin
@@ -51,6 +52,20 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
             return res.status(400).json({ message: 'Tenant already exists with that slug' });
         }
 
+        // Validate partners percentage (must sum to exactly 100% if provided)
+        let cleanPartners = [];
+        if (partners && Array.isArray(partners)) {
+            cleanPartners = partners.filter(p => p && p.name && p.name.trim());
+            if (cleanPartners.length > 0) {
+                const totalPct = cleanPartners.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+                if (Math.round(totalPct) !== 100) {
+                    return res.status(400).json({
+                        message: `La suma de los porcentajes de los socios debe ser exactamente 100%. Actualmente suma ${totalPct}%.`
+                    });
+                }
+            }
+        }
+
         // Tenant handles compound unique index { tenantId, username }
 
         tenant = new Tenant({
@@ -66,7 +81,10 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
                 menuActiveColor,
                 dashboardTitleColor
             },
-            partners: partners || [],
+            partners: cleanPartners.map(p => ({
+                name: p.name.trim(),
+                percentage: Number(p.percentage) || 0
+            })),
             instructorHourlyRate: instructorHourlyRate || 0,
             ...(locale && { locale }),
             ...(notifications && { notifications }),
@@ -74,6 +92,33 @@ router.post('/', auth, isSuperAdmin, async (req, res) => {
         });
 
         const savedTenant = await tenant.save();
+
+        // Initialize Settings document for this tenant with their custom partners
+        if (cleanPartners.length > 0) {
+            const settingsPartners = cleanPartners.map(p => ({
+                name: p.name.trim(),
+                percentage: Number(p.percentage) || 0,
+                hours: 0,
+                daysOff: 0
+            }));
+
+            await Settings.findOneAndUpdate(
+                { key: 'admin_config', tenantId: savedTenant._id },
+                {
+                    $set: {
+                        key: 'admin_config',
+                        tenantId: savedTenant._id,
+                        partners: settingsPartners,
+                        partnerHourlyRate: 1000,
+                        instructors: [],
+                        instructorHourlyRate: instructorHourlyRate || 500,
+                        savingsPercentage: 10,
+                        tasks: []
+                    }
+                },
+                { upsert: true, new: true }
+            );
+        }
 
         let createdUser = null;
         if (adminUsername && adminPassword) {
@@ -105,9 +150,42 @@ router.put('/:id', auth, isSuperAdmin, async (req, res) => {
     const updateFields = {};
     if (name) updateFields.name = name;
     if (slug) updateFields.slug = slug;
-    if (partners) updateFields.partners = partners;
     if (instructorHourlyRate !== undefined) updateFields.instructorHourlyRate = instructorHourlyRate;
     if (lowStockThreshold != null) updateFields.lowStockThreshold = lowStockThreshold;
+
+    if (partners && Array.isArray(partners)) {
+        const cleanPartners = partners.filter(p => p && p.name && p.name.trim());
+        if (cleanPartners.length > 0) {
+            const totalPct = cleanPartners.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+            if (Math.round(totalPct) !== 100) {
+                return res.status(400).json({
+                    message: `La suma de los porcentajes de los socios debe ser exactamente 100%. Actualmente suma ${totalPct}%.`
+                });
+            }
+        }
+        updateFields.partners = cleanPartners.map(p => ({
+            name: p.name.trim(),
+            percentage: Number(p.percentage) || 0
+        }));
+
+        // Synchronize Settings document for this tenant immediately
+        if (cleanPartners.length > 0) {
+            await Settings.findOneAndUpdate(
+                { key: 'admin_config', tenantId: req.params.id },
+                {
+                    $set: {
+                        partners: cleanPartners.map(p => ({
+                            name: p.name.trim(),
+                            percentage: Number(p.percentage) || 0,
+                            hours: 0,
+                            daysOff: 0
+                        }))
+                    }
+                },
+                { upsert: true }
+            );
+        }
+    }
 
     // For branding, we want to update specific fields but keep others if not provided? 
     // Or just overwrite branding? Let's assume we send the full branding state or merge it.

@@ -24,7 +24,7 @@ const SuperAdminDashboard = () => {
         newMemberButtonColor: '',
         newProductButtonColor: '',
         saveButtonColor: '',
-        partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
+        partners: [{ name: '', percentage: 50 }, { name: '', percentage: 50 }],
         instructorHourlyRate: 0,
         adminUsername: '',
         adminPassword: ''
@@ -69,6 +69,25 @@ const SuperAdminDashboard = () => {
 
     const handleSave = async (e) => {
         e.preventDefault();
+
+        // Validate partners: must have names and percentages must sum exactly to 100%
+        const partners = newTenant.partners || [];
+        const hasPartners = partners.length > 0;
+
+        if (hasPartners) {
+            const hasEmptyName = partners.some(p => !p.name || !p.name.trim());
+            if (hasEmptyName) {
+                alert('Por favor ingresa el nombre de todos los socios configurados.');
+                return;
+            }
+
+            const totalPct = partners.reduce((sum, p) => sum + (Number(p.percentage) || 0), 0);
+            if (Math.round(totalPct) !== 100) {
+                alert(`La suma de los porcentajes de los socios debe ser exactamente 100%. Actualmente suma ${totalPct}%. Nunca puede ser menor ni mayor a 100%.`);
+                return;
+            }
+        }
+
         const token = localStorage.getItem('token');
         const url = editingId
             ? `${API_URL}/api/tenants/${editingId}`
@@ -83,9 +102,9 @@ const SuperAdminDashboard = () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                ...newTenant,
-                notifications: { webhookUrl: newTenant.webhookUrl }
-            })
+                    ...newTenant,
+                    notifications: { webhookUrl: newTenant.webhookUrl }
+                })
             });
 
             if (res.status === 401) {
@@ -116,7 +135,7 @@ const SuperAdminDashboard = () => {
                     newMemberButtonColor: '',
                     newProductButtonColor: '',
                     saveButtonColor: '',
-                    partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
+                    partners: [{ name: '', percentage: 50 }, { name: '', percentage: 50 }],
                     instructorHourlyRate: 0,
                     adminUsername: '',
                     adminPassword: '',
@@ -124,7 +143,8 @@ const SuperAdminDashboard = () => {
                 });
                 fetchTenants();
             } else {
-                alert('Error saving tenant');
+                const errData = await res.json().catch(() => ({}));
+                alert(errData.message || 'Error al guardar el gimnasio');
             }
         } catch (error) {
             console.error(error);
@@ -152,7 +172,9 @@ const SuperAdminDashboard = () => {
             newMemberButtonColor: branding.newMemberButtonColor || '',
             newProductButtonColor: branding.newProductButtonColor || '',
             saveButtonColor: branding.saveButtonColor || '',
-            partners: tenant.partners && tenant.partners.length >= 2 ? tenant.partners : [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
+            partners: tenant.partners && tenant.partners.length > 0 
+                ? tenant.partners.map(p => ({ name: p.name || '', percentage: p.percentage ?? 0 })) 
+                : [{ name: '', percentage: 50 }, { name: '', percentage: 50 }],
             instructorHourlyRate: tenant.instructorHourlyRate || 0,
             webhookUrl: tenant.notifications?.webhookUrl || ''
         });
@@ -272,7 +294,7 @@ const SuperAdminDashboard = () => {
                                 newMemberButtonColor: '',
                                 newProductButtonColor: '',
                                 saveButtonColor: '',
-                                partners: [{ name: '', percentage: 0 }, { name: '', percentage: 0 }],
+                                partners: [{ name: '', percentage: 50 }, { name: '', percentage: 50 }],
                                 instructorHourlyRate: 0,
                                 adminUsername: '',
                                 adminPassword: ''
@@ -639,15 +661,72 @@ const SuperAdminDashboard = () => {
                                                 </div>
 
                                                 <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                                                    <h4 className="font-semibold text-slate-800 mb-3">Socios (Partners)</h4>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h4 className="font-semibold text-slate-800">Socios (Partners)</h4>
+                                                            {(() => {
+                                                                const totalPct = (newTenant.partners || []).reduce((acc, p) => acc + (Number(p.percentage) || 0), 0);
+                                                                const isExact100 = Math.round(totalPct) === 100;
+                                                                return (
+                                                                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                                                                        isExact100
+                                                                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                                            : 'bg-red-100 text-red-700 border border-red-200'
+                                                                    }`}>
+                                                                        {isExact100 
+                                                                            ? '✓ Total: 100% (Válido)' 
+                                                                            : totalPct < 100 
+                                                                                ? `⚠ Total: ${totalPct}% (Falta ${100 - totalPct}%)` 
+                                                                                : `⚠ Total: ${totalPct}% (Excede por ${totalPct - 100}%)`
+                                                                        }
+                                                                    </span>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {newTenant.partners?.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const count = newTenant.partners.length;
+                                                                        const equalPct = Math.floor(100 / count);
+                                                                        const remainder = 100 - (equalPct * count);
+                                                                        const updated = newTenant.partners.map((p, i) => ({
+                                                                            ...p,
+                                                                            percentage: i === 0 ? equalPct + remainder : equalPct
+                                                                        }));
+                                                                        setNewTenant({ ...newTenant, partners: updated });
+                                                                    }}
+                                                                    className="text-xs text-slate-600 hover:text-blue-600 bg-white border border-slate-200 px-2 py-1 rounded font-medium transition-colors shadow-sm"
+                                                                    title="Dividir porcentajes en partes iguales"
+                                                                >
+                                                                    Dividir Equitativo
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setNewTenant({
+                                                                        ...newTenant,
+                                                                        partners: [...newTenant.partners, { name: '', percentage: 0 }]
+                                                                    });
+                                                                }}
+                                                                className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-colors shadow-sm"
+                                                            >
+                                                                <Plus size={13} /> Agregar Socio
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
                                                     <div className="space-y-3">
                                                         {newTenant.partners.map((partner, index) => (
-                                                            <div key={index} className="flex gap-3">
+                                                            <div key={index} className="flex gap-2 items-center">
                                                                 <div className="flex-1">
                                                                     <label className="text-xs text-slate-500 mb-1 block">Nombre Socio {index + 1}</label>
                                                                     <input
                                                                         type="text"
-                                                                        className="w-full p-2 border border-slate-200 rounded-lg"
+                                                                        placeholder={`Ej: Socio ${index + 1}`}
+                                                                        className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                                                         value={partner.name}
                                                                         onChange={e => {
                                                                             const updatedPartners = [...newTenant.partners];
@@ -656,19 +735,42 @@ const SuperAdminDashboard = () => {
                                                                         }}
                                                                     />
                                                                 </div>
-                                                                <div className="w-24">
+                                                                <div className="w-28">
                                                                     <label className="text-xs text-slate-500 mb-1 block">% Reparto</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        className="w-full p-2 border border-slate-200 rounded-lg"
-                                                                        value={partner.percentage}
-                                                                        onChange={e => {
-                                                                            const updatedPartners = [...newTenant.partners];
-                                                                            updatedPartners[index].percentage = parseFloat(e.target.value) || 0;
-                                                                            setNewTenant({ ...newTenant, partners: updatedPartners });
-                                                                        }}
-                                                                    />
+                                                                    <div className="relative">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            max="100"
+                                                                            step="any"
+                                                                            className="w-full p-2 pr-6 border border-slate-200 rounded-lg bg-white text-sm font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                                            value={partner.percentage === 0 && !partner.name ? '' : partner.percentage}
+                                                                            onChange={e => {
+                                                                                const val = parseFloat(e.target.value);
+                                                                                const updatedPartners = [...newTenant.partners];
+                                                                                updatedPartners[index].percentage = isNaN(val) ? 0 : val;
+                                                                                setNewTenant({ ...newTenant, partners: updatedPartners });
+                                                                            }}
+                                                                        />
+                                                                        <span className="absolute right-2 top-2 text-xs font-bold text-slate-400 pointer-events-none">%</span>
+                                                                    </div>
                                                                 </div>
+                                                                {newTenant.partners.length > 1 && (
+                                                                    <div className="pt-5">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const updatedPartners = newTenant.partners.filter((_, i) => i !== index);
+                                                                                setNewTenant({ ...newTenant, partners: updatedPartners });
+                                                                            }}
+                                                                            className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                                                                            title="Eliminar socio"
+                                                                            aria-label={`Eliminar socio ${index + 1}`}
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>

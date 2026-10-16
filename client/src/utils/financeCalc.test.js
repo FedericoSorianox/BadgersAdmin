@@ -1,77 +1,127 @@
 import { describe, it, expect } from 'vitest';
 import { calculatePartnerDistribution } from './financeCalc';
 
-describe('Finance Calculation Logic', () => {
+describe('Finance Calculation Logic - Partner Distribution', () => {
     const baseConfig = {
-        partnerHourlyRate: 1000,
         savingsPercentage: 10,
         grossProfit: 100000,
         academySavingsBox: 50000,
         partners: [
-            { name: 'Alice', hours: 104, daysOff: 0 },
-            { name: 'Bob', hours: 104, daysOff: 0 }
+            { name: 'Fede', percentage: 70 },
+            { name: 'Gonza / Andy', percentage: 30 }
         ]
     };
 
-    it('should split profit equally when enough money is available and all partners have same hours', () => {
-        // 2 partners * 4 hours/day * 26 days = 104 hours each = 208 hours total
-        // 208 hours * 1000 = 208,000. 
-        // Wait, grossProfit = 100000, which is < 208000. So we need to set grossProfit > 208000 for this test.
-        const config = { ...baseConfig, grossProfit: 300000 };
-        const results = calculatePartnerDistribution(config);
+    it('should reserve 10% for academy savings and distribute remaining 90% as 70% Fede and 30% Gonza/Andy', () => {
+        // Gross: 100,000
+        // Savings (10%): 10,000
+        // Base de Reparto: 90,000
+        // Fede (70%): 63,000
+        // Gonza/Andy (30%): 27,000
+        const results = calculatePartnerDistribution(baseConfig);
 
-        expect(results.paymentStatus).toBe('complete');
-        // Total salaries = 208,000
-        // Remainder = 92,000
-        // Target savings = 300,000 * 0.1 = 30,000
-        // Remainder after savings = 62,000
-        // Utility per partner = 31,000
+        expect(results.academySavingsAdded).toBe(10000);
+        expect(results.academySavingsTaken).toBe(0);
+        expect(results.academySavingsNet).toBe(10000);
+        expect(results.academySavingsBoxUpdated).toBe(60000);
+        expect(results.distributableNet).toBe(90000);
 
-        expect(results.academySavingsAdded).toBe(30000);
-        expect(results.savingsStatus).toBe('complete');
-        
-        expect(results.partnerResults[0].hourlyPayment).toBe(104000);
-        expect(results.partnerResults[0].utility).toBe(31000);
-        expect(results.partnerResults[0].total).toBe(135000);
-        
-        expect(results.partnerResults[1].hourlyPayment).toBe(104000);
-        expect(results.partnerResults[1].utility).toBe(31000);
-        expect(results.partnerResults[1].total).toBe(135000);
+        expect(results.partnerResults).toHaveLength(2);
+        expect(results.partnerResults[0].name).toBe('Fede');
+        expect(results.partnerResults[0].percentage).toBe(70);
+        expect(results.partnerResults[0].total).toBe(63000);
+
+        expect(results.partnerResults[1].name).toBe('Gonza / Andy');
+        expect(results.partnerResults[1].percentage).toBe(30);
+        expect(results.partnerResults[1].total).toBe(27000);
     });
 
-    it('should take from academy box if profit is not enough to cover base salaries', () => {
-        // Total salaries = 208,000
-        // grossProfit = 100,000 -> deficit of 108,000
-        // academySavingsBox = 50,000 -> not enough to cover full deficit
-        // Total available = 100,000 + 50,000 = 150,000
-        // Distribution is proportional to 150,000 / 208,000
-        const config = { ...baseConfig, grossProfit: 100000, academySavingsBox: 50000 };
+    it('should distribute 70% to Fede and 30% to Gonza directly when savings percentage is 0%', () => {
+        // Gross: 100,000
+        // Savings (0%): 0
+        // Distributable: 100,000
+        // Fede: 70,000
+        // Gonza: 30,000
+        const config = { ...baseConfig, savingsPercentage: 0 };
         const results = calculatePartnerDistribution(config);
 
-        expect(results.paymentStatus).toBe('proportional');
-        expect(results.savingsStatus).toBe('taken');
-        expect(results.academySavingsTaken).toBe(50000);
         expect(results.academySavingsAdded).toBe(0);
-        expect(results.academySavingsBoxUpdated).toBe(0);
-
-        // 150,000 total distributed among 2 equally
-        expect(results.partnerResults[0].hourlyPayment).toBe(75000);
-        expect(results.partnerResults[0].utility).toBe(0);
-        expect(results.partnerResults[1].hourlyPayment).toBe(75000);
+        expect(results.distributableNet).toBe(100000);
+        expect(results.partnerResults[0].total).toBe(70000);
+        expect(results.partnerResults[1].total).toBe(30000);
     });
 
-    it('should pay full base salaries if academy box can cover deficit', () => {
-        // Deficit = 108,000
-        // Box = 150,000
-        const config = { ...baseConfig, grossProfit: 100000, academySavingsBox: 150000 };
+    it('should default to 70% Fede and 30% Gonza/Andy when percentage fields are not explicitly set', () => {
+        const config = {
+            savingsPercentage: 10,
+            grossProfit: 200000,
+            academySavingsBox: 0,
+            partners: [
+                { name: 'Fede' },
+                { name: 'Gonza' }
+            ]
+        };
         const results = calculatePartnerDistribution(config);
 
-        expect(results.paymentStatus).toBe('complete');
-        expect(results.savingsStatus).toBe('taken');
-        expect(results.academySavingsTaken).toBe(108000);
-        expect(results.academySavingsAdded).toBe(0);
-        expect(results.academySavingsBoxUpdated).toBe(150000 - 108000);
+        // Gross: 200,000 -> Savings 10% = 20,000 -> Distributable = 180,000
+        // Fede (70%): 126,000
+        // Gonza (30%): 54,000
+        expect(results.distributableNet).toBe(180000);
+        expect(results.partnerResults[0].percentage).toBe(70);
+        expect(results.partnerResults[0].total).toBe(126000);
+        expect(results.partnerResults[1].percentage).toBe(30);
+        expect(results.partnerResults[1].total).toBe(54000);
+    });
 
-        expect(results.partnerResults[0].hourlyPayment).toBe(104000);
+    it('should support custom dynamic percentages', () => {
+        const config = {
+            savingsPercentage: 10,
+            grossProfit: 100000,
+            academySavingsBox: 0,
+            partners: [
+                { name: 'Partner A', percentage: 60 },
+                { name: 'Partner B', percentage: 40 }
+            ]
+        };
+        const results = calculatePartnerDistribution(config);
+
+        expect(results.distributableNet).toBe(90000);
+        expect(results.partnerResults[0].total).toBe(54000);
+        expect(results.partnerResults[1].total).toBe(36000);
+    });
+
+    it('should handle zero gross profit cleanly', () => {
+        const config = { ...baseConfig, grossProfit: 0 };
+        const results = calculatePartnerDistribution(config);
+
+        expect(results.academySavingsAdded).toBe(0);
+        expect(results.distributableNet).toBe(0);
+        expect(results.partnerResults[0].total).toBe(0);
+        expect(results.partnerResults[1].total).toBe(0);
+        expect(results.academySavingsBoxUpdated).toBe(50000);
+    });
+
+    it('should take from academy savings box when gross profit is negative', () => {
+        // Gross: -20,000
+        // Box: 50,000
+        // Deficit: 20,000 taken from box -> Box updated: 30,000
+        // Distributable: 0
+        const config = { ...baseConfig, grossProfit: -20000, academySavingsBox: 50000 };
+        const results = calculatePartnerDistribution(config);
+
+        expect(results.academySavingsAdded).toBe(0);
+        expect(results.academySavingsTaken).toBe(20000);
+        expect(results.academySavingsBoxUpdated).toBe(30000);
+        expect(results.distributableNet).toBe(0);
+        expect(results.partnerResults[0].total).toBe(0);
+        expect(results.partnerResults[1].total).toBe(0);
+    });
+
+    it('should handle empty partners safely', () => {
+        const config = { ...baseConfig, partners: [] };
+        const results = calculatePartnerDistribution(config);
+
+        expect(results.partnerResults).toEqual([]);
+        expect(results.distributableNet).toBe(0);
     });
 });

@@ -12,9 +12,10 @@ const settingsSchema = new mongoose.Schema({
 
     // Dynamic partners for revenue distribution (replaces static fedeHours/gonzaHours)
     partners: [{
-        name:     { type: String, required: true },
-        hours:    { type: Number, default: 0 },    // Base monthly hours
-        daysOff:  { type: Number, default: 0 }      // Days off this month (reduces effective hours)
+        name:       { type: String, required: true },
+        percentage: { type: Number, default: 50 }, // % de reparto del resultado neto
+        hours:      { type: Number, default: 0 },   // Base monthly hours
+        daysOff:    { type: Number, default: 0 }     // Days off this month
     }],
     partnerHourlyRate: { type: Number, default: 1000 },  // $/hour for partner payment calculation
 

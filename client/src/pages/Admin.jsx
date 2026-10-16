@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Save, Calculator, PiggyBank, Plus, Trash2, Users } from 'lucide-react';
+import { Save, PiggyBank } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { useTenant } from '../context/TenantContext';
@@ -23,7 +23,8 @@ const Admin = () => {
     });
 
     const [results, setResults] = useState({
-        partnerResults: [],        // Array of { name, hourlyPayment, utility, total, effectiveHours }
+        partnerResults: [],        // Array of { name, percentage, effectivePercentage, total, distributableNet }
+        distributableNet: 0,
         academySavingsAdded: 0,
         academySavingsTaken: 0,
         academySavingsNet: 0,
@@ -70,9 +71,24 @@ const Admin = () => {
                 const settingsRes = await axios.get(`${API_URL}/api/settings`);
                 const settings = settingsRes.data;
 
+                const rawPartners = settings.partners && settings.partners.length > 0
+                    ? settings.partners
+                    : [
+                        { name: 'Fede', percentage: 70, hours: 40, daysOff: 0 },
+                        { name: 'Gonza / Andy', percentage: 30, hours: 16, daysOff: 0 }
+                    ];
+
+                const loadedPartners = rawPartners.map(p => ({
+                    ...p,
+                    name: p.name === 'Gonza' ? 'Gonza / Andy' : p.name,
+                    percentage: p.percentage !== undefined && p.percentage !== null
+                        ? Number(p.percentage)
+                        : (/fede/i.test(p.name) ? 70 : (/gonza|andy/i.test(p.name) ? 30 : 50))
+                }));
+
                 setConfig(prev => ({
                     ...prev,
-                    partners: settings.partners || [],
+                    partners: loadedPartners,
                     partnerHourlyRate: settings.partnerHourlyRate ?? 1000,
                     instructors: settings.instructors || [],
                     instructorHourlyRate: settings.instructorHourlyRate ?? 500,
@@ -124,25 +140,6 @@ const Admin = () => {
         } finally {
             setSaving(false);
         }
-    };
-
-    // --- PARTNER MANAGEMENT ---
-    const handlePartnerChange = (index, field, value) => {
-        const newPartners = [...config.partners];
-        newPartners[index] = { ...newPartners[index], [field]: value };
-        setConfig({ ...config, partners: newPartners });
-    };
-
-    const addPartner = () => {
-        setConfig({
-            ...config,
-            partners: [...config.partners, { name: '', hours: 0, daysOff: 0 }]
-        });
-    };
-
-    const removePartner = (index) => {
-        const newPartners = config.partners.filter((_, i) => i !== index);
-        setConfig({ ...config, partners: newPartners });
     };
 
     // --- INSTRUCTOR MANAGEMENT ---
@@ -238,85 +235,6 @@ const Admin = () => {
                         />
                     </div>
                 </div>
-
-                {/* Dynamic Partners Section */}
-                <div className="border-t border-slate-100 pt-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
-                            <Users size={20} />
-                            Socios / Dueños
-                        </h3>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm text-slate-600">Tarifa/hora:</label>
-                                <div className="relative">
-                                    <span className="absolute left-2 top-1.5 text-slate-400 text-sm">$</span>
-                                    <input
-                                        type="number"
-                                        className="w-24 pl-6 pr-2 py-1 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        value={config.partnerHourlyRate}
-                                        onChange={(e) => setConfig({ ...config, partnerHourlyRate: Number(e.target.value) })}
-                                    />
-                                </div>
-                            </div>
-                            <button
-                                onClick={addPartner}
-                                className="flex items-center gap-1 text-sm text-blue-600 font-bold hover:underline"
-                                aria-label="Agregar socio"
-                            >
-                                <Plus size={16} /> Agregar Socio
-                            </button>
-                        </div>
-                    </div>
-
-                    {config.partners.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400">
-                            <Users size={32} className="mx-auto mb-2 opacity-50" />
-                            <p>No hay socios configurados. Agregue al menos un socio para calcular el reparto.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {config.partners.map((partner, index) => (
-                                <div key={index} className="bg-slate-50 rounded-xl p-4 space-y-3 relative group">
-                                    <button
-                                        onClick={() => removePartner(index)}
-                                        className="absolute top-2 right-2 text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        aria-label={`Eliminar socio ${partner.name || index + 1}`}
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                    <input
-                                        type="text"
-                                        placeholder="Nombre del socio"
-                                        className="w-full bg-white px-3 py-2 rounded-lg border border-slate-200 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        value={partner.name}
-                                        onChange={(e) => handlePartnerChange(index, 'name', e.target.value)}
-                                    />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1">Horas Base</label>
-                                            <input
-                                                type="number"
-                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                value={partner.hours}
-                                                onChange={(e) => handlePartnerChange(index, 'hours', Number(e.target.value))}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1">Días Libres</label>
-                                            <input
-                                                type="number"
-                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                value={partner.daysOff}
-                                                onChange={(e) => handlePartnerChange(index, 'daysOff', Number(e.target.value))}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
             </div>
 
             {/* Results Cards */}
@@ -329,9 +247,14 @@ const Admin = () => {
                                 <PiggyBank size={16} className="text-blue-500" />
                                 Ahorros Academia
                             </p>
-                            {results.savingsStatus === 'complete' && (
+                            {results.savingsStatus === 'complete' && config.savingsPercentage > 0 && (
                                 <span className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-700 font-semibold">
                                     {config.savingsPercentage}% Completo
+                                </span>
+                            )}
+                            {config.savingsPercentage === 0 && (
+                                <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 font-semibold">
+                                    0% Ahorro
                                 </span>
                             )}
                             {results.savingsStatus === 'partial' && (
@@ -342,11 +265,6 @@ const Admin = () => {
                             {results.savingsStatus === 'taken' && results.academySavingsTaken > 0 && (
                                 <span className="text-xs bg-red-100 px-2 py-1 rounded text-red-700 font-semibold">
                                     Tomado de Ahorros
-                                </span>
-                            )}
-                            {results.savingsStatus === 'taken' && results.academySavingsTaken === 0 && (
-                                <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 font-semibold">
-                                    Sin Ahorro
                                 </span>
                             )}
                         </div>
@@ -361,16 +279,20 @@ const Admin = () => {
                         </div>
                         {results.academySavingsAdded > 0 && (
                             <div className="flex justify-between">
-                                <span>Ahorro del Mes:</span>
-                                <span className="font-medium text-blue-950">{formatCurrency(results.academySavingsAdded)}</span>
+                                <span>Ahorro del Mes ({config.savingsPercentage}%):</span>
+                                <span className="font-medium text-blue-950">+{formatCurrency(results.academySavingsAdded)}</span>
                             </div>
                         )}
                         {results.academySavingsTaken > 0 && (
                             <div className="flex justify-between text-red-700 font-semibold">
                                 <span>Tomado de Caja:</span>
-                                <span>{formatCurrency(results.academySavingsTaken)}</span>
+                                <span>-{formatCurrency(results.academySavingsTaken)}</span>
                             </div>
                         )}
+                        <div className="flex justify-between border-t border-blue-200/40 pt-1 mt-1 font-semibold text-blue-950">
+                            <span>Base de Reparto:</span>
+                            <span className="text-blue-950 font-bold">{formatCurrency(results.distributableNet)}</span>
+                        </div>
                         <div className="flex justify-between border-t border-blue-200/30 pt-1 mt-1">
                             <span>Caja Inicial:</span>
                             <span className="font-medium text-blue-950">{formatCurrency(config.academySavingsBox)}</span>
@@ -383,42 +305,37 @@ const Admin = () => {
                 </div>
 
                 {/* Dynamic Partner Cards */}
-                {results.partnerResults.map((partner, index) => (
-                    <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <div className="flex justify-between items-center mb-2">
-                            <p className="text-sm font-bold text-slate-400 uppercase">{partner.name || `Socio ${index + 1}`}</p>
-                            <div className="flex gap-2">
-                                {results.paymentStatus === 'proportional' ? (
-                                    <span className="text-xs bg-amber-100 px-2 py-1 rounded text-amber-700 font-semibold">
-                                        Proporcional
+                {results.partnerResults.map((partner, index) => {
+                    const isFede = /fede/i.test(partner.name);
+                    return (
+                        <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <p className="text-sm font-bold text-slate-600 uppercase flex items-center gap-1.5">
+                                        <span className="text-base">{isFede ? '🔵' : '🟢'}</span>
+                                        {partner.name || `Socio ${index + 1}`}
+                                    </p>
+                                    <span className="text-xs bg-slate-100 px-2.5 py-1 rounded-full text-slate-600 font-semibold">
+                                        Socio Dueño
                                     </span>
-                                ) : results.academySavingsTaken > 0 ? (
-                                    <span className="text-xs bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-semibold">
-                                        Completo (Ahorros)
-                                    </span>
-                                ) : (
-                                    <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
-                                        Completo
-                                    </span>
-                                )}
-                                <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
-                                    Neto: {partner.effectiveHours.toFixed(1)}h
-                                </span>
+                                </div>
+                                <p className="text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">
+                                    {formatCurrency(partner.total)}
+                                </p>
+                            </div>
+                            <div className="space-y-1.5 text-sm text-slate-500 border-t border-slate-100 pt-3 mt-auto">
+                                <div className="flex justify-between">
+                                    <span>Base de Reparto:</span>
+                                    <span className="font-medium text-slate-700">{formatCurrency(results.distributableNet)}</span>
+                                </div>
+                                <div className="flex justify-between border-t border-slate-100 pt-1 mt-1 font-bold">
+                                    <span className="text-slate-800">Total a Percibir:</span>
+                                    <span className="text-emerald-600 text-base">{formatCurrency(partner.total)}</span>
+                                </div>
                             </div>
                         </div>
-                        <p className="text-4xl font-bold text-slate-800 mb-4">{formatCurrency(partner.total)}</p>
-                        <div className="space-y-1 text-sm text-slate-500 border-t border-slate-100 pt-3">
-                            <div className="flex justify-between">
-                                <span>Pago por horas ({formatCurrency(config.partnerHourlyRate)}/h):</span>
-                                <span className="font-medium text-slate-700">{formatCurrency(partner.hourlyPayment)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Utilidad ({config.partners.length > 0 ? Math.round(100 / config.partners.length) : 0}%):</span>
-                                <span className="font-medium text-slate-700">{formatCurrency(partner.utility)}</span>
-                            </div>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Plans Management Section */}
