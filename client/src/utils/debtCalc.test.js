@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { isMemberActiveInMonth, isMonthSettled, getMemberPastDebts, getAllMemberDebts } from './debtCalc';
+import {
+    isMemberActiveInMonth,
+    isMonthSettled,
+    getMemberPastDebts,
+    getAllMemberDebts,
+    findMonthSettlement,
+    getSettlementStatus,
+    getPaymentPeriod,
+    getBillingMember,
+    SETTLEMENT_STATUS
+} from './debtCalc';
 
 describe('Member Debt Calculation Logic (debtCalc)', () => {
     const baseMember = {
@@ -214,4 +224,95 @@ describe('Member Debt Calculation Logic (debtCalc)', () => {
             expect(allDebts[1].isCurrent).toBe(true);
         });
     });
+
+    describe('findMonthSettlement and Matching Strategies', () => {
+        const member = {
+            _id: 'mem-123',
+            fullName: 'Juan Perez',
+            ci: '45678901'
+        };
+
+        it('matches payment by memberId', () => {
+            const payments = [{ memberId: 'mem-123', month: 5, year: 2026, type: 'Cuota' }];
+            const match = findMonthSettlement(payments, member, 5, 2026);
+            expect(match).not.toBeNull();
+            expect(getSettlementStatus(match)).toBe(SETTLEMENT_STATUS.PAID);
+        });
+
+        it('matches payment by memberCi when memberId differs (e.g., deleted and re-created member)', () => {
+            const payments = [{ memberId: 'old-deleted-id', memberCi: '45678901', month: 6, year: 2026, type: 'Cuota' }];
+            const match = findMonthSettlement(payments, member, 6, 2026);
+            expect(match).not.toBeNull();
+            expect(match.memberCi).toBe('45678901');
+        });
+
+        it('matches orphan payments without memberId by memberName or legacy socio field', () => {
+            const payments1 = [{ memberName: 'Juan Perez', month: 7, year: 2026, type: 'Cuota' }];
+            const match1 = findMonthSettlement(payments1, member, 7, 2026);
+            expect(match1).not.toBeNull();
+
+            const payments2 = [{ socio: 'Juan Perez', month: 8, year: 2026, type: 'Cuota' }];
+            const match2 = findMonthSettlement(payments2, member, 8, 2026);
+            expect(match2).not.toBeNull();
+        });
+
+        it('does NOT match by name if the payment has a different memberId', () => {
+            const payments = [{ memberId: 'other-member-999', memberName: 'Juan Perez', month: 9, year: 2026, type: 'Cuota' }];
+            const match = findMonthSettlement(payments, member, 9, 2026);
+            expect(match).toBeNull();
+        });
+
+        it('prioritizes Cuota over Licencia and Condonado when both exist', () => {
+            const payments = [
+                { memberId: 'mem-123', month: 10, year: 2026, type: 'Licencia', amount: 0 },
+                { memberId: 'mem-123', month: 10, year: 2026, type: 'Cuota', amount: 2000 }
+            ];
+            const match = findMonthSettlement(payments, member, 10, 2026);
+            expect(match.type).toBe('Cuota');
+            expect(getSettlementStatus(match)).toBe(SETTLEMENT_STATUS.PAID);
+        });
+
+        it('resolves legacy payments without month/year using UTC date', () => {
+            // Sep 1, 2026 00:00:00 UTC -> in UTC-3 it's Aug 31 local, but should still resolve to month 9 in UTC!
+            const payments = [
+                { memberId: 'mem-123', date: '2026-09-01T00:00:00.000Z', type: 'Cuota' }
+            ];
+            const period = getPaymentPeriod(payments[0]);
+            expect(period).toEqual({ month: 9, year: 2026 });
+
+            const match = findMonthSettlement(payments, member, 9, 2026);
+            expect(match).not.toBeNull();
+        });
+    });
+
+    describe('getBillingMember (Family billing)', () => {
+        const head = {
+            _id: 'head-1',
+            fullName: 'Padre Familia',
+            isFamilyHead: true,
+            active: true
+        };
+
+        const dependent = {
+            _id: 'dep-1',
+            fullName: 'Hijo Familia',
+            familyId: 'head-1',
+            isFamilyHead: false,
+            active: true
+        };
+
+        it('returns member itself if not a dependent', () => {
+            expect(getBillingMember(head)).toBe(head);
+        });
+
+        it('returns embedded familyHead if available', () => {
+            const depWithHead = { ...dependent, familyHead: head };
+            expect(getBillingMember(depWithHead)).toEqual(head);
+        });
+
+        it('resolves head from allMembers array if provided', () => {
+            expect(getBillingMember(dependent, [head, dependent])).toBe(head);
+        });
+    });
 });
+

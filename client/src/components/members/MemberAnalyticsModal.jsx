@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../Modal';
 import { API_URL } from '../../config';
-import { isMemberActiveInMonth } from '../../utils/debtCalc';
+import { isMemberActiveInMonth, findMonthSettlement } from '../../utils/debtCalc';
 
 const MemberAnalyticsModal = ({ isOpen, onClose }) => {
     const [analyticsData, setAnalyticsData] = useState([]);
@@ -105,26 +105,16 @@ const MemberAnalyticsModal = ({ isOpen, onClose }) => {
                     </div>
                 );
 
-                const paidIds = new Set(detailedPayments.map(p => String(p.memberId || '')));
-                const paidCis = new Set(detailedPayments.map(p => String(p.memberCi || '')));
-                const activeMembers = members.filter(m => !m.isExempt && isMemberActiveInMonth(m, selectedHistoryMonth, selectedYear, 15));
-                const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
-
                 const paidList = billableMembers.filter(m =>
-                    (m._id && paidIds.has(String(m._id))) ||
-                    (m.ci && paidCis.has(String(m.ci)))
+                    findMonthSettlement(detailedPayments, m, selectedHistoryMonth, selectedYear) !== null
                 );
 
                 const pendingList = billableMembers.filter(m =>
-                    !((m._id && paidIds.has(String(m._id))) ||
-                        (m.ci && paidCis.has(String(m.ci))))
+                    findMonthSettlement(detailedPayments, m, selectedHistoryMonth, selectedYear) === null
                 );
 
                 const getMemberStatusText = (member) => {
-                    const payment = detailedPayments.find(p =>
-                        (p.memberId && String(p.memberId) === String(member._id)) ||
-                        (p.memberCi && String(p.memberCi) === String(member.ci))
-                    );
+                    const payment = findMonthSettlement(detailedPayments, member, selectedHistoryMonth, selectedYear);
                     if (!payment) return null;
                     if (payment.type === 'Licencia') return 'Licencia';
                     if (payment.type === 'Condonado') return 'Condonado';

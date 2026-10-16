@@ -4,7 +4,7 @@ import axios from 'axios';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
 import { useTenant } from '../context/TenantContext';
-import { getMemberPastDebts } from '../utils/debtCalc';
+import { getMemberPastDebts, findMonthSettlement, getSettlementStatus, SETTLEMENT_STATUS } from '../utils/debtCalc';
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, iconClass, onClick }) => (
     <div
@@ -218,18 +218,8 @@ const Dashboard = () => {
             const inactiveMembersCount = members.length - activeMembersCount;
 
             // Paid members for current month (Includes Condoned & Licensed)
-            const paidThisMonthIds = new Set(
-                payments
-                    .filter(p =>
-                        Number(p.month) === currentMonth &&
-                        Number(p.year) === currentYear &&
-                        (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
-                    )
-                    .map(p => String(p.memberId))
-            );
-
             const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
-            const paidBillableCount = billableMembers.filter(m => paidThisMonthIds.has(String(m._id))).length;
+            const paidBillableCount = billableMembers.filter(m => findMonthSettlement(payments, m, currentMonth, currentYear) !== null).length;
 
             setStats({
                 activeMembers: activeMembersCount,
@@ -1075,26 +1065,13 @@ const Dashboard = () => {
             });
             const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
 
-            // Paid this month or has license this month
-            const paidThisMonthIds = new Set(
-                stats.paymentsList
-                    .filter(p =>
-                        Number(p.month) === currentMonth &&
-                        Number(p.year) === currentYear &&
-                        (p.type === 'Cuota' || p.type === 'Condonado' || !p.type)
-                    )
-                    .map(p => String(p.memberId))
-            );
-
-            const licensedThisMonthIds = new Set(
-                stats.paymentsList
-                    .filter(p =>
-                        Number(p.month) === currentMonth &&
-                        Number(p.year) === currentYear &&
-                        p.type === 'Licencia'
-                    )
-                    .map(p => String(p.memberId))
-            );
+            // Map settlement status per member using unified logic
+            const memberSettlements = new Map();
+            billableMembers.forEach(m => {
+                const settlement = findMonthSettlement(stats.paymentsList, m, currentMonth, currentYear);
+                const status = getSettlementStatus(settlement);
+                memberSettlements.set(String(m._id), { settlement, status });
+            });
 
             // Helper to check past debts (unpaid months where member was active >= 15 days, without license/forgiveness)
             const getPastDebts = (member) => {
@@ -1102,9 +1079,12 @@ const Dashboard = () => {
                 return debts.map(d => d.label);
             };
 
-            const pendingList = billableMembers.filter(m => !paidThisMonthIds.has(String(m._id)) && !licensedThisMonthIds.has(String(m._id)));
-            const paidList = billableMembers.filter(m => paidThisMonthIds.has(String(m._id)));
-            const licensedList = billableMembers.filter(m => licensedThisMonthIds.has(String(m._id)));
+            const pendingList = billableMembers.filter(m => !memberSettlements.get(String(m._id)).status);
+            const paidList = billableMembers.filter(m => {
+                const s = memberSettlements.get(String(m._id)).status;
+                return s === SETTLEMENT_STATUS.PAID || s === SETTLEMENT_STATUS.FORGIVEN;
+            });
+            const licensedList = billableMembers.filter(m => memberSettlements.get(String(m._id)).status === SETTLEMENT_STATUS.LICENSED);
 
             const filteredPending = pendingList.filter(m =>
                 m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1278,7 +1258,7 @@ const Dashboard = () => {
                                 </h4>
                                 <div className="bg-purple-50/50 rounded-xl p-4 max-h-[150px] overflow-y-auto divide-y divide-purple-100 italic">
                                     {licensedList.map(m => {
-                                        const p = stats.paymentsList.find(pay => String(pay.memberId) === String(m._id) && Number(pay.month) === currentMonth && Number(pay.year) === currentYear && pay.type === 'Licencia');
+                                        const p = memberSettlements.get(String(m._id))?.settlement;
                                         return (
                                             <div key={m._id} className="py-2 flex justify-between group">
                                                 <span className="text-sm font-medium text-purple-800">{m.fullName}</span>
@@ -1308,7 +1288,7 @@ const Dashboard = () => {
                             </h4>
                             <div className="bg-green-50 rounded-xl p-4 max-h-[150px] overflow-y-auto divide-y divide-green-100">
                                 {filteredPaid.map(m => {
-                                    const p = stats.paymentsList.find(pay => String(pay.memberId) === String(m._id) && Number(pay.month) === currentMonth && Number(pay.year) === currentYear && (pay.type === 'Cuota' || pay.type === 'Condonado' || !pay.type));
+                                    const p = memberSettlements.get(String(m._id))?.settlement;
                                     return (
                                         <div key={m._id} className="py-2 flex justify-between group">
                                             <span className="text-sm font-medium text-slate-700">{m.fullName}</span>
@@ -1343,27 +1323,7 @@ const Dashboard = () => {
             const activeMembers = stats.membersList.filter(m => m.active && !m.isExempt);
             const billableMembers = activeMembers.filter(m => !m.familyId || m.isFamilyHead);
 
-            const paidThisMonthIds = new Set(
-                stats.paymentsList
-                    .filter(p =>
-                        Number(p.month) === currentMonth &&
-                        Number(p.year) === currentYear &&
-                        (p.type === 'Cuota' || p.type === 'Condonado' || !p.type)
-                    )
-                    .map(p => String(p.memberId))
-            );
-
-            const licensedThisMonthIds = new Set(
-                stats.paymentsList
-                    .filter(p =>
-                        Number(p.month) === currentMonth &&
-                        Number(p.year) === currentYear &&
-                        p.type === 'Licencia'
-                    )
-                    .map(p => String(p.memberId))
-            );
-
-            const pendingList = billableMembers.filter(m => !paidThisMonthIds.has(String(m._id)) && !licensedThisMonthIds.has(String(m._id)));
+            const pendingList = billableMembers.filter(m => findMonthSettlement(stats.paymentsList, m, currentMonth, currentYear) === null);
             const filteredPending = pendingList.filter(m =>
                 m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (m.ci && m.ci.includes(searchTerm))

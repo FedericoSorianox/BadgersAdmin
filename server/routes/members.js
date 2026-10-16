@@ -265,12 +265,21 @@ router.put('/:id/training-time', auth, async (req, res) => {
     }
 });
 
+// Fields the public profile needs to compute debts exactly like the authenticated Payments page.
+// Still no internal comments, phone or medical info.
+const PUBLIC_BILLING_FIELDS = "fullName photoUrl planType planCost active isExempt familyId isFamilyHead statusHistory joinDate createdAt";
+const PUBLIC_HEAD_FIELDS = "fullName planType planCost active isExempt isFamilyHead statusHistory joinDate createdAt";
+
 // Get public member info (Read-only, minimum data exposure, no internal comments)
 router.get("/public/:id", async (req, res) => {
     try {
-        const member = await Member.findById(req.params.id)
-            .select("fullName photoUrl planType planCost active joinDate createdAt");
+        const member = await Member.findById(req.params.id).select(PUBLIC_BILLING_FIELDS).lean();
         if (!member) return res.status(404).json({ message: "Socio no encontrado" });
+
+        // Dependents are billed through the family head: expose the head so the profile settles against it.
+        if (member.familyId && !member.isFamilyHead) {
+            member.familyHead = await Member.findById(member.familyId).select(PUBLIC_HEAD_FIELDS).lean();
+        }
         res.json(member);
     } catch (err) {
         res.status(500).json({ message: err.message });

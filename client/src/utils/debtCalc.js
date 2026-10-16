@@ -6,7 +6,150 @@
  * 2. If a month has a payment of type 'Cuota', 'Licencia', or 'Condonado' (perdonar), the month is settled (no debt).
  * 3. Exempt members (isExempt = true) never owe membership fees.
  * 4. Months prior to the member's joinDate do not generate debt.
+ * 5. Family dependents are billed through their family head (see getBillingMember).
+ *
+ * IMPORTANT: Every view (Pagos, Dashboard, Ficha, Analíticas) must use the helpers in this file
+ * to decide whether a month is paid. Divergent inline checks are what caused "phantom debts".
  */
+
+export const SETTLEMENT_STATUS = Object.freeze({
+    PAID: 'paid',
+    LICENSED: 'licensed',
+    FORGIVEN: 'forgiven'
+});
+
+// Legacy records may have no type: they were always membership fees.
+const STATUS_BY_TYPE = {
+    Cuota: SETTLEMENT_STATUS.PAID,
+    Licencia: SETTLEMENT_STATUS.LICENSED,
+    Condonado: SETTLEMENT_STATUS.FORGIVEN
+};
+
+// When several settling records exist for the same month, a real payment wins over a status record.
+const STATUS_PRIORITY = {
+    [SETTLEMENT_STATUS.PAID]: 0,
+    [SETTLEMENT_STATUS.LICENSED]: 1,
+    [SETTLEMENT_STATUS.FORGIVEN]: 2
+};
+
+/**
+ * Maps a payment record to its settlement status, or null if it doesn't settle a month (Producto, Venta, Nota...).
+ * @param {Object|null|undefined} payment
+ * @returns {'paid'|'licensed'|'forgiven'|null}
+ */
+export const getSettlementStatus = (payment) => {
+    if (!payment) return null;
+    if (!payment.type) return SETTLEMENT_STATUS.PAID;
+    return STATUS_BY_TYPE[payment.type] || null;
+};
+
+export const isSettlingPayment = (payment) => getSettlementStatus(payment) !== null;
+
+/**
+ * Resolves the billing period of a payment.
+ * Explicit month/year always win. The date fallback only applies to legacy records and uses UTC,
+ * because imported dates are stored as UTC midnight (local time would shift the 1st to the previous month).
+ * @param {Object} payment
+ * @returns {{ month: number, year: number } | null}
+ */
+export const getPaymentPeriod = (payment) => {
+    if (!payment) return null;
+    const rawDate = payment.date || payment.createdAt;
+    const date = rawDate ? new Date(rawDate) : null;
+    const hasValidDate = date && !isNaN(date.getTime());
+
+    const month = Number(payment.month || (hasValidDate ? date.getUTCMonth() + 1 : NaN));
+    const year = Number(payment.year || (hasValidDate ? date.getUTCFullYear() : NaN));
+
+    if (!Number.isFinite(month) || !Number.isFinite(year)) return null;
+    return { month, year };
+};
+
+const normalizeName = (name) => (typeof name === 'string' ? name.trim().toLowerCase() : '');
+
+/**
+ * Whether a payment belongs to the given member identity.
+ * - memberId: primary key.
+ * - memberCi: unique per tenant; covers members that were deleted and re-created (new _id).
+ * - name: only for orphan records without memberId, otherwise two homonyms would settle each other.
+ *
+ * @param {Object} payment
+ * @param {{ id?: string, fullName?: string, ci?: string }} identity
+ * @returns {boolean}
+ */
+export const paymentMatchesMember = (payment, { id, fullName, ci } = {}) => {
+    if (!payment) return false;
+
+    if (id && payment.memberId && String(payment.memberId) === String(id)) return true;
+    if (ci && payment.memberCi && String(payment.memberCi).trim() === String(ci).trim()) return true;
+
+    if (!payment.memberId) {
+        const targetName = normalizeName(fullName);
+        // `socio` is the legacy field name; the schema field is `memberName`.
+        const payerName = normalizeName(payment.memberName || payment.socio);
+        if (targetName && payerName && payerName === targetName) return true;
+    }
+    return false;
+};
+
+/**
+ * Finds the record that settles a month for a member (highest priority: Cuota > Licencia > Condonado).
+ *
+ * @param {Array} payments
+ * @param {{ _id?: string, fullName?: string, ci?: string }} member
+ * @param {number} month - 1-indexed
+ * @param {number} year
+ * @returns {Object|null} The settling payment record, or null if the month is not settled.
+ */
+export const findMonthSettlement = (payments, member, month, year) => {
+    if (!Array.isArray(payments) || !member) return null;
+    const identity = { id: member._id, fullName: member.fullName, ci: member.ci };
+    if (!identity.id && !identity.fullName && !identity.ci) return null;
+
+    const targetMonth = Number(month);
+    const targetYear = Number(year);
+
+    let best = null;
+    let bestPriority = Infinity;
+
+    for (const payment of payments) {
+        const status = getSettlementStatus(payment);
+        if (!status) continue;
+
+        const period = getPaymentPeriod(payment);
+        if (!period || period.month !== targetMonth || period.year !== targetYear) continue;
+        if (!paymentMatchesMember(payment, identity)) continue;
+
+        const priority = STATUS_PRIORITY[status];
+        if (priority < bestPriority) {
+            best = payment;
+            bestPriority = priority;
+            if (priority === 0) break; // Can't beat a real payment
+        }
+    }
+    return best;
+};
+
+/**
+ * Returns the member whose payments settle this member's fee.
+ * Family dependents are billed through the head; the public endpoint embeds it as `familyHead`.
+ * When the head object isn't available we fall back to an id-only stub so matching still works.
+ *
+ * @param {Object} member
+ * @param {Array} [allMembers] - Optional list to resolve the head from (authenticated views).
+ * @returns {Object}
+ */
+export const getBillingMember = (member, allMembers = null) => {
+    if (!member || !member.familyId || member.isFamilyHead) return member;
+
+    if (member.familyHead && typeof member.familyHead === 'object') return member.familyHead;
+
+    if (Array.isArray(allMembers)) {
+        const head = allMembers.find(m => String(m._id) === String(member.familyId));
+        if (head) return head;
+    }
+    return member;
+};
 
 /**
  * Returns whether a member was active for at least `minActiveDays` in the specified month and year.
@@ -97,6 +240,7 @@ export const isMemberActiveInMonth = (member, month, year, minActiveDays = 15) =
 /**
  * Checks if a specific month/year has been settled for a member
  * (Paid as Cuota, marked as Licencia, or Condonado/Perdonado).
+ * Kept for backwards compatibility; delegates to findMonthSettlement.
  * 
  * @param {Array} payments - Array of payment records
  * @param {string} memberId - Member _id
@@ -107,35 +251,9 @@ export const isMemberActiveInMonth = (member, month, year, minActiveDays = 15) =
  * @returns {boolean}
  */
 export const isMonthSettled = (payments = [], memberId, memberFullName, month, year, memberCi) => {
-    if (!Array.isArray(payments) || (!memberId && !memberFullName && !memberCi)) {
-        return false;
-    }
-
-    const cleanName = memberFullName ? memberFullName.trim().toLowerCase() : null;
-    const targetMonth = Number(month);
-    const targetYear = Number(year);
-
-    return payments.some(p => {
-        const d = new Date(p.date || p.createdAt);
-        const pMonth = Number(p.month || (d.getMonth() + 1));
-        const pYear = Number(p.year || d.getFullYear());
-
-        if (pMonth !== targetMonth || pYear !== targetYear) {
-            return false;
-        }
-
-        // Must be Cuota, Licencia, Condonado, or unspecified type
-        const isSettlingType = p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type;
-        if (!isSettlingType) {
-            return false;
-        }
-
-        const matchesId = memberId && String(p.memberId) === String(memberId);
-        const matchesCi = memberCi && p.memberCi && String(p.memberCi) === String(memberCi);
-        const matchesName = cleanName && p.socio && p.socio.trim().toLowerCase() === cleanName;
-
-        return matchesId || matchesCi || matchesName;
-    });
+    if (!memberId && !memberFullName && !memberCi) return false;
+    const identity = { _id: memberId, fullName: memberFullName, ci: memberCi };
+    return findMonthSettlement(payments, identity, month, year) !== null;
 };
 
 /**
@@ -174,8 +292,7 @@ export const getMemberPastDebts = (
             const wasActive = isMemberActiveInMonth(member, m, y, minActiveDays);
             if (!wasActive) continue;
 
-            const isSettled = isMonthSettled(payments, member._id, member.fullName, m, y, member.ci);
-            if (!isSettled) {
+            if (!findMonthSettlement(payments, member, m, y)) {
                 pastDebts.push({
                     month: m,
                     year: y,
@@ -191,8 +308,7 @@ export const getMemberPastDebts = (
             const wasActive = isMemberActiveInMonth(member, m, currentYear, minActiveDays);
             if (!wasActive) continue;
 
-            const isSettled = isMonthSettled(payments, member._id, member.fullName, m, currentYear, member.ci);
-            if (!isSettled) {
+            if (!findMonthSettlement(payments, member, m, currentYear)) {
                 pastDebts.push(m);
             }
         }
@@ -229,7 +345,7 @@ export const getAllMemberDebts = (
 
     // Current month check
     const isCurrentActive = isMemberActiveInMonth(member, currentMonth, currentYear, minActiveDays);
-    const isCurrentSettled = isMonthSettled(payments, member._id, member.fullName, currentMonth, currentYear, member.ci);
+    const isCurrentSettled = findMonthSettlement(payments, member, currentMonth, currentYear) !== null;
 
     const allDebts = [...pastDebts];
 
@@ -249,4 +365,3 @@ export const getAllMemberDebts = (
 
     return allDebts;
 };
-

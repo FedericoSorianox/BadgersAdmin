@@ -9,7 +9,7 @@ import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Modal from '../components/Modal';
 import { API_URL } from '../config';
-import { getMemberPastDebts, getAllMemberDebts } from '../utils/debtCalc';
+import { getMemberPastDebts, getAllMemberDebts, findMonthSettlement, getSettlementStatus, getPaymentPeriod, SETTLEMENT_STATUS } from '../utils/debtCalc';
 
 const Payments = () => {
     const [loading, setLoading] = useState(true);
@@ -82,24 +82,13 @@ const Payments = () => {
                 return null;
             }
 
-            const payment = payments.find(p => {
-                const d = new Date(p.date || p.createdAt);
-                const pMonth = p.month || (d.getMonth() + 1);
-                const pYear = p.year || d.getFullYear();
-                return Number(pMonth) === Number(selectedMonth) &&
-                    Number(pYear) === Number(selectedYear) &&
-                    (p.type === 'Cuota' || p.type === 'Condonado' || p.type === 'Licencia' || !p.type) &&
-                    (p.memberId === member._id || (p.socio && p.socio.trim().toLowerCase() === member.fullName.trim().toLowerCase()));
-            });
+            const payment = findMonthSettlement(payments, member, selectedMonth, selectedYear);
+            const status = getSettlementStatus(payment);
 
             const note = payments.find(p => {
-                const d = new Date(p.date || p.createdAt);
-                const pMonth = p.month || (d.getMonth() + 1);
-                const pYear = p.year || d.getFullYear();
-                return Number(pMonth) === Number(selectedMonth) &&
-                    Number(pYear) === Number(selectedYear) &&
-                    p.type === 'Nota' &&
-                    p.memberId === member._id;
+                if (p.type !== 'Nota' || String(p.memberId) !== String(member._id)) return false;
+                const period = getPaymentPeriod(p);
+                return period && period.month === Number(selectedMonth) && period.year === Number(selectedYear);
             });
 
             const pastDebts = Number(selectedYear) === new Date().getFullYear()
@@ -108,9 +97,9 @@ const Payments = () => {
 
             return {
                 ...member,
-                paid: !!payment && (payment.type === 'Cuota' || !payment.type),
-                isForgiven: payment?.type === 'Condonado',
-                isLicensed: payment?.type === 'Licencia',
+                paid: status === SETTLEMENT_STATUS.PAID,
+                isForgiven: status === SETTLEMENT_STATUS.FORGIVEN,
+                isLicensed: status === SETTLEMENT_STATUS.LICENSED,
                 paymentDetails: payment,
                 note: note ? note.comments : null,
                 pastDebts
@@ -275,13 +264,10 @@ const Payments = () => {
         }));
 
         allPayments.forEach(p => {
-            const pDate = new Date(p.date || p.createdAt);
-            const pYear = p.year || pDate.getFullYear();
-            const pMonth = p.month || (pDate.getMonth() + 1);
-
-            if (Number(pYear) === Number(analyticsYear)) {
-                monthlyData[pMonth - 1].count += 1;
-                monthlyData[pMonth - 1].revenue += p.amount;
+            const period = getPaymentPeriod(p);
+            if (period && period.year === Number(analyticsYear)) {
+                monthlyData[period.month - 1].count += 1;
+                monthlyData[period.month - 1].revenue += p.amount || 0;
             }
         });
 

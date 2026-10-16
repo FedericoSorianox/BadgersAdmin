@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config';
-import { getMemberPastDebts } from '../utils/debtCalc';
+import { getMemberPastDebts, findMonthSettlement, getSettlementStatus, getBillingMember, SETTLEMENT_STATUS } from '../utils/debtCalc';
 import { Loader2, CheckCircle2, XCircle, Calendar, User, Phone, CreditCard, AlertCircle, Plane, Camera } from 'lucide-react';
 
 const PublicMemberProfile = () => {
@@ -100,33 +100,34 @@ const PublicMemberProfile = () => {
         );
     }
 
-    // Determine status for current month
+    // Determine status for current month (same rules as the Payments page)
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
-    const currentPayment = payments.find(p => 
-        Number(p.month) === currentMonth && 
-        Number(p.year) === currentYear && 
-        (p.type === 'Cuota' || p.type === 'Licencia' || p.type === 'Condonado' || !p.type)
-    );
 
-    const isPaid = currentPayment && (currentPayment.type === 'Cuota' || !currentPayment.type);
-    const isLicensed = currentPayment && currentPayment.type === 'Licencia';
-    const isCondoned = currentPayment && currentPayment.type === 'Condonado';
+    // Dependents are billed through the family head
+    const billingMember = getBillingMember(member);
+    const isBilledByHead = billingMember !== member;
+
+    const currentSettlement = findMonthSettlement(payments, billingMember, currentMonth, currentYear);
+    const currentStatus = getSettlementStatus(currentSettlement);
+    const isPaid = currentStatus === SETTLEMENT_STATUS.PAID;
+    const isLicensed = currentStatus === SETTLEMENT_STATUS.LICENSED;
+    const isCondoned = currentStatus === SETTLEMENT_STATUS.FORGIVEN;
 
     // Determine join date safely using UTC to avoid timezone shift
-    const joinDate = new Date(member.joinDate || member.createdAt || new Date());
+    const joinDate = new Date(billingMember.joinDate || billingMember.createdAt || new Date());
     const joinMonth = joinDate.getUTCMonth() + 1;
     const joinYear = joinDate.getUTCFullYear();
 
     // Calculate Past Debts using unified debtCalc logic (active >= 15 days, no payment/license/forgiven)
-    const memberPrice = member.planCost || 2000;
-    const pastDebtsList = getMemberPastDebts(member, payments, currentMonth, currentYear, 3, 15);
+    const memberPrice = billingMember.planCost || 2000;
+    const pastDebtsList = getMemberPastDebts(billingMember, payments, currentMonth, currentYear, 3, 15);
     const pastDebtAmount = pastDebtsList.reduce((acc, d) => acc + (d.amount || memberPrice), 0);
     const pastMonthsPending = pastDebtsList.map(d => d.fullLabel);
 
     const totalFiadoDebt = debts.reduce((acc, d) => acc + (d.totalAmount - (d.paidAmount || 0)), 0);
-    // Current month is only pending if member is active, not exempt, and hasn't settled
-    const isCurrentBillable = member.active && !member.isExempt && !isPaid && !isLicensed && !isCondoned &&
+    // Current month is only pending if the billing member is active, not exempt, and hasn't settled
+    const isCurrentBillable = billingMember.active && !billingMember.isExempt && !currentSettlement &&
         (currentYear > joinYear || (currentYear === joinYear && currentMonth >= joinMonth));
     const currentMonthPending = isCurrentBillable ? memberPrice : 0;
     const totalPendingAmount = currentMonthPending + pastDebtAmount + totalFiadoDebt;
@@ -162,7 +163,7 @@ const PublicMemberProfile = () => {
 
     // Combine and sort history
     const history = [
-        ...payments.map(p => ({ ...p, isDebt: false })),
+        ...payments.map(p => ({ ...p, isDebt: false, paidByHead: isBilledByHead && String(p.memberId) !== String(member._id) })),
         ...virtualDebts,
         ...debts.map(d => ({ 
             ...d, 
@@ -422,7 +423,7 @@ const PublicMemberProfile = () => {
                                                 )}
                                             </p>
                                             <p className="text-[10px] text-slate-400 uppercase">
-                                                {item.isVirtual ? 'Pendiente' : (item.isDebt ? item.productName : (item.type || 'Cuota'))}
+                                                {item.isVirtual ? 'Pendiente' : (item.isDebt ? item.productName : `${item.type || 'Cuota'}${item.paidByHead ? ' · Titular' : ''}`)}
                                             </p>
                                         </div>
                                         <div className="text-right">

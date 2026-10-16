@@ -8,13 +8,21 @@ const CashRegister = require('../models/CashRegister');
 const Settings = require('../models/Settings');
 const auth = require('../middleware/auth');
 
-// Public route to get member payments for their public profile
+// Public route to get member payments for their public profile.
+// memberId/memberCi are required: the client settles months by matching them (debtCalc.findMonthSettlement).
 router.get('/public/member/:memberId', async (req, res) => {
     try {
-        const query = { memberId: req.params.memberId };
-        const payments = await Payment.find(query)
-            .select('amount type date month year category')
-            .sort({ date: -1 });
+        const member = await Member.findById(req.params.memberId).select('familyId isFamilyHead tenantId').lean();
+        if (!member) return res.status(404).json({ message: 'Socio no encontrado' });
+
+        // Dependents' fees are paid by the family head, so include the head's records too.
+        const ownerIds = [member._id];
+        if (member.familyId && !member.isFamilyHead) ownerIds.push(member.familyId);
+
+        const payments = await Payment.find({ memberId: { $in: ownerIds }, tenantId: member.tenantId || null })
+            .select('memberId memberCi amount type date month year category')
+            .sort({ date: -1 })
+            .lean();
         res.json(payments);
     } catch (err) {
         res.status(500).json({ message: err.message });
