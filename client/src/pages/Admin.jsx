@@ -329,7 +329,7 @@ const Admin = () => {
                                     <span className="font-medium text-slate-700">{formatCurrency(results.distributableNet)}</span>
                                 </div>
                                 <div className="flex justify-between border-t border-slate-100 pt-1 mt-1 font-bold">
-                                    <span className="text-slate-800">Total a Rercibir:</span>
+                                    <span className="text-slate-800">Total a Recibir:</span>
                                     <span className="text-emerald-600 text-base">{formatCurrency(partner.total)}</span>
                                 </div>
                             </div>
