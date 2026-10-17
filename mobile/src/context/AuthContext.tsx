@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 
 export const AuthContext = createContext<any>(null);
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.2:5001/api';
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       router.replace('/(tabs)');
       return { success: true };
     } catch (error: any) {
-      console.log('Login error:', error.response?.data || error.message);
+      console.log(`Login error [${API_URL}/auth/login]:`, error.response?.data || error.message);
       return { success: false, message: error.response?.data?.message || 'Error de conexión' };
     } finally {
       setLoading(false);
