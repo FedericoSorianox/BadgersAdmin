@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Search, CheckCircle, XCircle, Calendar, Loader2, DollarSign,
     BarChart2, AlertCircle, MessageSquare, Trash2, Eye, ExternalLink,
-    User, Phone, Check, CheckSquare, Square, X
+    User, Phone, Check, CheckSquare, Square, X, CreditCard
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -38,6 +38,10 @@ const Payments = () => {
     // Bulk Selection State
     const [selectedDebtKeys, setSelectedDebtKeys] = useState(new Set()); // Set of `${memberId}_${month}_${year}`
     const [bulkConfirmModalOpen, setBulkConfirmModalOpen] = useState(false);
+
+    // Method Selection Modal State
+    const [payMethodModalOpen, setPayMethodModalOpen] = useState(false);
+    const [pendingPayment, setPendingPayment] = useState(null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -443,54 +447,59 @@ const Payments = () => {
         }
     };
 
-    const handlePaySingleDebt = async (member, debtItem) => {
+    const handlePaySingleDebt = (member, debtItem) => {
         const cost = debtItem.amount || member.planCost || 2000;
         const monthLabel = debtItem.label || getMonthName(debtItem.month);
-        const confirmPay = window.confirm(
-            `¿Confirmar cobro de $${cost.toLocaleString()} para ${member.fullName} (${monthLabel} ${debtItem.year})?`
-        );
-        if (!confirmPay) return;
 
-        try {
-            setActionLoading(true);
-            await axios.post(`${API_URL}/api/finance`, {
-                memberId: member._id,
-                memberName: member.fullName,
-                memberCi: member.ci,
-                month: debtItem.month,
-                year: debtItem.year,
-                amount: cost,
-                type: 'Cuota',
-                date: new Date()
-            });
-            await fetchData();
-
-            setSelectedDebtKeys(prev => {
-                const next = new Set(prev);
-                next.delete(`${member._id}_${debtItem.month}_${debtItem.year}`);
-                return next;
-            });
-
-            if (selectedDebtor && selectedDebtor._id === member._id) {
-                const remaining = selectedDebtor.debts.filter(d => !(d.month === debtItem.month && d.year === debtItem.year));
-                if (remaining.length === 0) {
-                    setDebtorDetailModalOpen(false);
-                    setSelectedDebtor(null);
-                } else {
-                    setSelectedDebtor({
-                        ...selectedDebtor,
-                        debts: remaining,
-                        totalDebt: remaining.reduce((sum, d) => sum + (d.amount || selectedDebtor.planCost || 2000), 0)
+        setPendingPayment({
+            title: `Cobro de Cuota (${monthLabel} ${debtItem.year})`,
+            subtitle: member.fullName,
+            amount: cost,
+            action: async (method) => {
+                try {
+                    setActionLoading(true);
+                    await axios.post(`${API_URL}/api/finance`, {
+                        memberId: member._id,
+                        memberName: member.fullName,
+                        memberCi: member.ci,
+                        month: debtItem.month,
+                        year: debtItem.year,
+                        amount: cost,
+                        type: 'Cuota',
+                        paymentMethod: method,
+                        date: new Date()
                     });
+                    await fetchData();
+
+                    setSelectedDebtKeys(prev => {
+                        const next = new Set(prev);
+                        next.delete(`${member._id}_${debtItem.month}_${debtItem.year}`);
+                        return next;
+                    });
+
+                    if (selectedDebtor && selectedDebtor._id === member._id) {
+                        const remaining = selectedDebtor.debts.filter(d => !(d.month === debtItem.month && d.year === debtItem.year));
+                        if (remaining.length === 0) {
+                            setDebtorDetailModalOpen(false);
+                            setSelectedDebtor(null);
+                        } else {
+                            setSelectedDebtor({
+                                ...selectedDebtor,
+                                debts: remaining,
+                                totalDebt: remaining.reduce((sum, d) => sum + (d.amount || selectedDebtor.planCost || 2000), 0)
+                            });
+                        }
+                    }
+                    toast.success(`Pago registrado correctamente (${method})`);
+                } catch (error) {
+                    console.error('Error al registrar pago:', error);
+                    toast.error('Error al registrar pago');
+                } finally {
+                    setActionLoading(false);
                 }
             }
-            toast.success('Pago registrado correctamente');
-        } catch (error) {
-            console.error('Error al registrar pago:', error);
-            toast.error('Error al registrar pago');
-        } finally {
-            setActionLoading(false);
-        }
+        });
+        setPayMethodModalOpen(true);
     };
 
     const handleViewDebtor = (member) => {
@@ -498,32 +507,38 @@ const Payments = () => {
         setDebtorDetailModalOpen(true);
     };
 
-    const handleQuickPayment = async (member) => {
-        const confirmPayment = window.confirm(`¿Confirmar pago para ${member.fullName}?`);
-        if (!confirmPayment) return;
+    const handleQuickPayment = (member) => {
+        setPendingPayment({
+            title: 'Cobro de Cuota',
+            subtitle: member.fullName,
+            amount: member.planCost || 2000,
+            action: async (method) => {
+                try {
+                    setActionLoading(true);
+                    const paymentData = {
+                        memberId: member._id,
+                        memberName: member.fullName,
+                        memberCi: member.ci,
+                        month: selectedMonth,
+                        year: selectedYear,
+                        amount: member.planCost || 2000,
+                        type: 'Cuota',
+                        paymentMethod: method,
+                        date: new Date()
+                    };
 
-        try {
-            setActionLoading(true);
-            const paymentData = {
-                memberId: member._id,
-                memberName: member.fullName,
-                memberCi: member.ci,
-                month: selectedMonth,
-                year: selectedYear,
-                amount: member.planCost || 2000,
-                type: 'Cuota',
-                date: new Date()
-            };
-
-            await axios.post(`${API_URL}/api/finance`, paymentData);
-            await fetchData();
-            toast.success('Pago registrado exitosamente');
-        } catch (error) {
-            console.error("Error registering payment", error);
-            toast.error('Error al registrar el pago');
-        } finally {
-            setActionLoading(false);
-        }
+                    await axios.post(`${API_URL}/api/finance`, paymentData);
+                    await fetchData();
+                    toast.success(`Pago registrado exitosamente (${method})`);
+                } catch (error) {
+                    console.error("Error registering payment", error);
+                    toast.error('Error al registrar el pago');
+                } finally {
+                    setActionLoading(false);
+                }
+            }
+        });
+        setPayMethodModalOpen(true);
     };
 
     const handleRevertStatus = async (paymentId) => {
@@ -1429,6 +1444,60 @@ const Payments = () => {
                     </div>
                 </div>
             </Modal>
+
+            {/* MODAL METODO DE PAGO (EFECTIVO / DIGITAL) */}
+            {payMethodModalOpen && pendingPayment && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 flex flex-col items-center text-center">
+                        <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
+                            <CreditCard size={28} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800">{pendingPayment.title}</h3>
+                        <p className="text-slate-500">{pendingPayment.subtitle}</p>
+                        <p className="text-2xl font-black text-slate-800 mt-2">${pendingPayment.amount.toLocaleString()}</p>
+                        
+                        <p className="text-xs text-slate-400 mt-4 mb-3 font-semibold uppercase tracking-wider">
+                            Selecciona método de pago:
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3 w-full">
+                            <button
+                                onClick={async () => {
+                                    setPayMethodModalOpen(false);
+                                    await pendingPayment.action('Efectivo');
+                                    setPendingPayment(null);
+                                }}
+                                className="flex flex-col items-center justify-center p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all group cursor-pointer"
+                            >
+                                <DollarSign size={24} className="text-emerald-600 mb-1" />
+                                <span className="font-bold text-slate-700 text-sm">Efectivo</span>
+                            </button>
+
+                            <button
+                                onClick={async () => {
+                                    setPayMethodModalOpen(false);
+                                    await pendingPayment.action('Digital');
+                                    setPendingPayment(null);
+                                }}
+                                className="flex flex-col items-center justify-center p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all group cursor-pointer"
+                            >
+                                <CreditCard size={24} className="text-blue-600 mb-1" />
+                                <span className="font-bold text-slate-700 text-sm">Digital</span>
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setPayMethodModalOpen(false);
+                                setPendingPayment(null);
+                            }}
+                            className="mt-4 text-xs font-semibold text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

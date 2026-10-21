@@ -29,34 +29,84 @@ export default function DebtsScreen() {
   };
 
   const handlePayDebt = (debt: any) => {
+    const remaining = debt.totalAmount - (debt.paidAmount || 0);
     Alert.alert(
-      'Saldar Deuda',
-      `¿Confirmas el pago total de $${debt.totalAmount - (debt.paidAmount || 0)} por ${debt.memberName}?`,
+      'Gestionar Deuda',
+      `Deuda de $${remaining} de ${debt.memberName}:`,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Cerrar', style: 'cancel' },
         { 
-          text: 'Confirmar Pago', 
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await axios.put(`${API_URL}/debts/${debt._id}/pay`, { paymentMethod: 'Efectivo' });
-              Alert.alert('Éxito', 'Deuda saldada correctamente.');
-              fetchDebts();
-            } catch (error: any) {
-              console.error('Error paying debt:', error);
-              Alert.alert('Error', error.response?.data?.message || 'No se pudo procesar el pago.');
-              setLoading(false);
-            }
-          }
+          text: 'Pagar Digital', 
+          onPress: () => processPayDebt(debt, 'Digital')
+        },
+        { 
+          text: 'Pagar Efectivo', 
+          onPress: () => processPayDebt(debt, 'Efectivo')
+        },
+        {
+          text: 'Anular / Borrar Deuda',
+          style: 'destructive',
+          onPress: () => confirmDeleteDebt(debt)
         }
       ]
     );
   };
 
+  const confirmDeleteDebt = (debt: any) => {
+    const remaining = debt.totalAmount - (debt.paidAmount || 0);
+    Alert.alert(
+      '¿Anular Deuda?',
+      `¿Deseas anular esta deuda de $${remaining}? Esta acción eliminará el registro y restaurará el stock del inventario.`,
+      [
+        { text: 'No, Volver', style: 'cancel' },
+        {
+          text: 'Sí, Anular',
+          style: 'destructive',
+          onPress: () => processDeleteDebt(debt)
+        }
+      ]
+    );
+  };
+
+  const processDeleteDebt = async (debt: any) => {
+    try {
+      setLoading(true);
+      await axios.delete(`${API_URL}/debts/${debt._id}`);
+      Alert.alert('Éxito', 'Deuda anulada y stock devuelto al inventario.');
+      fetchDebts();
+    } catch (error: any) {
+      console.error('Error deleting debt:', error);
+      Alert.alert('Error', error.response?.data?.message || 'No se pudo anular la deuda.');
+      setLoading(false);
+    }
+  };
+
+  const processPayDebt = async (debt: any, paymentMethod: 'Efectivo' | 'Digital') => {
+    try {
+      setLoading(true);
+      await axios.put(`${API_URL}/debts/${debt._id}/pay`, { paymentMethod });
+      Alert.alert('Éxito', `Deuda saldada correctamente (${paymentMethod}).`);
+      fetchDebts();
+    } catch (error: any) {
+      console.error('Error paying debt:', error);
+      Alert.alert('Error', error.response?.data?.message || 'No se pudo procesar el pago.');
+      setLoading(false);
+    }
+  };
+
   const renderDebt = ({ item }: { item: any }) => {
     const remaining = item.totalAmount - (item.paidAmount || 0);
     return (
-      <View className="bg-white p-4 mb-3 rounded-xl shadow-sm border border-red-100 flex-row items-center justify-between">
+      <View 
+        className="bg-white p-4 mb-3 rounded-xl border border-red-100 flex-row items-center justify-between"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 2,
+          elevation: 1,
+        }}
+      >
         <View className="flex-1">
           <Text className="text-lg font-bold text-slate-800">{item.memberName}</Text>
           <Text className="text-sm text-gray-500 mt-1">

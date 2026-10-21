@@ -77,6 +77,7 @@ export default function AddDebtScreen() {
   };
 
   const handleSubmit = async () => {
+    if (loading) return;
     if (!selectedMember || !selectedProduct) {
       Alert.alert('Error', 'Debe seleccionar un socio y un producto.');
       return;

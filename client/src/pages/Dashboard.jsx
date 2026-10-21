@@ -110,6 +110,9 @@ const Dashboard = () => {
     const [showFiadoProductDropdown, setShowFiadoProductDropdown] = useState(false);
     const [fiadoMemberSearchTerm, setFiadoMemberSearchTerm] = useState('');
     const [showFiadoMemberDropdown, setShowFiadoMemberDropdown] = useState(false);
+    const [isSubmittingFiado, setIsSubmittingFiado] = useState(false);
+    const [isSubmittingPartialPay, setIsSubmittingPartialPay] = useState(false);
+    const [deletingDebtId, setDeletingDebtId] = useState(null);
 
     const [partialPayModalOpen, setPartialPayModalOpen] = useState(false);
     const [partialPayForm, setPartialPayForm] = useState({
@@ -503,12 +506,19 @@ const Dashboard = () => {
     };
 
     const handleCreateFiado = async () => {
+        if (isSubmittingFiado) return;
+
         if (!newFiadoForm.memberId || newFiadoForm.products.length === 0) {
             alert('Selecciona un socio y al menos un producto');
             return;
         }
         const member = stats.membersList.find(m => m._id === newFiadoForm.memberId);
+        if (!member) {
+            alert('Socio no encontrado');
+            return;
+        }
 
+        setIsSubmittingFiado(true);
         try {
             const totalAmount = newFiadoForm.products.reduce((acc, p) => acc + (p.amount * p.quantity), 0);
             const fiadoData = {
@@ -522,14 +532,54 @@ const Dashboard = () => {
             setNewFiadoModalOpen(false);
             setNewFiadoForm({ memberId: '', products: [] });
             setFiadoMemberSearchTerm('');
-            fetchData();
+            await fetchData();
         } catch (error) {
             console.error('Error creating fiado:', error);
             alert(error.response?.data?.message || 'Error al crear el fiado');
+        } finally {
+            setIsSubmittingFiado(false);
+        }
+    };
+
+    const handleDeleteDebt = async (debtId, debtDescription, balance) => {
+        const confirmMsg = `¿Estás seguro de cancelar y anular esta deuda (${debtDescription || 'Deuda'}) por $${Number(balance || 0).toLocaleString()}?\n\nEsta acción devolverá los productos al stock del inventario y borrará la deuda sin registrar ningún pago.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            setDeletingDebtId(debtId);
+            await axios.delete(`${API_URL}/api/debts/${debtId}`);
+
+            // Update items in partialPayForm if modal is open
+            setPartialPayForm(prev => {
+                const remainingItems = (prev.items || []).filter(item => item._id !== debtId);
+                const newAdjustments = { ...prev.adjustments };
+                delete newAdjustments[debtId];
+                const newMax = remainingItems.reduce((acc, item) => acc + (item.totalAmount - (item.paidAmount || 0)), 0);
+
+                if (remainingItems.length === 0) {
+                    setPartialPayModalOpen(false);
+                }
+
+                return {
+                    ...prev,
+                    items: remainingItems,
+                    adjustments: newAdjustments,
+                    maxAmount: newMax
+                };
+            });
+
+            await fetchData();
+        } catch (error) {
+            console.error('Error deleting debt:', error);
+            alert(error.response?.data?.message || 'Error al cancelar la deuda');
+        } finally {
+            setDeletingDebtId(null);
         }
     };
 
     const handlePartialSubmit = async () => {
+        if (isSubmittingPartialPay) return;
+
         const totalToPay = Object.values(partialPayForm.adjustments).reduce((acc, val) => acc + Number(val || 0), 0) || Number(partialPayForm.amount);
 
         if (totalToPay <= 0) {
@@ -537,6 +587,7 @@ const Dashboard = () => {
             return;
         }
 
+        setIsSubmittingPartialPay(true);
         try {
             await axios.post(`${API_URL}/api/debts/pay-partial`, {
                 memberId: partialPayForm.memberId,
@@ -546,10 +597,12 @@ const Dashboard = () => {
             });
             setPartialPayModalOpen(false);
             setPartialPayForm({ memberId: '', amount: '', memberName: '', maxAmount: 0, items: [], adjustments: {}, paymentMethod: 'Efectivo' });
-            fetchData();
+            await fetchData();
         } catch (error) {
             console.error('Error paying partial:', error);
             alert(error.response?.data?.message || 'Error al registrar el pago');
+        } finally {
+            setIsSubmittingPartialPay(false);
         }
     };
 
@@ -2590,9 +2643,13 @@ const Dashboard = () => {
                             </button>
                             <button
                                 onClick={handleCreateFiado}
-                                className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-bold"
+                                disabled={isSubmittingFiado}
+                                className={`flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-bold flex items-center justify-center gap-2 transition-all ${
+                                    isSubmittingFiado ? 'opacity-60 cursor-not-allowed' : ''
+                                }`}
                             >
-                                Crear Deuda
+                                {isSubmittingFiado && <Loader2 size={16} className="animate-spin" />}
+                                {isSubmittingFiado ? 'Creando...' : 'Crear Deuda'}
                             </button>
                         </div>
                     </div>
@@ -2605,27 +2662,52 @@ const Dashboard = () => {
             {partialPayModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">Pago Detallado / Parcial</h3>
-                        <p className="text-sm text-slate-500 mb-4">
+                        <h3 className="text-xl font-bold text-slate-800 mb-1">Pago Detallado / Parcial</h3>
+                        <p className="text-sm text-slate-500 mb-1">
                             Socio: <span className="font-bold text-slate-700">{partialPayForm.memberName}</span>
+                        </p>
+                        <p className="text-[11px] text-slate-400 mb-3 flex items-center gap-1">
+                            <span>Ingresa montos a cobrar o usa</span>
+                            <span className="inline-flex items-center text-red-500 font-medium">
+                                <Trash2 size={12} className="inline mr-0.5" /> Anular
+                            </span>
+                            <span>para borrar una deuda errónea (repone stock).</span>
                         </p>
 
                         <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 mini-scrollbar">
                             <div className="space-y-3">
                                 {partialPayForm.items.map((item) => {
                                     const balance = item.totalAmount - (item.paidAmount || 0);
+                                    const productNames = (item.products || []).map(p => p.productName).join(', ');
+                                    const isDeletingThis = deletingDebtId === item._id;
+
                                     return (
-                                        <div key={item._id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <div key={item._id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
                                             <div className="flex justify-between items-start mb-2">
-                                                <div>
-                                                    <p className="text-xs font-bold text-slate-700 truncate w-44">
-                                                        {item.products.map(p => p.productName).join(', ')}
+                                                <div className="flex-1 min-w-0 pr-2">
+                                                    <p className="text-xs font-bold text-slate-700 truncate" title={productNames}>
+                                                        {productNames || 'Deuda'}
                                                     </p>
                                                     <p className="text-[10px] text-slate-400">{new Date(item.date).toLocaleDateString()}</p>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-xs font-bold text-red-600">${balance.toLocaleString()}</p>
-                                                    <p className="text-[9px] text-slate-400">Pendiente</p>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="text-right">
+                                                        <p className="text-xs font-bold text-red-600">${balance.toLocaleString()}</p>
+                                                        <p className="text-[9px] text-slate-400">Pendiente</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteDebt(item._id, productNames, balance)}
+                                                        disabled={isDeletingThis}
+                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-1"
+                                                        title="Anular y borrar esta deuda sin pagar (repone stock)"
+                                                    >
+                                                        {isDeletingThis ? (
+                                                            <Loader2 size={15} className="animate-spin text-red-500" />
+                                                        ) : (
+                                                            <Trash2 size={15} />
+                                                        )}
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div className="relative">
@@ -2686,9 +2768,13 @@ const Dashboard = () => {
                                 </button>
                                 <button
                                     onClick={handlePartialSubmit}
-                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-lg shadow-blue-200"
+                                    disabled={isSubmittingPartialPay}
+                                    className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 flex items-center justify-center gap-2 transition-all ${
+                                        isSubmittingPartialPay ? 'opacity-60 cursor-not-allowed' : ''
+                                    }`}
                                 >
-                                    Confirmar Cobro
+                                    {isSubmittingPartialPay && <Loader2 size={16} className="animate-spin" />}
+                                    {isSubmittingPartialPay ? 'Confirmando...' : 'Confirmar Cobro'}
                                 </button>
                             </div>
                         </div>

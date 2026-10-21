@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
 import axios from 'axios';
 import { Plus } from 'lucide-react-native';
@@ -8,13 +8,13 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function MembersScreen() {
   const { filter } = useLocalSearchParams();
-  const [currentFilter, setCurrentFilter] = useState<string>('all');
+  const initialFilter = typeof filter === 'string' ? filter : 'all';
+  const [currentFilter, setCurrentFilter] = useState<string>(initialFilter);
   const [members, setMembers] = useState<any[]>([]);
-  const [filteredMembers, setFilteredMembers] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (filter && typeof filter === 'string') {
       setCurrentFilter(filter);
     }
@@ -23,34 +23,14 @@ export default function MembersScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchMembers();
-    }, [currentFilter]) // Re-fetch or re-filter when filter param changes
+    }, [])
   );
-
-  const applyFilters = (data: any[], searchText: string, filterType: string) => {
-    let result = data;
-    
-    if (filterType === 'active') {
-      result = result.filter(m => m.active);
-    } else if (filterType === 'inactive') {
-      result = result.filter(m => !m.active);
-    }
-
-    if (searchText) {
-      result = result.filter(
-        (m: any) => 
-          m.fullName.toLowerCase().includes(searchText.toLowerCase()) ||
-          m.ci.includes(searchText)
-      );
-    }
-    setFilteredMembers(result);
-  };
 
   const fetchMembers = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${API_URL}/members`);
       setMembers(res.data);
-      applyFilters(res.data, search, currentFilter);
     } catch (error) {
       console.error('Error fetching members:', error);
     } finally {
@@ -58,21 +38,38 @@ export default function MembersScreen() {
     }
   };
 
-  const handleSearch = (text: string) => {
-    setSearch(text);
-    applyFilters(members, text, currentFilter);
-  };
+  const filteredMembers = useMemo(() => {
+    let result = members;
+    
+    if (currentFilter === 'active') {
+      result = result.filter(m => m.active);
+    } else if (currentFilter === 'inactive') {
+      result = result.filter(m => !m.active);
+    }
 
-  const changeFilter = (newFilter: string) => {
-    setCurrentFilter(newFilter);
-    applyFilters(members, search, newFilter);
-  };
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (m: any) => 
+          (m.fullName && m.fullName.toLowerCase().includes(q)) ||
+          (m.ci && m.ci.includes(q))
+      );
+    }
+    return result;
+  }, [members, currentFilter, search]);
 
   const renderMember = ({ item }: { item: any }) => {
     const isActive = item.active;
     return (
       <TouchableOpacity 
-        className="bg-white p-4 mb-3 rounded-xl shadow-sm border border-gray-100 flex-row items-center justify-between"
+        className="bg-white p-4 mb-3 rounded-xl border border-gray-100 flex-row items-center justify-between"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 2,
+          elevation: 1,
+        }}
         onPress={() => router.push(`/member-details/${item._id}`)}
       >
         <View className="flex-1">
@@ -94,32 +91,42 @@ export default function MembersScreen() {
       <View className="mb-4">
         <Text className="text-2xl font-bold text-slate-900 mb-4 mt-2">Socios</Text>
         
-        <View className="flex-row mb-4 bg-gray-200/50 p-1 rounded-xl">
+        <View className="flex-row mb-4 bg-gray-200 p-1 rounded-xl">
           <TouchableOpacity 
-            className={`flex-1 py-2 rounded-lg items-center ${currentFilter === 'all' ? 'bg-white shadow-sm' : ''}`}
-            onPress={() => changeFilter('all')}
+            className={`flex-1 py-2 rounded-lg items-center ${currentFilter === 'all' ? 'bg-white' : ''}`}
+            style={currentFilter === 'all' ? { elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1 } : undefined}
+            onPress={() => setCurrentFilter('all')}
           >
             <Text className={`font-bold text-xs ${currentFilter === 'all' ? 'text-slate-800' : 'text-slate-500'}`}>Todos</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            className={`flex-1 py-2 rounded-lg items-center ${currentFilter === 'active' ? 'bg-white shadow-sm' : ''}`}
-            onPress={() => changeFilter('active')}
+            className={`flex-1 py-2 rounded-lg items-center ${currentFilter === 'active' ? 'bg-white' : ''}`}
+            style={currentFilter === 'active' ? { elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1 } : undefined}
+            onPress={() => setCurrentFilter('active')}
           >
             <Text className={`font-bold text-xs ${currentFilter === 'active' ? 'text-green-600' : 'text-slate-500'}`}>Activos</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            className={`flex-1 py-2 rounded-lg items-center ${currentFilter === 'inactive' ? 'bg-white shadow-sm' : ''}`}
-            onPress={() => changeFilter('inactive')}
+            className={`flex-1 py-2 rounded-lg items-center ${currentFilter === 'inactive' ? 'bg-white' : ''}`}
+            style={currentFilter === 'inactive' ? { elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1 } : undefined}
+            onPress={() => setCurrentFilter('inactive')}
           >
             <Text className={`font-bold text-xs ${currentFilter === 'inactive' ? 'text-red-600' : 'text-slate-500'}`}>Inactivos</Text>
           </TouchableOpacity>
         </View>
 
         <TextInput
-          className="bg-white p-4 rounded-xl border border-gray-200 text-slate-800 shadow-sm"
+          className="bg-white p-4 rounded-xl border border-gray-200 text-slate-800"
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 2,
+            elevation: 1,
+          }}
           placeholder="Buscar por nombre o CI..."
           value={search}
-          onChangeText={handleSearch}
+          onChangeText={setSearch}
           placeholderTextColor="#9ca3af"
         />
       </View>
@@ -144,7 +151,14 @@ export default function MembersScreen() {
 
       {/* Floating Action Button */}
       <TouchableOpacity
-        className="absolute bottom-6 right-6 bg-blue-600 w-16 h-16 rounded-full items-center justify-center shadow-lg"
+        className="absolute bottom-6 right-6 bg-blue-600 w-16 h-16 rounded-full items-center justify-center"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 4,
+          elevation: 5,
+        }}
         onPress={() => router.push('/add-member')}
       >
         <Plus color="white" size={32} />

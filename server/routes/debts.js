@@ -18,10 +18,53 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
+// In-memory set for active in-flight debt creation requests per member to prevent race conditions
+const activeDebtCreations = new Set();
+
 // Create new debt (Fiado) (Protected)
 router.post('/', auth, async (req, res) => {
+    const { memberId, memberName, products, totalAmount } = req.body;
+
+    if (!memberId || !Array.isArray(products) || products.length === 0) {
+        return res.status(400).json({ message: 'Datos de fiado incompletos (requiere socio y productos)' });
+    }
+
+    const lockKey = `${req.tenantId || 'global'}:${memberId}`;
+
+    // 1. Prevent concurrent race conditions (e.g. rapid double-clicking within milliseconds)
+    if (activeDebtCreations.has(lockKey)) {
+        return res.status(409).json({ message: 'Ya se está procesando un fiado para este socio. Por favor espera un momento.' });
+    }
+
+    activeDebtCreations.add(lockKey);
+
     try {
-        const { memberId, memberName, products, totalAmount } = req.body;
+        // 2. Prevent duplicate creation within a 10-second window (same member, same amount, same items)
+        const tenSecondsAgo = new Date(Date.now() - 10000);
+        const query = {
+            memberId,
+            totalAmount: Number(totalAmount),
+            status: 'pending',
+            createdAt: { $gte: tenSecondsAgo }
+        };
+        if (req.tenantId) query.tenantId = req.tenantId;
+
+        const recentDuplicate = await Debt.findOne(query);
+
+        if (recentDuplicate && Array.isArray(recentDuplicate.products) && recentDuplicate.products.length === products.length) {
+            const isMatch = products.every(p => {
+                const rp = recentDuplicate.products.find(item => 
+                    String(item.productId) === String(p.productId) && 
+                    Number(item.quantity) === Number(p.quantity)
+                );
+                return !!rp;
+            });
+
+            if (isMatch) {
+                console.warn(`[Debts] Duplicate debt creation detected within 10s for member ${memberId}. Returning existing without double stock deduction.`);
+                return res.status(200).json(recentDuplicate);
+            }
+        }
 
         // Verify and deduct stock and increment salesCount for each product
         for (const item of products) {
@@ -50,6 +93,60 @@ router.post('/', auth, async (req, res) => {
         res.status(201).json(newDebt);
     } catch (err) {
         res.status(400).json({ message: err.message });
+    } finally {
+        activeDebtCreations.delete(lockKey);
+    }
+});
+
+// Cancel / Delete pending debt (Protected)
+router.delete('/:id', auth, async (req, res) => {
+    try {
+        const query = { _id: req.params.id };
+        if (req.tenantId) {
+            query.tenantId = req.tenantId;
+        }
+
+        const debt = await Debt.findOne(query);
+        if (!debt) {
+            return res.status(404).json({ message: 'Deuda no encontrada' });
+        }
+
+        if (debt.status === 'paid') {
+            return res.status(400).json({ message: 'No se puede cancelar una deuda que ya fue totalmente pagada' });
+        }
+
+        if (debt.paidAmount && debt.paidAmount > 0) {
+            return res.status(400).json({ 
+                message: 'No se puede cancelar directamente una deuda con pagos parciales registrados. Primero revisa los pagos asociados.' 
+            });
+        }
+
+        // Restore stock and decrease salesCount for each product in the cancelled debt
+        if (Array.isArray(debt.products)) {
+            for (const item of debt.products) {
+                if (item.productId) {
+                    const product = await Product.findById(item.productId);
+                    if (product) {
+                        const qty = Number(item.quantity) || 1;
+                        product.stock = (product.stock || 0) + qty;
+                        if (product.salesCount !== undefined) {
+                            product.salesCount = Math.max(0, (product.salesCount || 0) - qty);
+                        }
+                        await product.save();
+                    }
+                }
+            }
+        }
+
+        await Debt.deleteOne({ _id: debt._id });
+
+        res.json({ 
+            message: 'Deuda cancelada correctamente. Se restauró el stock de los productos.',
+            deletedDebtId: debt._id 
+        });
+    } catch (err) {
+        console.error('Error cancelling debt:', err);
+        res.status(500).json({ message: err.message });
     }
 });
 

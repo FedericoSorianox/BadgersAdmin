@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, TextInput, Alert } from 'react-native';
 import axios from 'axios';
 import { router } from 'expo-router';
-import { ArrowLeft, Search, UserCircle, XCircle, Check, CheckCircle2, FileText } from 'lucide-react-native';
+import { ArrowLeft, Search, UserCircle, XCircle, Check, CheckCircle2 } from 'lucide-react-native';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -40,14 +40,23 @@ export default function PaymentStatusScreen() {
     const memberStatuses = useMemo(() => {
         const statuses = members.map(m => {
             const memberPayments = payments.filter(p => p.memberId === m._id);
-            const isPaid = memberPayments.some(p => p.type === 'Cuota' || p.type === 'Condonado');
+            const paidPayment = memberPayments.find(p => p.type === 'Cuota');
+            const condonedPayment = memberPayments.find(p => p.type === 'Condonado');
             const isLicense = memberPayments.some(p => p.type === 'Licencia');
 
             let status = 'PENDING';
-            if (isPaid) status = 'PAID';
-            else if (isLicense) status = 'LICENSE';
+            let paymentDetail = '';
+            if (paidPayment) {
+                status = 'PAID';
+                paymentDetail = paidPayment.paymentMethod || 'Efectivo';
+            } else if (condonedPayment) {
+                status = 'PAID';
+                paymentDetail = 'Perdonado';
+            } else if (isLicense) {
+                status = 'LICENSE';
+            }
 
-            return { ...m, status };
+            return { ...m, status, paymentDetail };
         });
 
         const filtered = search ? statuses.filter(m => 
@@ -82,6 +91,45 @@ export default function PaymentStatusScreen() {
         ]);
     };
 
+    const handleQuickPayment = (member: any) => {
+        Alert.alert(
+            'Marcar como Pago',
+            `Selecciona el método de pago para ${member.fullName} ($${member.planCost}):`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Digital',
+                    onPress: () => submitPayment(member, 'Digital')
+                },
+                {
+                    text: 'Efectivo',
+                    onPress: () => submitPayment(member, 'Efectivo')
+                }
+            ]
+        );
+    };
+
+    const submitPayment = async (member: any, paymentMethod: 'Efectivo' | 'Digital') => {
+        try {
+            setActionLoading(true);
+            const payload = {
+                memberId: member._id,
+                memberName: member.fullName,
+                month,
+                year,
+                amount: member.planCost,
+                type: 'Cuota',
+                paymentMethod
+            };
+            await axios.post(`${API_URL}/finance`, payload);
+            fetchData();
+        } catch (error) {
+            console.error('Error al registrar pago:', error);
+            Alert.alert("Error", "Fallo al registrar el pago.");
+            setActionLoading(false);
+        }
+    };
+
     const totalMembers = members.length;
     const paidMembersCount = memberStatuses.paid.length;
     const paidPercentage = totalMembers > 0 ? Math.round((paidMembersCount / totalMembers) * 100) : 0;
@@ -106,7 +154,16 @@ export default function PaymentStatusScreen() {
                 )}
             </View>
 
-            <View className="p-4 bg-white border-b border-gray-100 shadow-sm">
+            <View 
+                className="p-4 bg-white border-b border-gray-100"
+                style={{
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 2,
+                    elevation: 1,
+                }}
+            >
                 <View className="flex-row items-center bg-gray-50 p-3 rounded-xl border border-gray-200">
                     <Search color="#9ca3af" size={20} className="mr-2" />
                     <TextInput 
@@ -141,7 +198,16 @@ export default function PaymentStatusScreen() {
                                     <Text className={`text-base font-bold ${section.color}`}>{section.title}</Text>
                                 </View>
                                 
-                                <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2">
+                                <View 
+                                    className="bg-white rounded-2xl border border-gray-100 p-2"
+                                    style={{
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 1 },
+                                        shadowOpacity: 0.05,
+                                        shadowRadius: 2,
+                                        elevation: 1,
+                                    }}
+                                >
                                     {section.data.map((member, index) => (
                                         <View key={member._id} className={`p-3 ${index > 0 ? 'border-t border-gray-50' : ''}`}>
                                             <TouchableOpacity 
@@ -152,12 +218,19 @@ export default function PaymentStatusScreen() {
                                                     <Text className="font-bold text-slate-800 text-base">{member.fullName}</Text>
                                                     <Text className="text-xs text-gray-500">CI: {member.ci} • ${member.planCost}</Text>
                                                 </View>
+                                                {member.status === 'PAID' && (
+                                                    <View className={`px-2.5 py-0.5 rounded-full ${member.paymentDetail === 'Digital' ? 'bg-blue-100' : member.paymentDetail === 'Efectivo' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                                        <Text className={`text-[10px] font-bold ${member.paymentDetail === 'Digital' ? 'text-blue-700' : member.paymentDetail === 'Efectivo' ? 'text-green-700' : 'text-gray-700'}`}>
+                                                            {member.paymentDetail ? member.paymentDetail.toUpperCase() : 'PAGADO'}
+                                                        </Text>
+                                                    </View>
+                                                )}
                                             </TouchableOpacity>
                                             
                                             {member.status === 'PENDING' && (
                                                 <View className="flex-row flex-wrap mt-2">
                                                     <TouchableOpacity 
-                                                        className="px-3 py-1.5 rounded-lg border border-gray-200 mr-2 mb-2 flex-row items-center bg-gray-50/50"
+                                                        className="px-3 py-1.5 rounded-lg border border-gray-200 mr-2 mb-2 flex-row items-center bg-gray-50"
                                                         onPress={() => router.push(`/member-details/${member._id}`)}
                                                     >
                                                         <UserCircle size={14} color="#64748b" className="mr-1.5" />
@@ -165,7 +238,7 @@ export default function PaymentStatusScreen() {
                                                     </TouchableOpacity>
 
                                                     <TouchableOpacity 
-                                                        className="px-3 py-1.5 rounded-lg border border-gray-200 mr-2 mb-2 flex-row items-center bg-gray-50/50"
+                                                        className="px-3 py-1.5 rounded-lg border border-gray-200 mr-2 mb-2 flex-row items-center bg-gray-50"
                                                         onPress={() => confirmAction('Licencia', '¿Marcar en licencia este mes?', () => handleAction('license', member))}
                                                     >
                                                         <XCircle size={14} color="#64748b" className="mr-1.5" />
@@ -173,7 +246,7 @@ export default function PaymentStatusScreen() {
                                                     </TouchableOpacity>
 
                                                     <TouchableOpacity 
-                                                        className="px-3 py-1.5 rounded-lg border border-gray-200 mr-2 mb-2 flex-row items-center bg-gray-50/50"
+                                                        className="px-3 py-1.5 rounded-lg border border-gray-200 mr-2 mb-2 flex-row items-center bg-gray-50"
                                                         onPress={() => confirmAction('Perdonar', '¿Perdonar la cuota de este mes?', () => handleAction('condone', member))}
                                                     >
                                                         <Check size={14} color="#64748b" className="mr-1.5" />
@@ -182,14 +255,7 @@ export default function PaymentStatusScreen() {
 
                                                     <TouchableOpacity 
                                                         className="px-3 py-1.5 rounded-lg bg-green-500 flex-row items-center mb-2"
-                                                        onPress={() => confirmAction('Pago Rápido', `¿Registrar pago de $${member.planCost} en efectivo?`, () => {
-                                                            setActionLoading(true);
-                                                            const payload = { memberId: member._id, memberName: member.fullName, month, year, amount: member.planCost, type: 'Cuota', paymentMethod: 'Efectivo' };
-                                                            axios.post(`${API_URL}/finance`, payload).then(() => fetchData()).catch(() => {
-                                                                Alert.alert("Error", "Fallo al registrar");
-                                                                setActionLoading(false);
-                                                            });
-                                                        })}
+                                                        onPress={() => handleQuickPayment(member)}
                                                     >
                                                         <CheckCircle2 size={14} color="white" className="mr-1.5" />
                                                         <Text className="text-xs font-bold text-white">Pagó</Text>

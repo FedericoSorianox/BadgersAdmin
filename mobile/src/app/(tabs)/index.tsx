@@ -84,7 +84,7 @@ export default function DashboardScreen() {
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Digital', 
-          onPress: () => submitQuickSale(product, 'Transferencia/Débito')
+          onPress: () => submitQuickSale(product, 'Digital')
         },
         { 
           text: 'Efectivo', 
@@ -213,21 +213,21 @@ export default function DashboardScreen() {
             <View className="flex-row flex-wrap justify-between mb-6">
               <TouchableOpacity 
                 className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 w-[48%] mb-3 items-center justify-center active:bg-gray-50"
-                onPress={() => router.push('/members?filter=active')}
+                onPress={() => router.navigate({ pathname: '/(tabs)/members', params: { filter: 'active' } })}
               >
                 <Text className="text-gray-400 text-[10px] font-bold uppercase mb-1">Socios Activos</Text>
                 <Text className="text-3xl font-black text-slate-800">{stats.activeMembers}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 w-[48%] mb-3 items-center justify-center active:bg-gray-50"
-                onPress={() => router.push('/members?filter=inactive')}
+                onPress={() => router.navigate({ pathname: '/(tabs)/members', params: { filter: 'inactive' } })}
               >
                 <Text className="text-gray-400 text-[10px] font-bold uppercase mb-1">Inactivos</Text>
                 <Text className="text-3xl font-black text-slate-800">{stats.inactiveMembers}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 w-[48%] mb-1 items-center justify-center active:bg-gray-50"
-                onPress={() => router.push('/products')}
+                onPress={() => router.navigate('/(tabs)/products')}
               >
                 <Text className="text-gray-400 text-[10px] font-bold uppercase mb-1 text-center">Productos Stock</Text>
                 <Text className="text-3xl font-black text-slate-800">{productsCount}</Text>
