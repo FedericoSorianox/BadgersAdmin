@@ -81,7 +81,7 @@ const Admin = () => {
                 const loadedPartners = rawPartners.map(p => ({
                     ...p,
                     name: p.name === 'Gonza' ? 'Gonza / Andy' : p.name,
-                    percentage: p.percentage !== undefined && p.percentage !== null
+                    percentage: (p.percentage !== undefined && p.percentage !== null && p.percentage !== '' && !isNaN(Number(p.percentage)))
                         ? Number(p.percentage)
                         : (/fede/i.test(p.name) ? 70 : (/gonza|andy/i.test(p.name) ? 30 : 50))
                 }));
@@ -120,8 +120,18 @@ const Admin = () => {
         try {
             setSaving(true);
             const updatedSavingsBox = results.academySavingsBoxUpdated !== undefined ? results.academySavingsBoxUpdated : config.academySavingsBox;
+            const partnersToSave = (config.partners && config.partners.length > 0
+                ? config.partners
+                : [
+                    { name: 'Fede', percentage: 70, hours: 40, daysOff: 0 },
+                    { name: 'Gonza / Andy', percentage: 30, hours: 16, daysOff: 0 }
+                ]).map(p => ({
+                    ...p,
+                    percentage: p.percentage === '' ? 0 : (Number(p.percentage) || 0)
+                }));
+
             await axios.post(`${API_URL}/api/settings`, {
-                partners: config.partners,
+                partners: partnersToSave,
                 partnerHourlyRate: config.partnerHourlyRate,
                 instructors: config.instructors,
                 instructorHourlyRate: config.instructorHourlyRate,
@@ -131,6 +141,7 @@ const Admin = () => {
             });
             setConfig(prev => ({
                 ...prev,
+                partners: partnersToSave,
                 academySavingsBox: updatedSavingsBox
             }));
             alert('Configuración guardada exitosamente');
@@ -140,6 +151,55 @@ const Admin = () => {
         } finally {
             setSaving(false);
         }
+    };
+
+    // --- PARTNER PERCENTAGE MANAGEMENT ---
+    const handlePartnerPercentageChange = (index, value) => {
+        const basePartners = config.partners && config.partners.length > 0
+            ? config.partners
+            : (results.partnerResults && results.partnerResults.length > 0
+                ? results.partnerResults.map(p => ({
+                    name: p.name,
+                    percentage: p.percentage,
+                    hours: p.effectiveHours || 0,
+                    daysOff: 0
+                }))
+                : [
+                    { name: 'Fede', percentage: 70, hours: 40, daysOff: 0 },
+                    { name: 'Gonza / Andy', percentage: 30, hours: 16, daysOff: 0 }
+                ]);
+
+        const newPartners = basePartners.map((p, i) => {
+            if (i === index) {
+                const parsedVal = value === '' ? '' : Math.max(0, Math.min(100, Number(value)));
+                return {
+                    ...p,
+                    percentage: parsedVal
+                };
+            }
+            return { ...p };
+        });
+
+        setConfig(prev => ({
+            ...prev,
+            partners: newPartners
+        }));
+    };
+
+    const handleResetDefaultPercentages = () => {
+        const basePartners = config.partners && config.partners.length > 0
+            ? config.partners
+            : [
+                { name: 'Fede', percentage: 70, hours: 40, daysOff: 0 },
+                { name: 'Gonza / Andy', percentage: 30, hours: 16, daysOff: 0 }
+            ];
+
+        const resetPartners = basePartners.map(p => ({
+            ...p,
+            percentage: /fede/i.test(p.name) ? 70 : (/gonza|andy/i.test(p.name) ? 30 : 50)
+        }));
+
+        setConfig(prev => ({ ...prev, partners: resetPartners }));
     };
 
     // --- INSTRUCTOR MANAGEMENT ---
@@ -237,8 +297,44 @@ const Admin = () => {
                 </div>
             </div>
 
+            {/* Distribution Section Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-800">Distribución de Ganancias</h2>
+                    <p className="text-sm text-slate-500">Reparto operativo del mes entre la academia y los socios dueños.</p>
+                </div>
+                {results.partnerResults.length > 0 && (() => {
+                    const totalPct = results.partnerResults.reduce((acc, p) => acc + (Number(p.percentage) || 0), 0);
+                    const isExact100 = Math.round(totalPct) === 100;
+                    return (
+                        <div className="flex items-center gap-2">
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${
+                                isExact100
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                                {isExact100 
+                                    ? `✓ Reparto Socios: ${totalPct}%` 
+                                    : totalPct < 100 
+                                        ? `⚠ Reparto Socios: ${totalPct}% (Falta ${100 - totalPct}%)` 
+                                        : `⚠ Reparto Socios: ${totalPct}% (Excede por ${totalPct - 100}%)`
+                                }
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleResetDefaultPercentages}
+                                className="text-xs text-slate-600 hover:text-blue-600 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-medium transition-colors shadow-sm"
+                                title="Restablecer reparto predeterminado (70/30)"
+                            >
+                                Restablecer 70/30
+                            </button>
+                        </div>
+                    );
+                })()}
+            </div>
+
             {/* Results Cards */}
-            <div className={`grid grid-cols-1 gap-6 ${results.partnerResults.length > 0 ? `md:grid-cols-${Math.min(results.partnerResults.length + 1, 4)}` : 'md:grid-cols-1'}`} style={{ gridTemplateColumns: `repeat(${Math.min(results.partnerResults.length + 1, 4)}, minmax(0, 1fr))` }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Savings Card */}
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl shadow-sm border border-blue-100 flex flex-col justify-between">
                     <div>
@@ -307,28 +403,79 @@ const Admin = () => {
                 {/* Dynamic Partner Cards */}
                 {results.partnerResults.map((partner, index) => {
                     const isFede = /fede/i.test(partner.name);
+                    const partnerConfig = config.partners[index] || {};
+                    const currentPercentage = partnerConfig.percentage !== undefined ? partnerConfig.percentage : (partner.percentage ?? '');
+
                     return (
-                        <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                        <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between hover:border-slate-200 transition-all">
                             <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <p className="text-sm font-bold text-slate-600 uppercase flex items-center gap-1.5">
+                                <div className="flex justify-between items-center mb-3">
+                                    <p className="text-sm font-bold text-slate-700 uppercase flex items-center gap-1.5 tracking-wide">
                                         <span className="text-base">{isFede ? '🔵' : '🟢'}</span>
                                         {partner.name || `Socio ${index + 1}`}
                                     </p>
-                                    <span className="text-xs bg-slate-100 px-2.5 py-1 rounded-full text-slate-600 font-semibold">
-                                        Socio Dueño
-                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs bg-blue-50 text-blue-700 font-bold px-2.5 py-0.5 rounded-full border border-blue-100">
+                                            {currentPercentage !== '' ? `${currentPercentage}%` : '0%'}
+                                        </span>
+                                        <span className="text-xs bg-slate-100 px-2.5 py-0.5 rounded-full text-slate-600 font-semibold">
+                                            Socio Dueño
+                                        </span>
+                                    </div>
                                 </div>
-                                <p className="text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">
-                                    {formatCurrency(partner.total)}
-                                </p>
+
+                                {/* Editable % de Reparto Control */}
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 mb-4">
+                                    <div className="flex items-center justify-between">
+                                        <label
+                                            htmlFor={`partner-pct-${index}`}
+                                            className="text-xs font-bold text-slate-600 uppercase tracking-wider cursor-pointer"
+                                        >
+                                            % de Reparto
+                                        </label>
+                                        <div className="relative inline-flex items-center">
+                                            <input
+                                                id={`partner-pct-${index}`}
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="any"
+                                                className="w-20 pl-2 pr-6 py-1 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-800 text-right focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow shadow-sm"
+                                                value={currentPercentage}
+                                                onChange={(e) => handlePartnerPercentageChange(index, e.target.value)}
+                                                disabled={loading}
+                                                aria-label={`Porcentaje de reparto para ${partner.name}`}
+                                            />
+                                            <span className="absolute right-2 text-xs font-bold text-slate-400 pointer-events-none">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mb-4">
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-0.5">Total a Recibir</p>
+                                    <p className="text-4xl font-extrabold text-slate-800 tracking-tight">
+                                        {formatCurrency(partner.total)}
+                                    </p>
+                                </div>
                             </div>
+
                             <div className="space-y-1.5 text-sm text-slate-500 border-t border-slate-100 pt-3 mt-auto">
                                 <div className="flex justify-between">
                                     <span>Base de Reparto:</span>
                                     <span className="font-medium text-slate-700">{formatCurrency(results.distributableNet)}</span>
                                 </div>
-                                <div className="flex justify-between border-t border-slate-100 pt-1 mt-1 font-bold">
+                                <div className="flex justify-between">
+                                    <span>Porcentaje Asignado:</span>
+                                    <span className="font-semibold text-blue-600">
+                                        {partner.percentage}%
+                                        {partner.effectivePercentage !== partner.percentage && (
+                                            <span className="text-xs text-slate-400 ml-1 font-normal">
+                                                (efectivo: {partner.effectivePercentage}%)
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between border-t border-slate-100 pt-1.5 mt-1 font-bold">
                                     <span className="text-slate-800">Total a Recibir:</span>
                                     <span className="text-emerald-600 text-base">{formatCurrency(partner.total)}</span>
                                 </div>

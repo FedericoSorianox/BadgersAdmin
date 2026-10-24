@@ -32,8 +32,10 @@ export const calculatePartnerDistribution = (config = {}) => {
     // Resolver porcentaje por cada socio (Fede: 70%, Gonza/Andy: 30%, otros: 50% o valor configurado)
     const partners = rawPartners.map(p => {
         let pct;
-        if (p.percentage !== undefined && p.percentage !== null && !isNaN(Number(p.percentage))) {
+        if (p.percentage !== undefined && p.percentage !== null && p.percentage !== '' && !isNaN(Number(p.percentage))) {
             pct = Number(p.percentage);
+        } else if (p.percentage === '') {
+            pct = 0;
         } else if (/fede/i.test(p.name || '')) {
             pct = 70;
         } else if (/gonza|andy/i.test(p.name || '')) {

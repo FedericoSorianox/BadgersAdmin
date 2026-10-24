@@ -153,12 +153,23 @@ router.post('/', async (req, res) => {
         if (partners !== undefined) {
             settings.partners = partners.map(p => ({
                 name: p.name,
-                percentage: p.percentage !== undefined && p.percentage !== null
+                percentage: (p.percentage !== undefined && p.percentage !== null && !isNaN(Number(p.percentage)))
                     ? Number(p.percentage)
                     : (/fede/i.test(p.name) ? 70 : (/gonza|andy/i.test(p.name) ? 30 : 50)),
                 hours: Number(p.hours) || 0,
                 daysOff: Number(p.daysOff) || 0
             }));
+            settings.markModified('partners');
+
+            if (req.tenantId) {
+                try {
+                    await Tenant.findByIdAndUpdate(req.tenantId, {
+                        partners: settings.partners.map(p => ({ name: p.name, percentage: p.percentage }))
+                    });
+                } catch (tErr) {
+                    console.error('Error syncing partners to tenant:', tErr);
+                }
+            }
         } else if (fedeHours !== undefined || gonzaHours !== undefined) {
             // Legacy compatibility: convert flat fields to partners array
             const p = settings.partners?.length ? [...settings.partners] : [];

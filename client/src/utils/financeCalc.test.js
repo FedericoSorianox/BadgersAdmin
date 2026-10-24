@@ -124,4 +124,39 @@ describe('Finance Calculation Logic - Partner Distribution', () => {
         expect(results.partnerResults).toEqual([]);
         expect(results.distributableNet).toBe(0);
     });
+
+    it('should treat empty string percentage as 0 without resetting to defaults', () => {
+        const config = {
+            savingsPercentage: 0,
+            grossProfit: 100000,
+            partners: [
+                { name: 'Fede', percentage: '' },
+                { name: 'Gonza / Andy', percentage: 100 }
+            ]
+        };
+        const results = calculatePartnerDistribution(config);
+
+        expect(results.distributableNet).toBe(100000);
+        expect(results.partnerResults[0].percentage).toBe(0);
+        expect(results.partnerResults[0].total).toBe(0);
+        expect(results.partnerResults[1].percentage).toBe(100);
+        expect(results.partnerResults[1].total).toBe(100000);
+    });
+
+    it('should support updating distribution to 80/20 cleanly', () => {
+        const config = {
+            savingsPercentage: 0,
+            grossProfit: 100000,
+            partners: [
+                { name: 'Fede', percentage: 80 },
+                { name: 'Gonza / Andy', percentage: 20 }
+            ]
+        };
+        const results = calculatePartnerDistribution(config);
+
+        expect(results.partnerResults[0].percentage).toBe(80);
+        expect(results.partnerResults[0].total).toBe(80000);
+        expect(results.partnerResults[1].percentage).toBe(20);
+        expect(results.partnerResults[1].total).toBe(20000);
+    });
 });
