@@ -44,7 +44,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
     await mongoose.disconnect();
-    await mongoServer.stop();
+    if (mongoServer) {
+        await mongoServer.stop();
+    }
 });
 
 beforeEach(async () => {
@@ -195,5 +197,110 @@ describe('Debts API - Concurrency, Duplicate Prevention & Cancellation', () => {
         const res = await request(app).delete(`/api/debts/${debt._id}`);
         expect(res.status).toBe(400);
         expect(res.body.message).toContain('pagos parciales');
+    });
+
+    it('should create multiple debts in bulk and deduct combined stock and increment salesCount', async () => {
+        const sharedProduct = await Product.create({
+            name: 'Agua Mineral',
+            stock: 10,
+            salePrice: 100,
+            costPrice: 50,
+            salesCount: 0
+        });
+        const secondProduct = await Product.create({
+            name: 'Barrita Proteica',
+            stock: 5,
+            salePrice: 200,
+            costPrice: 100,
+            salesCount: 1
+        });
+
+        const member1Id = new mongoose.Types.ObjectId();
+        const member2Id = new mongoose.Types.ObjectId();
+
+        const res = await request(app)
+            .post('/api/debts/bulk')
+            .send({
+                debts: [
+                    {
+                        memberId: member1Id,
+                        memberName: 'Juan Perez',
+                        products: [
+                            { productId: sharedProduct._id, productName: sharedProduct.name, quantity: 2, amount: 100 },
+                            { productId: secondProduct._id, productName: secondProduct.name, quantity: 1, amount: 200 }
+                        ],
+                        totalAmount: 400
+                    },
+                    {
+                        memberId: member2Id,
+                        memberName: 'Maria Lopez',
+                        products: [
+                            { productId: sharedProduct._id, productName: sharedProduct.name, quantity: 3, amount: 100 }
+                        ],
+                        totalAmount: 300
+                    }
+                ]
+            });
+
+        expect(res.status).toBe(201);
+        expect(Array.isArray(res.body.debts)).toBe(true);
+        expect(res.body.debts).toHaveLength(2);
+
+        const allDebts = await Debt.find({});
+        expect(allDebts).toHaveLength(2);
+
+        const updatedShared = await Product.findById(sharedProduct._id);
+        expect(updatedShared.stock).toBe(5);
+        expect(updatedShared.salesCount).toBe(5);
+
+        const updatedSecond = await Product.findById(secondProduct._id);
+        expect(updatedSecond.stock).toBe(4);
+        expect(updatedSecond.salesCount).toBe(2);
+    });
+
+    it('should fail atomically in bulk when combined product quantity exceeds stock without mutating DB', async () => {
+        const product = await Product.create({
+            name: 'Isotonica',
+            stock: 3,
+            salePrice: 150,
+            costPrice: 80,
+            salesCount: 0
+        });
+
+        const member1Id = new mongoose.Types.ObjectId();
+        const member2Id = new mongoose.Types.ObjectId();
+
+        const res = await request(app)
+            .post('/api/debts/bulk')
+            .send({
+                debts: [
+                    {
+                        memberId: member1Id,
+                        memberName: 'Juan Perez',
+                        products: [
+                            { productId: product._id, productName: product.name, quantity: 2, amount: 150 }
+                        ],
+                        totalAmount: 300
+                    },
+                    {
+                        memberId: member2Id,
+                        memberName: 'Maria Lopez',
+                        products: [
+                            { productId: product._id, productName: product.name, quantity: 2, amount: 150 }
+                        ],
+                        totalAmount: 300
+                    }
+                ]
+            });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toContain('Stock insuficiente');
+
+        const updatedProduct = await Product.findById(product._id);
+        expect(updatedProduct.stock).toBe(3);
+        expect(updatedProduct.salesCount).toBe(0);
+
+        const count = await Debt.countDocuments();
+        expect(count).toBe(0);
     });
 });

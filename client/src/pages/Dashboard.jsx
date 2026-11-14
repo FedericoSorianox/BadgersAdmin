@@ -102,9 +102,18 @@ const Dashboard = () => {
     const [cashDetailData, setCashDetailData] = useState({ payments: [], expenses: [] });
     const [cashDetailLoading, setCashDetailLoading] = useState(false);
 
+    const createEmptyFiadoEntry = () => ({
+        id: `${Date.now()}-${Math.random()}`,
+        memberId: '',
+        memberName: '',
+        memberCi: '',
+        products: []
+    });
+
     const [newFiadoModalOpen, setNewFiadoModalOpen] = useState(false);
-    const [newFiadoForm, setNewFiadoForm] = useState({ memberId: '', products: [] });
-    // products in fixture: [{ productId, productName, quantity, amount }]
+    const [fiadoEntries, setFiadoEntries] = useState(() => [createEmptyFiadoEntry()]);
+    const [activeFiadoIndex, setActiveFiadoIndex] = useState(0);
+    // products in each entry: [{ productId, productName, quantity, amount }]
     const [currentFiadoProduct, setCurrentFiadoProduct] = useState({ productId: '', quantity: 1 });
     const [fiadoProductSearchTerm, setFiadoProductSearchTerm] = useState('');
     const [showFiadoProductDropdown, setShowFiadoProductDropdown] = useState(false);
@@ -178,9 +187,12 @@ const Dashboard = () => {
 
     // ... existing state ...
 
-    const fetchData = async () => {
-        setLoading(true);
-        setError(null);
+    const fetchData = async (options = {}) => {
+        const silent = options?.silent === true;
+        if (!silent) {
+            setLoading(true);
+            setError(null);
+        }
         try {
             // Set a long timeout (60s) to allow for Render Clean/Cold start
             const config = { timeout: 60000 };
@@ -259,9 +271,13 @@ const Dashboard = () => {
 
         } catch (error) {
             console.error("Error fetching dashboard data", error);
-            setError("No se pudo conectar con el servidor. El backend puede estar iniciándose (espera 1 min) o hay un error de conexión.");
+            if (!silent) {
+                setError("No se pudo conectar con el servidor. El backend puede estar iniciándose (espera 1 min) o hay un error de conexión.");
+            }
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
         }
     };
 
@@ -463,75 +479,232 @@ const Dashboard = () => {
 
     // --- Fiados Logic ---
 
-    const addProductToFiado = () => {
-        if (!currentFiadoProduct.productId) return;
-        const product = stats.products.find(p => p._id === currentFiadoProduct.productId);
-        if (!product) return;
+    const resetFiadoModal = () => {
+        setFiadoEntries([createEmptyFiadoEntry()]);
+        setActiveFiadoIndex(0);
+        setCurrentFiadoProduct({ productId: '', quantity: 1 });
+        setFiadoMemberSearchTerm('');
+        setFiadoProductSearchTerm('');
+        setShowFiadoMemberDropdown(false);
+        setShowFiadoProductDropdown(false);
+    };
 
-        const existingItem = newFiadoForm.products.find(p => p.productId === product._id);
+    const getReservedStockInModal = (productId) => {
+        return fiadoEntries.reduce((total, entry) => {
+            const match = entry.products.find(p => p.productId === productId);
+            return total + (match ? Number(match.quantity || 0) : 0);
+        }, 0);
+    };
 
-        // Check local stock availability (naive check against loaded data)
-        const currentQtyInForm = existingItem ? existingItem.quantity : 0;
-        if (product.stock < (currentQtyInForm + currentFiadoProduct.quantity)) {
-            alert(`Stock insuficiente. Solo quedan ${product.stock}`);
+    const getRemainingStockForProduct = (product) => {
+        if (!product) return 0;
+        return Math.max(0, Number(product.stock || 0) - getReservedStockInModal(product._id));
+    };
+
+    const selectMemberForFiado = (member) => {
+        const existingIdx = fiadoEntries.findIndex(
+            (entry, idx) => idx !== activeFiadoIndex && entry.memberId === member._id
+        );
+
+        if (existingIdx !== -1) {
+            const activeEntry = fiadoEntries[activeFiadoIndex];
+            const mergedEntries = fiadoEntries
+                .map((entry, idx) => {
+                    if (idx !== existingIdx) return entry;
+                    const mergedProducts = [...entry.products];
+                    for (const item of (activeEntry?.products || [])) {
+                        const existingItemIdx = mergedProducts.findIndex(p => p.productId === item.productId);
+                        if (existingItemIdx !== -1) {
+                            mergedProducts[existingItemIdx] = {
+                                ...mergedProducts[existingItemIdx],
+                                quantity: mergedProducts[existingItemIdx].quantity + item.quantity
+                            };
+                        } else {
+                            mergedProducts.push(item);
+                        }
+                    }
+                    return { ...entry, products: mergedProducts };
+                })
+                .filter((_, idx) => idx !== activeFiadoIndex);
+
+            const nextActiveIdx = existingIdx > activeFiadoIndex ? existingIdx - 1 : existingIdx;
+            setFiadoEntries(mergedEntries);
+            setActiveFiadoIndex(nextActiveIdx);
+            setFiadoMemberSearchTerm(member.fullName);
+            setShowFiadoMemberDropdown(false);
             return;
         }
 
-        let updatedProducts;
-        if (existingItem) {
-            updatedProducts = newFiadoForm.products.map(p =>
-                p.productId === product._id
-                    ? { ...p, quantity: p.quantity + currentFiadoProduct.quantity }
-                    : p
-            );
-        } else {
-            updatedProducts = [...newFiadoForm.products, {
-                productId: product._id,
-                productName: product.name,
-                quantity: currentFiadoProduct.quantity,
-                amount: product.salePrice
-            }];
+        setFiadoEntries(prev => prev.map((entry, idx) =>
+            idx === activeFiadoIndex
+                ? { ...entry, memberId: member._id, memberName: member.fullName, memberCi: member.ci || '' }
+                : entry
+        ));
+        setFiadoMemberSearchTerm(member.fullName);
+        setShowFiadoMemberDropdown(false);
+    };
+
+    const addProductToFiado = () => {
+        const qty = Number(currentFiadoProduct.quantity);
+        if (!currentFiadoProduct.productId || !Number.isFinite(qty) || qty < 1) return;
+
+        const product = stats.products.find(p => p._id === currentFiadoProduct.productId);
+        if (!product) return;
+
+        const reservedInModal = getReservedStockInModal(product._id);
+        if (product.stock < reservedInModal + qty) {
+            const available = Math.max(0, product.stock - reservedInModal);
+            alert(`Stock insuficiente. Disponible: ${available} (Stock total: ${product.stock})`);
+            return;
         }
 
-        setNewFiadoForm({ ...newFiadoForm, products: updatedProducts });
+        setFiadoEntries(prev => prev.map((entry, idx) => {
+            if (idx !== activeFiadoIndex) return entry;
+            const existingItem = entry.products.find(p => p.productId === product._id);
+            const updatedProducts = existingItem
+                ? entry.products.map(p =>
+                    p.productId === product._id
+                        ? { ...p, quantity: p.quantity + qty }
+                        : p
+                )
+                : [
+                    ...entry.products,
+                    {
+                        productId: product._id,
+                        productName: product.name,
+                        quantity: qty,
+                        amount: product.salePrice
+                    }
+                ];
+            return { ...entry, products: updatedProducts };
+        }));
+
         setCurrentFiadoProduct({ productId: '', quantity: 1 });
         setFiadoProductSearchTerm('');
     };
 
-    const removeProductFromFiado = (productId) => {
-        setNewFiadoForm({
-            ...newFiadoForm,
-            products: newFiadoForm.products.filter(p => p.productId !== productId)
-        });
+    const removeProductFromFiado = (entryIndex, productId) => {
+        setFiadoEntries(prev => prev.map((entry, idx) =>
+            idx === entryIndex
+                ? { ...entry, products: entry.products.filter(p => p.productId !== productId) }
+                : entry
+        ));
+    };
+
+    const updateProductQuantityInFiado = (entryIndex, productId, delta) => {
+        if (delta > 0) {
+            const product = stats.products.find(p => p._id === productId);
+            if (product && getRemainingStockForProduct(product) < delta) {
+                alert(`Stock insuficiente para ${product.name}. Disponible: ${getRemainingStockForProduct(product)}`);
+                return;
+            }
+        }
+
+        setFiadoEntries(prev => prev.map((entry, idx) => {
+            if (idx !== entryIndex) return entry;
+            const updatedProducts = entry.products
+                .map(p => p.productId === productId ? { ...p, quantity: p.quantity + delta } : p)
+                .filter(p => p.quantity > 0);
+            return { ...entry, products: updatedProducts };
+        }));
+    };
+
+    const switchActiveFiadoPerson = (index) => {
+        setActiveFiadoIndex(index);
+        setFiadoMemberSearchTerm(fiadoEntries[index]?.memberName || '');
+        setFiadoProductSearchTerm('');
+        setCurrentFiadoProduct({ productId: '', quantity: 1 });
+        setShowFiadoMemberDropdown(false);
+        setShowFiadoProductDropdown(false);
+    };
+
+    const addPersonToFiado = () => {
+        const activeEntry = fiadoEntries[activeFiadoIndex];
+        if (!activeEntry || !activeEntry.memberId || activeEntry.products.length === 0) {
+            alert('Selecciona un socio y agrega al menos un producto antes de agregar otra persona');
+            return;
+        }
+
+        const nextIndex = fiadoEntries.length;
+        setFiadoEntries(prev => [...prev, createEmptyFiadoEntry()]);
+        setActiveFiadoIndex(nextIndex);
+        setFiadoMemberSearchTerm('');
+        setFiadoProductSearchTerm('');
+        setCurrentFiadoProduct({ productId: '', quantity: 1 });
+        setShowFiadoMemberDropdown(false);
+        setShowFiadoProductDropdown(false);
+    };
+
+    const removePersonFromFiado = (index) => {
+        if (fiadoEntries.length <= 1) {
+            resetFiadoModal();
+            return;
+        }
+
+        const updated = fiadoEntries.filter((_, i) => i !== index);
+        let nextIdx = activeFiadoIndex;
+        if (index < activeFiadoIndex) {
+            nextIdx = activeFiadoIndex - 1;
+        } else if (index === activeFiadoIndex) {
+            nextIdx = Math.min(index, updated.length - 1);
+        }
+
+        setFiadoEntries(updated);
+        setActiveFiadoIndex(nextIdx);
+        setFiadoMemberSearchTerm(updated[nextIdx]?.memberName || '');
+        setFiadoProductSearchTerm('');
+        setCurrentFiadoProduct({ productId: '', quantity: 1 });
+        setShowFiadoMemberDropdown(false);
+        setShowFiadoProductDropdown(false);
     };
 
     const handleCreateFiado = async () => {
         if (isSubmittingFiado) return;
 
-        if (!newFiadoForm.memberId || newFiadoForm.products.length === 0) {
+        const nonEmptyEntries = fiadoEntries.filter(
+            e => e.memberId || e.products.length > 0
+        );
+
+        if (nonEmptyEntries.length === 0) {
             alert('Selecciona un socio y al menos un producto');
             return;
         }
-        const member = stats.membersList.find(m => m._id === newFiadoForm.memberId);
-        if (!member) {
-            alert('Socio no encontrado');
+
+        const incompleteEntry = nonEmptyEntries.find(e => !e.memberId || e.products.length === 0);
+        if (incompleteEntry) {
+            const incompleteIdx = fiadoEntries.findIndex(e => e.id === incompleteEntry.id);
+            if (incompleteIdx !== -1) {
+                switchActiveFiadoPerson(incompleteIdx);
+            }
+            alert('Completa el socio y al menos un producto para cada persona en la lista (o elimina la fila incompleta).');
             return;
+        }
+
+        const debtsPayload = [];
+        for (const entry of nonEmptyEntries) {
+            const member = stats.membersList.find(m => m._id === entry.memberId);
+            if (!member) {
+                alert(`Socio no encontrado: ${entry.memberName || 'Desconocido'}`);
+                return;
+            }
+            const totalAmount = entry.products.reduce((acc, p) => acc + (p.amount * p.quantity), 0);
+            debtsPayload.push({
+                memberId: member._id,
+                memberName: member.fullName,
+                products: entry.products,
+                totalAmount
+            });
         }
 
         setIsSubmittingFiado(true);
         try {
-            const totalAmount = newFiadoForm.products.reduce((acc, p) => acc + (p.amount * p.quantity), 0);
-            const fiadoData = {
-                memberId: member._id,
-                memberName: member.fullName,
-                products: newFiadoForm.products,
-                totalAmount
-            };
-
-            await axios.post(`${API_URL}/api/debts`, fiadoData);
+            if (debtsPayload.length === 1) {
+                await axios.post(`${API_URL}/api/debts`, debtsPayload[0]);
+            } else {
+                await axios.post(`${API_URL}/api/debts/bulk`, { debts: debtsPayload });
+            }
             setNewFiadoModalOpen(false);
-            setNewFiadoForm({ memberId: '', products: [] });
-            setFiadoMemberSearchTerm('');
+            resetFiadoModal();
             await fetchData();
         } catch (error) {
             console.error('Error creating fiado:', error);
@@ -660,8 +833,7 @@ const Dashboard = () => {
                     paymentMethod: method,
                     date: new Date()
                 });
-                fetchData();
-                setModalOpen(false);
+                await fetchData({ silent: true });
             }
         });
         setPayMethodModalOpen(true);
@@ -827,7 +999,6 @@ const Dashboard = () => {
         const memberIds = Object.keys(pendingNotes);
         if (memberIds.length === 0) return;
 
-        setLoading(true);
         try {
             const currentMonth = new Date().getMonth() + 1;
             const currentYear = new Date().getFullYear();
@@ -848,13 +1019,11 @@ const Dashboard = () => {
 
             await Promise.all(promises);
             setPendingNotes({});
-            await fetchData();
+            await fetchData({ silent: true });
             alert('Notas guardadas correctamente');
         } catch (error) {
             console.error('Error saving notes:', error);
             alert('Error al guardar las notas');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -936,7 +1105,7 @@ const Dashboard = () => {
 
         try {
             await axios.put(`${API_URL}/api/members/${member._id}/toggle-status`);
-            fetchData();
+            await fetchData({ silent: true });
         } catch (error) {
             console.error(`Error al ${action} el socio:`, error);
             alert(`Error al ${action} el socio`);
@@ -1157,7 +1326,7 @@ const Dashboard = () => {
                         month: currentMonth,
                         year: currentYear
                     });
-                    fetchData();
+                    await fetchData({ silent: true });
                 } catch (e) {
                     alert('Error al registrar licencia');
                 }
@@ -1172,7 +1341,7 @@ const Dashboard = () => {
                         month: currentMonth,
                         year: currentYear
                     });
-                    fetchData();
+                    await fetchData({ silent: true });
                 } catch (e) {
                     alert('Error al condonar deuda');
                 }
@@ -1182,7 +1351,7 @@ const Dashboard = () => {
                 if (!confirm(`¿Seguro que deseas deshacer este estado y volver a Pendiente?`)) return;
                 try {
                     await axios.delete(`${API_URL}/api/finance/${paymentId}`);
-                    fetchData();
+                    await fetchData({ silent: true });
                 } catch (e) {
                     alert('Error al deshacer estado');
                 }
@@ -1583,9 +1752,7 @@ const Dashboard = () => {
 
                     <button
                         onClick={() => {
-                            setNewFiadoForm({ memberId: '', products: [] });
-                            setFiadoMemberSearchTerm('');
-                            setFiadoProductSearchTerm('');
+                            resetFiadoModal();
                             setNewFiadoModalOpen(true);
                         }}
                         className="flex flex-col items-center justify-center p-4 rounded-2xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors border border-amber-100 group"
@@ -2459,202 +2626,385 @@ const Dashboard = () => {
             )}
 
             {/* New Fiado Modal */}
-            {newFiadoModalOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4">
-                        <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Clock className="text-amber-500" />
-                            Nuevo Fiado / Deuda
-                        </h3>
+            {newFiadoModalOpen && (() => {
+                const validCount = fiadoEntries.filter(e => e.memberId && e.products.length > 0).length;
+                const totalItemsCount = fiadoEntries.reduce(
+                    (acc, e) => acc + e.products.reduce((pAcc, p) => pAcc + Number(p.quantity || 0), 0),
+                    0
+                );
+                const grandTotal = fiadoEntries.reduce(
+                    (acc, e) => acc + e.products.reduce((pAcc, p) => pAcc + (p.amount * p.quantity), 0),
+                    0
+                );
 
-                        <div className="space-y-4">
-                            {/* Member Select */}
-                            <div className="relative">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Socio</label>
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                    <input
-                                        type="text"
-                                        className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        placeholder="Buscar socio por nombre o CI..."
-                                        value={fiadoMemberSearchTerm}
-                                        onChange={(e) => {
-                                            setFiadoMemberSearchTerm(e.target.value);
-                                            setShowFiadoMemberDropdown(true);
-                                            if (newFiadoForm.memberId && e.target.value !== stats.membersList.find(m => m._id === newFiadoForm.memberId)?.fullName) {
-                                                setNewFiadoForm(prev => ({ ...prev, memberId: '' }));
-                                            }
-                                        }}
-                                        onFocus={() => setShowFiadoMemberDropdown(true)}
-                                    />
-                                </div>
-                                {showFiadoMemberDropdown && (
-                                    <>
-                                        <div className="fixed inset-0 z-10" onClick={() => setShowFiadoMemberDropdown(false)} />
-                                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                            {stats.membersList
-                                                .filter(m => m.active && (
-                                                    m.fullName.toLowerCase().includes(fiadoMemberSearchTerm.toLowerCase()) ||
-                                                    (m.ci && m.ci.includes(fiadoMemberSearchTerm))
-                                                ))
-                                                .map(member => (
-                                                    <div
-                                                        key={member._id}
-                                                        className="px-4 py-3 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-none"
-                                                        onClick={() => {
-                                                            setNewFiadoForm({ ...newFiadoForm, memberId: member._id });
-                                                            setFiadoMemberSearchTerm(member.fullName);
-                                                            setShowFiadoMemberDropdown(false);
-                                                        }}
-                                                    >
-                                                        <div>
-                                                            <span className="font-bold text-slate-700 block text-sm">{member.fullName}</span>
-                                                            <span className="text-[10px] text-slate-400 uppercase font-medium">CI: {member.ci || 'N/A'}</span>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Activo</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            {stats.membersList.filter(m => m.active && (m.fullName.toLowerCase().includes(fiadoMemberSearchTerm.toLowerCase()) || (m.ci && m.ci.includes(fiadoMemberSearchTerm)))).length === 0 && (
-                                                <div className="px-4 py-4 text-slate-400 text-sm text-center">No se encontraron socios activos</div>
-                                            )}
-                                        </div>
-                                    </>
+                return (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-2xl p-6 max-w-xl w-full mx-4 max-h-[90vh] flex flex-col shadow-2xl">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                    <Clock className="text-amber-500" />
+                                    Nuevo Fiado / Deuda
+                                </h3>
+                                {fiadoEntries.length > 1 && (
+                                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                                        {fiadoEntries.length} personas
+                                    </span>
                                 )}
                             </div>
 
-                            {/* Add Product Section */}
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
-                                <div className="relative">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Producto</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        placeholder="Buscar producto..."
-                                        value={fiadoProductSearchTerm}
-                                        onChange={(e) => {
-                                            setFiadoProductSearchTerm(e.target.value);
-                                            setShowFiadoProductDropdown(true);
-                                            // Reset selected product if text changes manually
-                                            if (currentFiadoProduct.productId && e.target.value !== stats.products.find(p => p._id === currentFiadoProduct.productId)?.name) {
-                                                setCurrentFiadoProduct(prev => ({ ...prev, productId: '' }));
-                                            }
-                                        }}
-                                        onFocus={() => setShowFiadoProductDropdown(true)}
-                                    />
-                                    {showFiadoProductDropdown && (
-                                        <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                            {stats.products
-                                                .filter(p => p.name.toLowerCase().includes(fiadoProductSearchTerm.toLowerCase()) && p.stock > 0)
-                                                .sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0))
-                                                .map(p => (
-                                                    <div
-                                                        key={p._id}
-                                                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center"
-                                                        onClick={() => {
-                                                            if (p.stock > 0) {
-                                                                setCurrentFiadoProduct({ ...currentFiadoProduct, productId: p._id });
-                                                                setFiadoProductSearchTerm(p.name);
-                                                                setShowFiadoProductDropdown(false);
+                            <div className="flex-1 overflow-y-auto pr-1 space-y-3 mini-scrollbar">
+                                {fiadoEntries.map((entry, idx) => {
+                                    const entrySubtotal = entry.products.reduce((acc, p) => acc + (p.amount * p.quantity), 0);
+                                    const isActive = idx === activeFiadoIndex;
+
+                                    if (!isActive) {
+                                        return (
+                                            <div
+                                                key={entry.id}
+                                                className="p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-amber-200 transition-colors"
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 shrink-0">
+                                                            #{idx + 1}
+                                                        </span>
+                                                        <span className="font-bold text-slate-800 text-sm truncate">
+                                                            {entry.memberName || 'Sin socio seleccionado'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <span className="text-sm font-bold text-red-600">
+                                                            ${entrySubtotal.toLocaleString()}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => switchActiveFiadoPerson(idx)}
+                                                            className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 transition-colors"
+                                                        >
+                                                            + Producto / Editar
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removePersonFromFiado(idx)}
+                                                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Quitar persona"
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {entry.products.length > 0 && (
+                                                    <div className="mt-2 space-y-1">
+                                                        {entry.products.map(item => (
+                                                            <div
+                                                                key={item.productId}
+                                                                className="flex justify-between items-center text-xs bg-white px-2.5 py-1.5 rounded-lg border border-slate-100"
+                                                            >
+                                                                <span className="text-slate-700">
+                                                                    <span className="font-bold">{item.quantity}x</span> {item.productName}
+                                                                </span>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-medium text-slate-600">
+                                                                        ${(item.amount * item.quantity).toLocaleString()}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => removeProductFromFiado(idx, item.productId)}
+                                                                        className="text-red-400 hover:text-red-600"
+                                                                        title="Quitar producto"
+                                                                    >
+                                                                        <XCircle size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div
+                                            key={entry.id}
+                                            className="p-4 rounded-xl border-2 border-amber-200 bg-white space-y-4"
+                                        >
+                                            {fiadoEntries.length > 1 && (
+                                                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                                    <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                                                        Persona #{idx + 1}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removePersonFromFiado(idx)}
+                                                        className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                        Quitar
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Member Select */}
+                                            <div className="relative">
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Socio</label>
+                                                <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                    <input
+                                                        type="text"
+                                                        className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                        placeholder="Buscar socio por nombre o CI..."
+                                                        value={fiadoMemberSearchTerm}
+                                                        onChange={(e) => {
+                                                            const nextValue = e.target.value;
+                                                            setFiadoMemberSearchTerm(nextValue);
+                                                            setShowFiadoMemberDropdown(true);
+                                                            if (entry.memberId && nextValue !== entry.memberName) {
+                                                                setFiadoEntries(prev => prev.map((item, itemIdx) =>
+                                                                    itemIdx === activeFiadoIndex
+                                                                        ? { ...item, memberId: '', memberName: '', memberCi: '' }
+                                                                        : item
+                                                                ));
                                                             }
                                                         }}
-                                                    >
-                                                        <span className="font-medium text-slate-700 text-xs">{p.name}</span>
-                                                        <div className="text-right">
-                                                            <span className="block text-[10px] text-slate-500">Stock: {p.stock}</span>
-                                                            <span className="block text-[10px] text-blue-500 font-medium">Vendidos: {p.salesCount || 0}</span>
-                                                            <span className="block text-xs font-bold text-green-600">${p.salePrice}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            {stats.products.filter(p => p.name.toLowerCase().includes(fiadoProductSearchTerm.toLowerCase()) && p.stock > 0).length === 0 && (
-                                                <div className="px-4 py-2 text-slate-400 text-xs">No se encontraron productos con stock</div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Overlay to close dropdown when clicking outside */}
-                                {showFiadoProductDropdown && (
-                                    <div className="fixed inset-0 z-0" onClick={() => setShowFiadoProductDropdown(false)} />
-                                )}
-
-                                <div className="flex gap-2 items-end">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cant.</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                            value={currentFiadoProduct.quantity}
-                                            onChange={(e) => setCurrentFiadoProduct({ ...currentFiadoProduct, quantity: Number(e.target.value) })}
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={addProductToFiado}
-                                        className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex justify-center items-center gap-2 font-bold text-sm transition-colors"
-                                    >
-                                        <Plus size={18} />
-                                        Agregar Item
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* List of added products */}
-                            <div className="min-h-[100px] max-h-[200px] overflow-y-auto border border-slate-100 rounded-lg p-2">
-                                {newFiadoForm.products.length === 0 ? (
-                                    <p className="text-center text-slate-400 text-sm py-4">Agrega productos a la lista...</p>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {newFiadoForm.products.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 shadow-sm text-sm">
-                                                <div>
-                                                    <span className="font-bold">{item.quantity}x</span> {item.productName}
+                                                        onFocus={() => setShowFiadoMemberDropdown(true)}
+                                                    />
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="font-medium text-slate-600">${item.amount * item.quantity}</span>
+                                                {showFiadoMemberDropdown && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-10" onClick={() => setShowFiadoMemberDropdown(false)} />
+                                                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                            {stats.membersList
+                                                                .filter(m => m.active && (
+                                                                    m.fullName.toLowerCase().includes(fiadoMemberSearchTerm.toLowerCase()) ||
+                                                                    (m.ci && m.ci.includes(fiadoMemberSearchTerm))
+                                                                ))
+                                                                .map(member => {
+                                                                    const alreadyInList = fiadoEntries.some(
+                                                                        (e, i) => i !== activeFiadoIndex && e.memberId === member._id
+                                                                    );
+                                                                    return (
+                                                                        <div
+                                                                            key={member._id}
+                                                                            className="px-4 py-3 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-none"
+                                                                            onClick={() => selectMemberForFiado(member)}
+                                                                        >
+                                                                            <div>
+                                                                                <span className="font-bold text-slate-700 block text-sm">{member.fullName}</span>
+                                                                                <span className="text-[10px] text-slate-400 uppercase font-medium">CI: {member.ci || 'N/A'}</span>
+                                                                            </div>
+                                                                            <div className="text-right flex items-center gap-1.5">
+                                                                                {alreadyInList && (
+                                                                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Ya en lista</span>
+                                                                                )}
+                                                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Activo</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            {stats.membersList.filter(m => m.active && (m.fullName.toLowerCase().includes(fiadoMemberSearchTerm.toLowerCase()) || (m.ci && m.ci.includes(fiadoMemberSearchTerm)))).length === 0 && (
+                                                                <div className="px-4 py-4 text-slate-400 text-sm text-center">No se encontraron socios activos</div>
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Add Product Section */}
+                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
+                                                <div className="relative">
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Producto</label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                        placeholder="Buscar producto..."
+                                                        value={fiadoProductSearchTerm}
+                                                        onChange={(e) => {
+                                                            setFiadoProductSearchTerm(e.target.value);
+                                                            setShowFiadoProductDropdown(true);
+                                                            if (currentFiadoProduct.productId && e.target.value !== stats.products.find(p => p._id === currentFiadoProduct.productId)?.name) {
+                                                                setCurrentFiadoProduct(prev => ({ ...prev, productId: '' }));
+                                                            }
+                                                        }}
+                                                        onFocus={() => setShowFiadoProductDropdown(true)}
+                                                    />
+                                                    {showFiadoProductDropdown && (
+                                                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                            {stats.products
+                                                                .filter(p => p.name.toLowerCase().includes(fiadoProductSearchTerm.toLowerCase()) && getRemainingStockForProduct(p) > 0)
+                                                                .sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0))
+                                                                .map(p => {
+                                                                    const availableStock = getRemainingStockForProduct(p);
+                                                                    return (
+                                                                        <div
+                                                                            key={p._id}
+                                                                            className="px-4 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center"
+                                                                            onClick={() => {
+                                                                                if (availableStock > 0) {
+                                                                                    setCurrentFiadoProduct({ ...currentFiadoProduct, productId: p._id });
+                                                                                    setFiadoProductSearchTerm(p.name);
+                                                                                    setShowFiadoProductDropdown(false);
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <span className="font-medium text-slate-700 text-xs">{p.name}</span>
+                                                                            <div className="text-right">
+                                                                                <span className="block text-[10px] text-slate-500">Disponible: {availableStock}</span>
+                                                                                <span className="block text-[10px] text-blue-500 font-medium">Vendidos: {p.salesCount || 0}</span>
+                                                                                <span className="block text-xs font-bold text-green-600">${p.salePrice}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            {stats.products.filter(p => p.name.toLowerCase().includes(fiadoProductSearchTerm.toLowerCase()) && getRemainingStockForProduct(p) > 0).length === 0 && (
+                                                                <div className="px-4 py-2 text-slate-400 text-xs">No se encontraron productos con stock disponible</div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {showFiadoProductDropdown && (
+                                                    <div className="fixed inset-0 z-10" onClick={() => setShowFiadoProductDropdown(false)} />
+                                                )}
+
+                                                <div className="flex gap-2 items-end">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cant.</label>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                            value={currentFiadoProduct.quantity}
+                                                            onChange={(e) => setCurrentFiadoProduct({ ...currentFiadoProduct, quantity: Number(e.target.value) })}
+                                                        />
+                                                    </div>
                                                     <button
-                                                        onClick={() => removeProductFromFiado(item.productId)}
-                                                        className="text-red-400 hover:text-red-600"
+                                                        type="button"
+                                                        onClick={addProductToFiado}
+                                                        className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex justify-center items-center gap-2 font-bold text-sm transition-colors"
                                                     >
-                                                        <UserX size={16} /> {/* Using UserX as 'X' icon proxy */}
+                                                        <Plus size={18} />
+                                                        Agregar Item
                                                     </button>
                                                 </div>
                                             </div>
-                                        ))}
+
+                                            {/* List of added products */}
+                                            <div className="min-h-[84px] max-h-[180px] overflow-y-auto border border-slate-100 rounded-lg p-2">
+                                                {entry.products.length === 0 ? (
+                                                    <p className="text-center text-slate-400 text-sm py-4">Agrega productos a la lista...</p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {entry.products.map((item) => (
+                                                            <div key={item.productId} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 shadow-sm text-sm">
+                                                                <div className="min-w-0 pr-2 truncate">
+                                                                    <span className="font-bold">{item.quantity}x</span> {item.productName}
+                                                                </div>
+                                                                <div className="flex items-center gap-2 shrink-0">
+                                                                    <div className="flex items-center border border-slate-200 rounded-md overflow-hidden">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => updateProductQuantityInFiado(idx, item.productId, -1)}
+                                                                            className="px-2 py-0.5 text-slate-600 hover:bg-slate-100 font-bold text-xs"
+                                                                            title="Restar 1"
+                                                                        >
+                                                                            -
+                                                                        </button>
+                                                                        <span className="px-1.5 text-xs font-bold text-slate-700">{item.quantity}</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => updateProductQuantityInFiado(idx, item.productId, 1)}
+                                                                            className="px-2 py-0.5 text-slate-600 hover:bg-slate-100 font-bold text-xs"
+                                                                            title="Sumar 1"
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                    </div>
+                                                                    <span className="font-medium text-slate-600 min-w-[52px] text-right">
+                                                                        ${(item.amount * item.quantity).toLocaleString()}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => removeProductFromFiado(idx, item.productId)}
+                                                                        className="text-red-400 hover:text-red-600"
+                                                                        title="Quitar producto"
+                                                                    >
+                                                                        <XCircle size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {fiadoEntries.length > 1 && (
+                                                <div className="flex justify-between items-center text-xs text-slate-600 pt-1">
+                                                    <span className="font-medium">
+                                                        Subtotal {entry.memberName || `Persona #${idx + 1}`}:
+                                                    </span>
+                                                    <span className="font-bold text-slate-800">
+                                                        ${entrySubtotal.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                <button
+                                    type="button"
+                                    onClick={addPersonToFiado}
+                                    className="w-full py-2.5 px-4 border-2 border-dashed border-amber-300 text-amber-700 bg-amber-50/60 hover:bg-amber-100/80 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    <Plus size={18} />
+                                    Agregar otra persona
+                                </button>
+                            </div>
+
+                            <div className="pt-4 mt-4 border-t border-slate-100">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <span className="font-bold text-slate-700 block">Total a Deber:</span>
+                                        {fiadoEntries.length > 1 && (
+                                            <span className="text-xs text-slate-400">
+                                                {validCount} persona(s) · {totalItemsCount} producto(s)
+                                            </span>
+                                        )}
                                     </div>
-                                )}
-                            </div>
+                                    <span className="text-xl font-bold text-red-600">
+                                        ${grandTotal.toLocaleString()}
+                                    </span>
+                                </div>
 
-                            <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                                <span className="font-bold text-slate-700">Total a Deber:</span>
-                                <span className="text-xl font-bold text-red-600">
-                                    ${newFiadoForm.products.reduce((acc, p) => acc + (p.amount * p.quantity), 0).toLocaleString()}
-                                </span>
+                                <div className="flex gap-3 mt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewFiadoModalOpen(false)}
+                                        className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleCreateFiado}
+                                        disabled={isSubmittingFiado}
+                                        className={`flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-bold flex items-center justify-center gap-2 transition-all ${
+                                            isSubmittingFiado ? 'opacity-60 cursor-not-allowed' : ''
+                                        }`}
+                                    >
+                                        {isSubmittingFiado && <Loader2 size={16} className="animate-spin" />}
+                                        {isSubmittingFiado
+                                            ? 'Creando...'
+                                            : (validCount > 1 ? `Crear ${validCount} Deudas` : 'Crear Deuda')
+                                        }
+                                    </button>
+                                </div>
                             </div>
-
-                        </div>
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setNewFiadoModalOpen(false)}
-                                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleCreateFiado}
-                                disabled={isSubmittingFiado}
-                                className={`flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-bold flex items-center justify-center gap-2 transition-all ${
-                                    isSubmittingFiado ? 'opacity-60 cursor-not-allowed' : ''
-                                }`}
-                            >
-                                {isSubmittingFiado && <Loader2 size={16} className="animate-spin" />}
-                                {isSubmittingFiado ? 'Creando...' : 'Crear Deuda'}
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
 
 

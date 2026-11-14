@@ -21,8 +21,173 @@ router.get('/', auth, async (req, res) => {
 // In-memory set for active in-flight debt creation requests per member to prevent race conditions
 const activeDebtCreations = new Set();
 
+const findRecentDuplicateDebt = async ({ memberId, products, totalAmount }, tenantId, sinceDate) => {
+    const query = {
+        memberId,
+        totalAmount: Number(totalAmount),
+        status: 'pending',
+        createdAt: { $gte: sinceDate }
+    };
+    if (tenantId) query.tenantId = tenantId;
+
+    const recentDuplicate = await Debt.findOne(query);
+    if (
+        recentDuplicate &&
+        Array.isArray(recentDuplicate.products) &&
+        recentDuplicate.products.length === products.length
+    ) {
+        const isMatch = products.every(p => {
+            const rp = recentDuplicate.products.find(item =>
+                String(item.productId) === String(p.productId) &&
+                Number(item.quantity) === Number(p.quantity)
+            );
+            return !!rp;
+        });
+
+        if (isMatch) {
+            return recentDuplicate;
+        }
+    }
+
+    return null;
+};
+
+const handleBulkCreateDebts = async (req, res) => {
+    const { debts } = req.body;
+
+    if (!Array.isArray(debts) || debts.length === 0) {
+        return res.status(400).json({ message: 'Datos de fiado incompletos (requiere al menos una persona con productos)' });
+    }
+
+    for (const entry of debts) {
+        if (!entry || !entry.memberId || !entry.memberName || !Array.isArray(entry.products) || entry.products.length === 0) {
+            return res.status(400).json({ message: 'Cada fiado debe incluir socio y al menos un producto' });
+        }
+        for (const item of entry.products) {
+            if (!item || !item.productId || !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0) {
+                return res.status(400).json({ message: 'Cada producto debe tener productId y una cantidad válida mayor a 0' });
+            }
+        }
+    }
+
+    const lockKeys = [...new Set(debts.map(d => `${req.tenantId || 'global'}:${d.memberId}`))];
+
+    if (lockKeys.some(key => activeDebtCreations.has(key))) {
+        return res.status(409).json({ message: 'Ya se está procesando un fiado para uno de los socios seleccionados. Por favor espera un momento.' });
+    }
+
+    lockKeys.forEach(key => activeDebtCreations.add(key));
+
+    try {
+        const tenSecondsAgo = new Date(Date.now() - 10000);
+        const entriesToCreate = [];
+        const existingDuplicates = [];
+
+        for (const entry of debts) {
+            const computedTotal = entry.totalAmount !== undefined
+                ? Number(entry.totalAmount)
+                : entry.products.reduce((acc, p) => acc + (Number(p.amount || 0) * Number(p.quantity)), 0);
+
+            const duplicate = await findRecentDuplicateDebt(
+                { memberId: entry.memberId, products: entry.products, totalAmount: computedTotal },
+                req.tenantId,
+                tenSecondsAgo
+            );
+
+            if (duplicate) {
+                existingDuplicates.push(duplicate);
+            } else {
+                entriesToCreate.push({
+                    memberId: entry.memberId,
+                    memberName: entry.memberName,
+                    products: entry.products,
+                    totalAmount: computedTotal
+                });
+            }
+        }
+
+        if (entriesToCreate.length === 0) {
+            return res.status(200).json({
+                message: 'Fiados ya registrados recientemente',
+                debts: existingDuplicates
+            });
+        }
+
+        // Aggregate required quantities per productId across the entire batch before mutating stock
+        const requiredByProduct = new Map();
+        for (const entry of entriesToCreate) {
+            for (const item of entry.products) {
+                const key = String(item.productId);
+                const qty = Number(item.quantity);
+                const existing = requiredByProduct.get(key);
+                if (existing) {
+                    existing.quantity += qty;
+                } else {
+                    requiredByProduct.set(key, {
+                        quantity: qty,
+                        productName: item.productName || 'Producto'
+                    });
+                }
+            }
+        }
+
+        // Fetch and validate all products atomically before deducting stock or saving debts
+        const validatedProducts = [];
+        for (const [productId, info] of requiredByProduct.entries()) {
+            const product = await Product.findById(productId);
+            if (!product) {
+                return res.status(404).json({ message: `Producto no encontrado: ${info.productName}` });
+            }
+            if (product.stock < info.quantity) {
+                return res.status(400).json({
+                    message: `Stock insuficiente para ${product.name}. Solicitado en total: ${info.quantity}, Stock actual: ${product.stock}`
+                });
+            }
+            validatedProducts.push({ product, quantity: info.quantity });
+        }
+
+        // Deduct stock and increment salesCount
+        for (const { product, quantity } of validatedProducts) {
+            product.stock -= quantity;
+            product.salesCount = (product.salesCount || 0) + quantity;
+            await product.save();
+        }
+
+        // Persist each Debt document via .save() so tenantPlugin runs
+        const createdDebts = [];
+        for (const entry of entriesToCreate) {
+            const debt = new Debt({
+                memberId: entry.memberId,
+                memberName: entry.memberName,
+                products: entry.products,
+                totalAmount: entry.totalAmount,
+                status: 'pending',
+                tenantId: req.tenantId || null
+            });
+            const savedDebt = await debt.save();
+            createdDebts.push(savedDebt);
+        }
+
+        return res.status(201).json({
+            message: `${createdDebts.length} fiado(s) creado(s) exitosamente`,
+            debts: [...existingDuplicates, ...createdDebts]
+        });
+    } catch (err) {
+        return res.status(400).json({ message: err.message });
+    } finally {
+        lockKeys.forEach(key => activeDebtCreations.delete(key));
+    }
+};
+
+// Create multiple debts in bulk (Protected)
+router.post('/bulk', auth, handleBulkCreateDebts);
+
 // Create new debt (Fiado) (Protected)
 router.post('/', auth, async (req, res) => {
+    if (Array.isArray(req.body?.debts)) {
+        return handleBulkCreateDebts(req, res);
+    }
+
     const { memberId, memberName, products, totalAmount } = req.body;
 
     if (!memberId || !Array.isArray(products) || products.length === 0) {
@@ -41,29 +206,15 @@ router.post('/', auth, async (req, res) => {
     try {
         // 2. Prevent duplicate creation within a 10-second window (same member, same amount, same items)
         const tenSecondsAgo = new Date(Date.now() - 10000);
-        const query = {
-            memberId,
-            totalAmount: Number(totalAmount),
-            status: 'pending',
-            createdAt: { $gte: tenSecondsAgo }
-        };
-        if (req.tenantId) query.tenantId = req.tenantId;
+        const recentDuplicate = await findRecentDuplicateDebt(
+            { memberId, products, totalAmount },
+            req.tenantId,
+            tenSecondsAgo
+        );
 
-        const recentDuplicate = await Debt.findOne(query);
-
-        if (recentDuplicate && Array.isArray(recentDuplicate.products) && recentDuplicate.products.length === products.length) {
-            const isMatch = products.every(p => {
-                const rp = recentDuplicate.products.find(item => 
-                    String(item.productId) === String(p.productId) && 
-                    Number(item.quantity) === Number(p.quantity)
-                );
-                return !!rp;
-            });
-
-            if (isMatch) {
-                console.warn(`[Debts] Duplicate debt creation detected within 10s for member ${memberId}. Returning existing without double stock deduction.`);
-                return res.status(200).json(recentDuplicate);
-            }
+        if (recentDuplicate) {
+            console.warn(`[Debts] Duplicate debt creation detected within 10s for member ${memberId}. Returning existing without double stock deduction.`);
+            return res.status(200).json(recentDuplicate);
         }
 
         // Verify and deduct stock and increment salesCount for each product
