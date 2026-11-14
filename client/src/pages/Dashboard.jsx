@@ -1246,6 +1246,7 @@ const Dashboard = () => {
                             <thead className="bg-slate-50 text-slate-500 font-bold">
                                 <tr>
                                     <th className="px-4 py-3">Producto</th>
+                                    <th className="px-4 py-3 text-right">Precio</th>
                                     <th className="px-4 py-3 text-right">Stock</th>
                                     <th className="px-4 py-3 text-right">Estado</th>
                                 </tr>
@@ -1254,6 +1255,7 @@ const Dashboard = () => {
                                 {stats.products.map(p => (
                                     <tr key={p._id}>
                                         <td className="px-4 py-3 font-medium text-slate-700">{p.name}</td>
+                                        <td className="px-4 py-3 text-right font-semibold text-slate-700">${Number(p.salePrice || 0).toLocaleString()}</td>
                                         <td className="px-4 py-3 text-right">{p.stock}</td>
                                         <td className="px-4 py-3 text-right">
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold

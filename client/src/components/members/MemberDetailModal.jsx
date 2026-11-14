@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../Modal';
-import { Edit2, Share2, Check, X, Calendar } from 'lucide-react';
+import { Edit2, Share2, Check, X, Calendar, ExternalLink } from 'lucide-react';
 import { API_URL } from '../../config';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -273,21 +273,31 @@ const MemberDetailModal = ({ isOpen, onClose, member, onEdit, onUpdateLocalMembe
                             <p className="text-sm font-bold uppercase tracking-wider italic">Link de Ficha Pública</p>
                         </div>
                         <p className="text-xs text-blue-600">Comparte este link con el socio para que vea su estado de cuenta.</p>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap sm:flex-nowrap gap-2">
                             <input 
                                 readOnly
                                 type="text" 
-                                className="flex-1 text-[10px] px-2 py-1.5 bg-white border border-blue-200 rounded text-blue-800 font-mono"
+                                className="flex-1 min-w-0 text-[10px] px-2 py-1.5 bg-white border border-blue-200 rounded text-blue-800 font-mono"
                                 value={`${window.location.origin}/public/profile/${member._id}`}
                             />
                             <button 
+                                type="button"
                                 onClick={() => {
                                     navigator.clipboard.writeText(`${window.location.origin}/public/profile/${member._id}`);
                                     alert('Link copiado al portapapeles');
                                 }}
-                                className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700 transition-colors"
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700 transition-colors shrink-0"
                             >
                                 Copiar Link
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => window.open(`/public/profile/${member._id}`, '_blank')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-blue-700 border border-blue-200 rounded text-xs font-bold hover:bg-blue-100 transition-colors shrink-0"
+                                title="Abrir Ficha Pública en nueva pestaña"
+                            >
+                                <ExternalLink size={14} />
+                                Abrir Ficha
                             </button>
                         </div>
                     </div>
