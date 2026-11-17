@@ -207,6 +207,56 @@ router.post('/', async (req, res) => {
     }
 });
 
+/* ─── POST /api/settings/close-month-savings ─────────────────────────────── */
+// Applies the monthly savings (or deficit deduction) to academySavingsBox exactly once per month/year.
+router.post('/close-month-savings', async (req, res) => {
+    try {
+        const month = Number(req.body.month);
+        const year = Number(req.body.year);
+        const netSavings = Number(req.body.netSavings);
+        const savingsPercentage = req.body.savingsPercentage !== undefined ? Number(req.body.savingsPercentage) : undefined;
+        const grossProfit = Number(req.body.grossProfit) || 0;
+
+        if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000) {
+            return res.status(400).json({ message: 'Mes o año inválido.' });
+        }
+        if (!Number.isFinite(netSavings)) {
+            return res.status(400).json({ message: 'Monto de ahorro inválido.' });
+        }
+
+        let settings = await Settings.findOne({ key: 'admin_config' });
+        if (!settings) {
+            settings = new Settings({ key: 'admin_config', tenantId: req.tenantId || null });
+        }
+
+        const alreadyClosed = (settings.savingsHistory || []).some(
+            (entry) => entry.month === month && entry.year === year
+        );
+        if (alreadyClosed) {
+            return res.status(400).json({ message: `El ahorro para ${month}/${year} ya fue cerrado y aplicado.` });
+        }
+
+        settings.academySavingsBox = Math.round(((settings.academySavingsBox || 0) + netSavings) * 100) / 100;
+        if (savingsPercentage !== undefined && Number.isFinite(savingsPercentage)) {
+            settings.savingsPercentage = savingsPercentage;
+        }
+        settings.savingsHistory = settings.savingsHistory || [];
+        settings.savingsHistory.push({
+            month,
+            year,
+            amount: Math.round(netSavings * 100) / 100,
+            savingsPercentage: savingsPercentage ?? (settings.savingsPercentage || 0),
+            grossProfit,
+            appliedAt: new Date()
+        });
+
+        const updated = await settings.save();
+        res.json(updated);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
 /* ─── PATCH /api/settings/tasks/:taskId/toggle ───────────────────────────── */
 // Toggle a single task's completed state without sending the full document.
 router.patch('/tasks/:taskId/toggle', async (req, res) => {

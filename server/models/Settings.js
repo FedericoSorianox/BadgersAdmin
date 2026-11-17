@@ -7,6 +7,15 @@ const taskSchema = new mongoose.Schema({
     completedAt: { type: Date, default: null }   // null = pending
 });
 
+const savingsHistorySchema = new mongoose.Schema({
+    month:             { type: Number, required: true, min: 1, max: 12 },
+    year:              { type: Number, required: true },
+    amount:            { type: Number, required: true },
+    savingsPercentage: { type: Number, default: 0 },
+    grossProfit:       { type: Number, default: 0 },
+    appliedAt:         { type: Date, default: Date.now }
+});
+
 const settingsSchema = new mongoose.Schema({
     key:          { type: String, default: 'admin_config' }, // Uniqueness enforced per-tenant via compound index below
 
@@ -39,6 +48,7 @@ const settingsSchema = new mongoose.Schema({
     }],
     academySavingsBox: { type: Number, default: 0 },
     savingsPercentage: { type: Number, default: 10 }, // % of gross profit reserved for savings
+    savingsHistory:    [savingsHistorySchema],
     tasks: [taskSchema]
 }, { timestamps: true });
 

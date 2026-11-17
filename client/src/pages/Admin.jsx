@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Save, PiggyBank } from 'lucide-react';
+import { Save, PiggyBank, CheckCircle2, Lock } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { useTenant } from '../context/TenantContext';
@@ -35,6 +35,9 @@ const Admin = () => {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [closingMonth, setClosingMonth] = useState(false);
+    const [savingsHistory, setSavingsHistory] = useState([]);
+    const [savingsBoxDirty, setSavingsBoxDirty] = useState(false);
 
     // Fetch initial data
     useEffect(() => {
@@ -96,6 +99,8 @@ const Admin = () => {
                     academySavingsBox: settings.academySavingsBox ?? 0,
                     savingsPercentage: settings.savingsPercentage ?? 10
                 }));
+                setSavingsHistory(settings.savingsHistory || []);
+                setSavingsBoxDirty(false);
             } catch (error) {
                 console.error('Error fetching settings:', error);
             } finally {
@@ -119,7 +124,6 @@ const Admin = () => {
     const handleSave = async () => {
         try {
             setSaving(true);
-            const updatedSavingsBox = results.academySavingsBoxUpdated !== undefined ? results.academySavingsBoxUpdated : config.academySavingsBox;
             const partnersToSave = (config.partners && config.partners.length > 0
                 ? config.partners
                 : [
@@ -130,26 +134,73 @@ const Admin = () => {
                     percentage: p.percentage === '' ? 0 : (Number(p.percentage) || 0)
                 }));
 
-            await axios.post(`${API_URL}/api/settings`, {
+            const payload = {
                 partners: partnersToSave,
                 partnerHourlyRate: config.partnerHourlyRate,
                 instructors: config.instructors,
                 instructorHourlyRate: config.instructorHourlyRate,
                 plans: config.plans,
-                academySavingsBox: updatedSavingsBox,
                 savingsPercentage: config.savingsPercentage
-            });
+            };
+
+            // Only update academySavingsBox from general save if the user explicitly edited the input
+            if (savingsBoxDirty) {
+                payload.academySavingsBox = Number(config.academySavingsBox) || 0;
+            }
+
+            await axios.post(`${API_URL}/api/settings`, payload);
             setConfig(prev => ({
                 ...prev,
-                partners: partnersToSave,
-                academySavingsBox: updatedSavingsBox
+                partners: partnersToSave
             }));
+            setSavingsBoxDirty(false);
             alert('Configuración guardada exitosamente');
         } catch (error) {
             console.error('Error saving settings:', error);
             alert('Error al guardar la configuración');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const currentMonthClosure = savingsHistory.find(
+        (entry) => entry.month === currentMonth && entry.year === currentYear
+    );
+    const isCurrentMonthClosed = Boolean(currentMonthClosure);
+    const currentMonthName = new Date(currentYear, currentMonth - 1)
+        .toLocaleString('es-ES', { month: 'long' })
+        .replace(/^\w/, (c) => c.toUpperCase());
+
+    const handleCloseMonthSavings = async () => {
+        if (isCurrentMonthClosed || closingMonth) return;
+
+        const netSign = results.academySavingsNet >= 0 ? '+' : '';
+        const confirmed = window.confirm(
+            `¿Cerrar ${currentMonthName} ${currentYear} y aplicar ${netSign}${formatCurrency(results.academySavingsNet)} a la Caja de Ahorros?\n\nCaja Inicial: ${formatCurrency(config.academySavingsBox)}\nCaja Actualizada: ${formatCurrency(results.academySavingsBoxUpdated)}\n\nEsta acción solo puede realizarse una vez por mes.`
+        );
+        if (!confirmed) return;
+
+        try {
+            setClosingMonth(true);
+            const res = await axios.post(`${API_URL}/api/settings/close-month-savings`, {
+                month: currentMonth,
+                year: currentYear,
+                netSavings: results.academySavingsNet,
+                savingsPercentage: config.savingsPercentage,
+                grossProfit: Number(config.grossProfit) || 0
+            });
+            setConfig(prev => ({
+                ...prev,
+                academySavingsBox: res.data.academySavingsBox ?? prev.academySavingsBox
+            }));
+            setSavingsHistory(res.data.savingsHistory || []);
+            setSavingsBoxDirty(false);
+            alert(`Mes ${currentMonthName} ${currentYear} cerrado y ahorro aplicado exitosamente`);
+        } catch (error) {
+            console.error('Error closing month savings:', error);
+            alert(error.response?.data?.message || 'Error al cerrar el mes y aplicar el ahorro');
+        } finally {
+            setClosingMonth(false);
         }
     };
 
@@ -184,22 +235,6 @@ const Admin = () => {
             ...prev,
             partners: newPartners
         }));
-    };
-
-    const handleResetDefaultPercentages = () => {
-        const basePartners = config.partners && config.partners.length > 0
-            ? config.partners
-            : [
-                { name: 'Fede', percentage: 70, hours: 40, daysOff: 0 },
-                { name: 'Gonza / Andy', percentage: 30, hours: 16, daysOff: 0 }
-            ];
-
-        const resetPartners = basePartners.map(p => ({
-            ...p,
-            percentage: /fede/i.test(p.name) ? 70 : (/gonza|andy/i.test(p.name) ? 30 : 50)
-        }));
-
-        setConfig(prev => ({ ...prev, partners: resetPartners }));
     };
 
     // --- INSTRUCTOR MANAGEMENT ---
@@ -278,7 +313,10 @@ const Admin = () => {
                                 type="number"
                                 className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 value={config.academySavingsBox}
-                                onChange={(e) => setConfig({ ...config, academySavingsBox: Number(e.target.value) })}
+                                onChange={(e) => {
+                                    setConfig({ ...config, academySavingsBox: Number(e.target.value) });
+                                    setSavingsBoxDirty(true);
+                                }}
                                 disabled={loading}
                             />
                         </div>
@@ -320,14 +358,6 @@ const Admin = () => {
                                         : `⚠ Reparto Socios: ${totalPct}% (Excede por ${totalPct - 100}%)`
                                 }
                             </span>
-                            <button
-                                type="button"
-                                onClick={handleResetDefaultPercentages}
-                                className="text-xs text-slate-600 hover:text-blue-600 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-medium transition-colors shadow-sm"
-                                title="Restablecer reparto predeterminado (70/30)"
-                            >
-                                Restablecer 70/30
-                            </button>
                         </div>
                     );
                 })()}
@@ -397,6 +427,31 @@ const Admin = () => {
                             <span>Caja Actualizada:</span>
                             <span className="text-blue-950">{formatCurrency(results.academySavingsBoxUpdated)}</span>
                         </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-blue-200/60">
+                        {isCurrentMonthClosed ? (
+                            <div className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-xl text-xs font-semibold">
+                                <span className="flex items-center gap-1.5">
+                                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                                    {currentMonthName} {currentYear} cerrado
+                                </span>
+                                <span>
+                                    {currentMonthClosure.amount >= 0 ? '+' : ''}{formatCurrency(currentMonthClosure.amount)}
+                                </span>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={handleCloseMonthSavings}
+                                disabled={loading || closingMonth || results.academySavingsNet === 0}
+                                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white px-3 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm"
+                                title={results.academySavingsNet === 0 ? 'No hay ahorro neto para aplicar este mes' : `Aplicar ahorro de ${currentMonthName} ${currentYear}`}
+                            >
+                                <Lock size={15} />
+                                {closingMonth ? 'Cerrando mes...' : `Cerrar Mes y Aplicar Ahorro (${currentMonthName})`}
+                            </button>
+                        )}
                     </div>
                 </div>
 
