@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const Settings = require('../models/Settings');
 const Tenant = require('../models/Tenant');
+const Member = require('../models/Member');
 const auth = require('../middleware/auth');
 
 // Protect all settings routes
@@ -201,6 +202,40 @@ router.post('/', async (req, res) => {
         if (savingsPercentage    !== undefined) settings.savingsPercentage    = savingsPercentage;
 
         const updated = await settings.save();
+
+        // Sync member planCost snapshots when membership plans are saved
+        if (plans !== undefined && Array.isArray(plans)) {
+            for (const plan of plans) {
+                const planCostNum = Number(plan.cost);
+                if (!plan.name || !Number.isFinite(planCostNum)) continue;
+
+                if (plan.type !== 'Familiar') {
+                    await Member.updateMany(
+                        {
+                            planType: plan.name,
+                            isFamilyHead: { $ne: true },
+                            $or: [{ familyId: null }, { familyId: { $exists: false } }],
+                            planCost: { $ne: planCostNum }
+                        },
+                        { $set: { planCost: planCostNum } }
+                    );
+                } else {
+                    const familyHeads = await Member.find({ planType: plan.name, isFamilyHead: true });
+                    for (const head of familyHeads) {
+                        const activeDependents = await Member.countDocuments({ familyId: head._id, active: true });
+                        const totalActive = activeDependents + (head.active ? 1 : 0);
+                        if (totalActive > 0) {
+                            const billable = totalActive - Math.floor(totalActive / 3);
+                            const totalCost = billable * (planCostNum / 2);
+                            if (head.planCost !== totalCost) {
+                                await Member.findByIdAndUpdate(head._id, { planCost: totalCost });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         res.json(updated);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -251,6 +286,40 @@ router.post('/close-month-savings', async (req, res) => {
         });
 
         const updated = await settings.save();
+
+        // Sync member planCost snapshots when membership plans are saved
+        if (plans !== undefined && Array.isArray(plans)) {
+            for (const plan of plans) {
+                const planCostNum = Number(plan.cost);
+                if (!plan.name || !Number.isFinite(planCostNum)) continue;
+
+                if (plan.type !== 'Familiar') {
+                    await Member.updateMany(
+                        {
+                            planType: plan.name,
+                            isFamilyHead: { $ne: true },
+                            $or: [{ familyId: null }, { familyId: { $exists: false } }],
+                            planCost: { $ne: planCostNum }
+                        },
+                        { $set: { planCost: planCostNum } }
+                    );
+                } else {
+                    const familyHeads = await Member.find({ planType: plan.name, isFamilyHead: true });
+                    for (const head of familyHeads) {
+                        const activeDependents = await Member.countDocuments({ familyId: head._id, active: true });
+                        const totalActive = activeDependents + (head.active ? 1 : 0);
+                        if (totalActive > 0) {
+                            const billable = totalActive - Math.floor(totalActive / 3);
+                            const totalCost = billable * (planCostNum / 2);
+                            if (head.planCost !== totalCost) {
+                                await Member.findByIdAndUpdate(head._id, { planCost: totalCost });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         res.json(updated);
     } catch (err) {
         res.status(400).json({ message: err.message });
